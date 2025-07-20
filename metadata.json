@@ -1,0 +1,6 @@
+{
+  "name": "Greybrainer AI Movie Reviewer",
+  "description": "An AI-powered application to review movies and series based on the 'Greybrainer' template, analyzing story, conceptualization, and performance layers for originality and impact. Generates editable analyses and a final shareable report.",
+  "requestFramePermissions": [],
+  "prompt": ""
+}

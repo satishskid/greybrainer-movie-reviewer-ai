@@ -1,0 +1,64 @@
+@import url('https://rsms.me/inter/inter.css');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: 'Inter var', 'Inter', sans-serif;
+  }
+  
+  body {
+    font-family: 'Inter', sans-serif;
+  }
+}
+
+@layer components {
+  /* General custom scrollbar for elements that might need it */
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: rgba(51, 65, 85, 0.5); /* slate-700/50 */
+    border-radius: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background: #6366f1; /* indigo-500 */
+    border-radius: 4px;
+  }
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #4f46e5; /* indigo-600 */
+  }
+
+  /* Fallback for Firefox */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #6366f1 rgba(51, 65, 85, 0.5);
+  }
+
+  /* Enhanced readability for content areas where long text is expected */
+  .gb-content-area p,
+  .gb-content-area li,
+  .gb-content-area dd,
+  .gb-content-area blockquote {
+    line-height: 1.7; /* Increased line height */
+    margin-bottom: 0.65em; /* Space between paragraphs/items */
+  }
+  .gb-content-area ul, .gb-content-area ol {
+    padding-left: 1.5em; /* Standard indentation for lists */
+  }
+  .gb-content-area h3,
+  .gb-content-area h4,
+  .gb-content-area h5 {
+    margin-bottom: 0.5em; /* Add some space below headings */
+    line-height: 1.4; /* Slightly tighter for headings */
+  }
+}
+
+@supports (font-variation-settings: normal) {
+  html { 
+    font-family: 'Inter var', sans-serif; 
+  }
+}
