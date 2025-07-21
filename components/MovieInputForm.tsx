@@ -26,6 +26,7 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [originalInput, setOriginalInput] = useState('');
+  const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
 
   // Debounced suggestion fetching
   const debouncedGetSuggestions = useCallback(
@@ -69,17 +70,36 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
 
   // Debounce effect
   useEffect(() => {
+    // Clear any existing timer
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+    }
+
     const timer = setTimeout(() => {
       if (movieInput.movieTitle.trim()) {
         debouncedGetSuggestions(movieInput.movieTitle);
       } else {
         setSuggestions([]);
         setShowSuggestions(false);
+        setIsLoadingSuggestions(false);
       }
     }, 800); // 800ms delay
 
-    return () => clearTimeout(timer);
+    setDebounceTimer(timer);
+
+    return () => {
+      clearTimeout(timer);
+    };
   }, [movieInput.movieTitle, debouncedGetSuggestions]);
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimer) {
+        clearTimeout(debounceTimer);
+      }
+    };
+  }, [debounceTimer]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
@@ -97,6 +117,13 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
   };
 
   const handleSuggestionSelect = (suggestion: string) => {
+    // Clear any pending timer and loading state immediately
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      setDebounceTimer(null);
+    }
+    setIsLoadingSuggestions(false);
+
     setMovieInput({
       ...movieInput,
       movieTitle: suggestion,
@@ -106,6 +133,12 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
   };
 
   const handleDismissSuggestions = () => {
+    // Clear any pending timer and loading state
+    if (debounceTimer) {
+      clearTimeout(debounceTimer);
+      setDebounceTimer(null);
+    }
+    setIsLoadingSuggestions(false);
     setSuggestions([]);
     setShowSuggestions(false);
   };
