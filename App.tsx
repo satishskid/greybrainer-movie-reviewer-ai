@@ -31,6 +31,7 @@ const App: React.FC = () => {
     movieTitle: '',
     reviewStage: ReviewStage.MOVIE_RELEASED,
     productionBudget: undefined,
+    enableROIAnalysis: false,
   });
 
   const [layerAnalyses, setLayerAnalyses] = useState<LayerAnalysisData[]>(initialLayerAnalyses());
@@ -150,7 +151,9 @@ const App: React.FC = () => {
     });
     await Promise.all(analysesPromises);
     setPersonnelData(collectedPersonnelData); setIsAnalyzingLayers(false);
-    if (!movieInput.productionBudget) {
+
+    // Only fetch financial data if ROI analysis is enabled
+    if (movieInput.enableROIAnalysis && !movieInput.productionBudget) {
       setFinancialAnalysisData(prev => ({ ...(prev || {}), isLoadingBudget: true, errorBudget: null }));
       try {
         const financials = await fetchMovieFinancialsWithGemini(confirmedMovieTitle, logTokenUsage);
@@ -164,7 +167,7 @@ const App: React.FC = () => {
         setFinancialAnalysisData(prev => ({ ...(prev || {}), isLoadingBudget: false, errorBudget: error instanceof Error ? error.message : 'Failed to fetch budget info.' }));
       }
     }
-  }, [movieInput.reviewStage, movieInput.productionBudget, logTokenUsage]);
+  }, [movieInput.reviewStage, movieInput.productionBudget, movieInput.enableROIAnalysis, logTokenUsage]);
 
   const handleAnalyzeMovie = useCallback(async () => {
     if (!movieInput.movieTitle.trim()) { setOverallError('Please enter a movie/series title.'); return; }
@@ -202,30 +205,35 @@ const App: React.FC = () => {
     setOverallError(null); setIsGeneratingReport(true); setSummaryReport(null);
     let currentFinancialData = { ...financialAnalysisData, userProvidedBudget: movieInput.productionBudget };
     let budgetForROI = movieInput.productionBudget;
-    if (budgetForROI === undefined && currentFinancialData.fetchedBudget === undefined && !currentFinancialData.isLoadingBudget && !currentFinancialData.errorBudget) {
-      currentFinancialData = { ...currentFinancialData, isLoadingBudget: true, errorBudget: null };
-      setFinancialAnalysisData(currentFinancialData);
-      try {
-        const financials = await fetchMovieFinancialsWithGemini(movieInput.movieTitle, logTokenUsage);
-        currentFinancialData = { ...currentFinancialData, fetchedBudget: financials.budget, fetchedBudgetCurrency: financials.currency, fetchedBudgetSources: financials.sources, fetchedDuration: financials.duration, isLoadingBudget: false, isFallbackBudgetResult: financials.isFallbackResult };
-        setFinancialAnalysisData(currentFinancialData); budgetForROI = financials.budget;
-      } catch (error) {
-        console.error('Error fetching movie financials during report generation:', error);
-        currentFinancialData = { ...currentFinancialData, isLoadingBudget: false, errorBudget: error instanceof Error ? error.message : 'Failed to fetch budget info for report.'};
+
+    // Only perform financial analysis if ROI is enabled
+    if (movieInput.enableROIAnalysis) {
+      if (budgetForROI === undefined && currentFinancialData.fetchedBudget === undefined && !currentFinancialData.isLoadingBudget && !currentFinancialData.errorBudget) {
+        currentFinancialData = { ...currentFinancialData, isLoadingBudget: true, errorBudget: null };
         setFinancialAnalysisData(currentFinancialData);
-      }
-    } else if (budgetForROI === undefined && currentFinancialData.fetchedBudget !== undefined) { budgetForROI = currentFinancialData.fetchedBudget; }
-    if (budgetForROI !== undefined && !currentFinancialData.qualitativeROIAnalysis && !currentFinancialData.isLoadingROI && !currentFinancialData.errorROI) {
-      currentFinancialData = { ...currentFinancialData, isLoadingROI: true, errorROI: null };
-      setFinancialAnalysisData(currentFinancialData);
-      try {
-        const roiResult = await generateQualitativeROIAnalysisWithGemini(movieInput.movieTitle, budgetForROI, currentFinancialData.fetchedDuration, movieInput.productionBudget === undefined, layerAnalyses, logTokenUsage);
-        currentFinancialData = { ...currentFinancialData, qualitativeROIAnalysis: roiResult.analysisText, isLoadingROI: false, isFallbackROIResult: roiResult.isFallbackResult };
+        try {
+          const financials = await fetchMovieFinancialsWithGemini(movieInput.movieTitle, logTokenUsage);
+          currentFinancialData = { ...currentFinancialData, fetchedBudget: financials.budget, fetchedBudgetCurrency: financials.currency, fetchedBudgetSources: financials.sources, fetchedDuration: financials.duration, isLoadingBudget: false, isFallbackBudgetResult: financials.isFallbackResult };
+          setFinancialAnalysisData(currentFinancialData); budgetForROI = financials.budget;
+        } catch (error) {
+          console.error('Error fetching movie financials during report generation:', error);
+          currentFinancialData = { ...currentFinancialData, isLoadingBudget: false, errorBudget: error instanceof Error ? error.message : 'Failed to fetch budget info for report.'};
+          setFinancialAnalysisData(currentFinancialData);
+        }
+      } else if (budgetForROI === undefined && currentFinancialData.fetchedBudget !== undefined) { budgetForROI = currentFinancialData.fetchedBudget; }
+
+      if (budgetForROI !== undefined && !currentFinancialData.qualitativeROIAnalysis && !currentFinancialData.isLoadingROI && !currentFinancialData.errorROI) {
+        currentFinancialData = { ...currentFinancialData, isLoadingROI: true, errorROI: null };
         setFinancialAnalysisData(currentFinancialData);
-      } catch (error) {
-        console.error('Error generating qualitative ROI analysis:', error);
-        currentFinancialData = { ...currentFinancialData, isLoadingROI: false, errorROI: error instanceof Error ? error.message : 'Failed to generate ROI analysis.'};
-        setFinancialAnalysisData(currentFinancialData);
+        try {
+          const roiResult = await generateQualitativeROIAnalysisWithGemini(movieInput.movieTitle, budgetForROI, currentFinancialData.fetchedDuration, movieInput.productionBudget === undefined, layerAnalyses, logTokenUsage);
+          currentFinancialData = { ...currentFinancialData, qualitativeROIAnalysis: roiResult.analysisText, isLoadingROI: false, isFallbackROIResult: roiResult.isFallbackResult };
+          setFinancialAnalysisData(currentFinancialData);
+        } catch (error) {
+          console.error('Error generating qualitative ROI analysis:', error);
+          currentFinancialData = { ...currentFinancialData, isLoadingROI: false, errorROI: error instanceof Error ? error.message : 'Failed to generate ROI analysis.'};
+          setFinancialAnalysisData(currentFinancialData);
+        }
       }
     }
     try {
@@ -357,8 +365,8 @@ const App: React.FC = () => {
 
           {canGenerateReport && !isCurrentlyProcessing && (
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-              <button onClick={handleGenerateReport} disabled={isGeneratingReport || isCurrentlyProcessing} className="w-full sm:w-auto px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" title="Generate Greybrainer Report">
-                {isGeneratingReport || financialAnalysisData?.isLoadingROI ? (<> <LoadingSpinner size="sm" /> {financialAnalysisData?.isLoadingROI ? 'Analyzing ROI...':'Generating Report...'}</>) : (<> <SparklesIcon className="w-5 h-5 mr-2" /> Generate Greybrainer Report</>)}
+              <button onClick={handleGenerateReport} disabled={isGeneratingReport || isCurrentlyProcessing} className="w-full sm:w-auto px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" title={`Generate Greybrainer Report${movieInput.enableROIAnalysis ? ' with ROI Analysis' : ''}`}>
+                {isGeneratingReport || financialAnalysisData?.isLoadingROI ? (<> <LoadingSpinner size="sm" /> {financialAnalysisData?.isLoadingROI ? 'Analyzing ROI...':'Generating Report...'}</>) : (<> <SparklesIcon className="w-5 h-5 mr-2" /> Generate Report{movieInput.enableROIAnalysis ? ' + ROI' : ''}</>)}
               </button>
               
               <button onClick={handleAnalyzeMorphokinetics} disabled={isAnalyzingMorphokinetics || !movieInput.movieTitle || isCurrentlyProcessing} className="w-full sm:w-auto px-8 py-3 bg-teal-600 hover:bg-teal-500 text-white font-semibold rounded-lg shadow-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" title="Analyze Movie Motion & Dynamics">

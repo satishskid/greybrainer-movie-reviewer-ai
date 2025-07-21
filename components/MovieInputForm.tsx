@@ -28,6 +28,13 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
     });
   };
 
+  const handleROIToggle = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setMovieInput({
+      ...movieInput,
+      enableROIAnalysis: e.target.checked,
+    });
+  };
+
   return (
     <div className="p-6 bg-slate-800/70 rounded-xl shadow-2xl mb-8 border border-slate-700">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start"> {/* Changed to items-start for better alignment with multiline helper text */}
@@ -86,6 +93,29 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
            </p>
         </div>
       </div>
+
+      {/* ROI Analysis Opt-in */}
+      <div className="mt-6 p-4 bg-slate-700/50 rounded-lg border border-slate-600/50">
+        <div className="flex items-start space-x-3">
+          <input
+            type="checkbox"
+            id="enableROIAnalysis"
+            checked={movieInput.enableROIAnalysis || false}
+            onChange={handleROIToggle}
+            className="mt-1 w-4 h-4 text-indigo-600 bg-slate-700 border-slate-500 rounded focus:ring-indigo-500 focus:ring-2"
+          />
+          <div className="flex-1">
+            <label htmlFor="enableROIAnalysis" className="text-sm font-medium text-slate-200 cursor-pointer">
+              💰 Enable ROI & Financial Analysis
+            </label>
+            <p className="text-xs text-slate-400 mt-1">
+              Include budget estimation, production duration analysis, and qualitative ROI insights.
+              This feature uses additional AI processing and may increase analysis time.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="mt-6 flex justify-center">
         <button
           onClick={onAnalyze}
