@@ -6,9 +6,11 @@ import { DownloadIcon } from './icons/DownloadIcon'; // New Icon
 import { LayerAnalysisData, GroundingChunkWeb, PersonnelData, SummaryReportData, ActualPerformanceData, FinancialAnalysisData } from '../types'; 
 import { LAYER_DEFINITIONS, MAX_SCORE, LAYER_SHORT_NAMES } from '../constants'; 
 import { ConcentricRingsVisualization } from './ConcentricRingsVisualization';
-import { LightBulbIcon } from './icons/LightBulbIcon'; 
+import { LightBulbIcon } from './icons/LightBulbIcon';
 import { TicketIcon } from './icons/TicketIcon'; // For actual performance section
 import { CheckCircleIcon } from './icons/CheckCircleIcon'; // For save button
+import { BlogExportModal } from './BlogExportModal';
+import { DocumentTextIcon } from './icons/DocumentTextIcon';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
 import { LinkIcon } from './icons/LinkIcon';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -43,6 +45,7 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
   const [copiedLinkedIn, setCopiedLinkedIn] = useState(false);
   const [localActualPerformance, setLocalActualPerformance] = useState<ActualPerformanceData>(initialActualPerformance || {});
   const [showActualsInput, setShowActualsInput] = useState(false);
+  const [showBlogExportModal, setShowBlogExportModal] = useState(false);
 
   useEffect(() => {
     setLocalActualPerformance(initialActualPerformance || {});
@@ -322,6 +325,14 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
           Greybrainer Report: <span className="italic">{title}</span>
         </h2>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+            <button
+              onClick={() => setShowBlogExportModal(true)}
+              className="flex items-center justify-center px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg shadow-md transition-colors duration-150 w-full sm:w-auto"
+              title="Export for blog/social media with all content and diagrams"
+            >
+              <DocumentTextIcon className="w-4 h-4 mr-2" />
+              Blog/Social Export
+            </button>
             <button
               onClick={() => handleCopyToClipboard(generateFullReportTextForCopy(), 'report')}
               className="flex items-center justify-center px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-medium rounded-lg shadow-md transition-colors duration-150 w-full sm:w-auto"
@@ -647,6 +658,19 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
           })}
         </div>
       </div>
+
+      {/* Blog Export Modal */}
+      <BlogExportModal
+        isOpen={showBlogExportModal}
+        onClose={() => setShowBlogExportModal(false)}
+        title={title}
+        summaryReportData={summaryReportData}
+        layerAnalyses={layerAnalyses}
+        personnelData={personnelData}
+        actualPerformance={localActualPerformance}
+        financialAnalysisData={financialAnalysisData}
+        maxScore={maxScore}
+      />
     </div>
   );
 };

@@ -332,7 +332,7 @@ const extractGroundingSources = (response: GenerateContentResponse): GroundingCh
     if (groundingMetadata?.groundingAttribution?.web) {
         sources = groundingMetadata.groundingAttribution.web.map(chunk => ({
             uri: chunk.uri,
-            title: chunk.title || chunk.uri 
+            title: chunk.title || chunk.uri
         }));
     }
      // Also check the old groundingChunks if new one is empty (for backward compatibility or variations in response)
@@ -344,7 +344,75 @@ const extractGroundingSources = (response: GenerateContentResponse): GroundingCh
                 title: chunk.web.title || chunk.web.uri,
             }));
     }
-    return sources;
+
+    // Filter out unnecessary/irrelevant URLs
+    return filterRelevantSources(sources);
+};
+
+const filterRelevantSources = (sources: GroundingChunkWeb[]): GroundingChunkWeb[] => {
+    const irrelevantPatterns = [
+        // Generic/unhelpful domains
+        /^https?:\/\/(www\.)?google\./,
+        /^https?:\/\/(www\.)?bing\./,
+        /^https?:\/\/(www\.)?yahoo\./,
+        /^https?:\/\/(www\.)?search\./,
+        /^https?:\/\/(www\.)?wikipedia\.org\/wiki\/List_of/,
+
+        // Ad/tracking/social media noise
+        /facebook\.com\/.*\/posts\//,
+        /twitter\.com\/.*\/status\//,
+        /instagram\.com\/p\//,
+        /tiktok\.com\/@/,
+        /pinterest\.com\/pin\//,
+        /reddit\.com\/r\/.*\/comments\//,
+
+        // Generic movie database pages (keep specific ones)
+        /\/movies\/\d+\/?$/,
+        /\/title\/tt\d+\/?$/,
+
+        // Shopping/commercial sites
+        /amazon\.com\/.*\/dp\//,
+        /ebay\.com\/itm\//,
+        /walmart\.com\/ip\//,
+
+        // Generic news aggregators
+        /news\.google\.com/,
+        /news\.yahoo\.com/,
+
+        // Unhelpful generic pages
+        /\/search\?/,
+        /\/results\?/,
+        /\/category\//,
+        /\/tag\//,
+        /\/archive\//,
+    ];
+
+    const relevantKeywords = [
+        'imdb', 'rottentomatoes', 'metacritic', 'boxofficemojo', 'variety', 'hollywood',
+        'entertainment', 'film', 'movie', 'cinema', 'review', 'critic', 'analysis',
+        'interview', 'behind', 'scenes', 'production', 'director', 'actor', 'actress',
+        'cast', 'crew', 'budget', 'box office', 'awards', 'festival', 'premiere'
+    ];
+
+    return sources.filter(source => {
+        const url = source.uri.toLowerCase();
+        const title = (source.title || '').toLowerCase();
+
+        // Remove if matches irrelevant patterns
+        if (irrelevantPatterns.some(pattern => pattern.test(url))) {
+            return false;
+        }
+
+        // Keep if contains relevant keywords in URL or title
+        const hasRelevantKeyword = relevantKeywords.some(keyword =>
+            url.includes(keyword) || title.includes(keyword)
+        );
+
+        // Keep well-known movie/entertainment sites
+        const isRelevantDomain = /\b(imdb|rottentomatoes|metacritic|variety|hollywood|entertainment|film|movie|cinema)\b/.test(url);
+
+        return hasRelevantKeyword || isRelevantDomain;
+    }).slice(0, 5); // Limit to top 5 most relevant sources
 };
 
 export const analyzeLayerWithGemini = async (
