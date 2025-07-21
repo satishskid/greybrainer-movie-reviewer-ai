@@ -23,6 +23,7 @@ import { MonthlyMagicScoreboard } from './components/MonthlyMagicScoreboard';
 import { LightBulbIcon } from './components/icons/LightBulbIcon';
 import { GreybrainerInsights } from './components/GreybrainerInsights';
 import { ApiStatusChecker } from './components/ApiStatusChecker';
+import { AuthWrapper } from './components/AuthWrapper';
 
 
 const App: React.FC = () => {
@@ -319,11 +320,12 @@ const App: React.FC = () => {
   const isCurrentlyProcessing = isFetchingSuggestions || isAnalyzingLayers || isGeneratingReport || isAnalyzingMagicQuotient || isAnalyzingMorphokinetics || isGeneratingCreativeSpark || isEnhancingSpark || (analyzingMagicFactorFor !== null) || financialAnalysisData?.isLoadingBudget || financialAnalysisData?.isLoadingROI ;
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-slate-100">
-      <Header 
-        onToggleTokenDashboard={() => setShowTokenDashboard(prev => !prev)} 
-      />
-      <main className="flex-grow container mx-auto px-4 py-8 max-w-5xl">
+    <AuthWrapper>
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-slate-100">
+        <Header
+          onToggleTokenDashboard={() => setShowTokenDashboard(prev => !prev)}
+        />
+        <main className="flex-grow container mx-auto px-4 py-8 max-w-5xl">
         <>
           {showTokenDashboard && (
             <TokenBudgetDashboard config={tokenBudgetConfig} setConfig={saveTokenBudgetConfig} usageLog={tokenUsageLog} clearLog={() => { setTokenUsageLog([]); localStorage.removeItem('tokenUsageLog'); }} onClose={() => setShowTokenDashboard(false)} />
@@ -377,9 +379,10 @@ const App: React.FC = () => {
           
           <ScriptMagicQuotientAnalyzer genres={COMMON_GENRES} onAnalyze={handleAnalyzeScriptMagicQuotient} isLoading={isAnalyzingMagicQuotient || isCurrentlyProcessing} error={magicQuotientError} analysisResult={magicQuotientResult} />
         </>
-      </main>
-      <Footer />
-    </div>
+        </main>
+        <Footer />
+      </div>
+    </AuthWrapper>
   );
 };
 
