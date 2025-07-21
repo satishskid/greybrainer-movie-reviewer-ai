@@ -69,10 +69,7 @@ const App: React.FC = () => {
 
   const [monthlyScoreboardData, setMonthlyScoreboardData] = useState<MonthlyScoreboardItem[]>([]);
 
-  const [movieTitleSuggestions, setMovieTitleSuggestions] = useState<string[] | null>(null);
-  const [isFetchingSuggestions, setIsFetchingSuggestions] = useState<boolean>(false);
-  const [originalUserMovieTitle, setOriginalUserMovieTitle] = useState<string | null>(null);
-  const [showSuggestionsSection, setShowSuggestionsSection] = useState<boolean>(false);
+
 
   useEffect(() => {
     const storedTokenConfig = localStorage.getItem('tokenBudgetConfig');
@@ -114,9 +111,8 @@ const App: React.FC = () => {
   const resetAllAnalysesState = () => {
     setOverallError(null); setLayerAnalyses(initialLayerAnalyses()); setSummaryReport(null);
     setPersonnelData({ sources: [] }); setMagicFactorAnalyses([]); setAnalyzingMagicFactorFor(null);
-    setCreativeSparkError(null); setActualPerformance(null); setFinancialAnalysisData(null); 
-    setMorphokineticsAnalysis(null); setMorphokineticsError(null); setMovieTitleSuggestions(null);
-    setShowSuggestionsSection(false); setOriginalUserMovieTitle(null);
+    setCreativeSparkError(null); setActualPerformance(null); setFinancialAnalysisData(null);
+    setMorphokineticsAnalysis(null); setMorphokineticsError(null);
   };
   
   const analyzeMovieFlowInternal = useCallback(async (confirmedMovieTitle: string) => {
@@ -171,32 +167,20 @@ const App: React.FC = () => {
 
   const handleAnalyzeMovie = useCallback(async () => {
     if (!movieInput.movieTitle.trim()) { setOverallError('Please enter a movie/series title.'); return; }
-    resetAllAnalysesState(); setIsFetchingSuggestions(true); setOriginalUserMovieTitle(movieInput.movieTitle.trim());
+    resetAllAnalysesState();
+    await analyzeMovieFlowInternal(movieInput.movieTitle.trim());
+  }, [movieInput.movieTitle, analyzeMovieFlowInternal]);
+
+  const handleGetSuggestions = useCallback(async (title: string): Promise<string[]> => {
     try {
-      const suggestions = await getMovieTitleSuggestions(movieInput.movieTitle.trim(), logTokenUsage);
-      if (suggestions && suggestions.length > 0 && suggestions.some(s => s.toLowerCase() !== movieInput.movieTitle.trim().toLowerCase())) {
-        setMovieTitleSuggestions(suggestions); setShowSuggestionsSection(true);
-      } else { await analyzeMovieFlowInternal(movieInput.movieTitle.trim()); }
+      return await getMovieTitleSuggestions(title, logTokenUsage);
     } catch (error) {
-      console.error('Error fetching movie title suggestions or in main flow:', error);
-      const errorMessage = error instanceof Error ? error.message : 'An unexpected error occurred.';
-      setOverallError(`Suggestion fetch failed: ${errorMessage}. Proceeding with original title.`);
-      await analyzeMovieFlowInternal(movieInput.movieTitle.trim());
-    } finally { setIsFetchingSuggestions(false); }
-  }, [movieInput.movieTitle, logTokenUsage, analyzeMovieFlowInternal]);
+      console.error('Error fetching movie title suggestions:', error);
+      return [];
+    }
+  }, [logTokenUsage]);
   
-  const handleSuggestionSelected = (suggestedTitle: string) => {
-    setShowSuggestionsSection(false); setMovieTitleSuggestions(null);
-    setMovieInput(prev => ({ ...prev, movieTitle: suggestedTitle }));
-    analyzeMovieFlowInternal(suggestedTitle);
-  };
-  const handleProceedWithOriginalTitle = () => {
-    setShowSuggestionsSection(false); setMovieTitleSuggestions(null);
-    if (originalUserMovieTitle) analyzeMovieFlowInternal(originalUserMovieTitle);
-  };
-  const handleCancelSuggestions = () => {
-    setShowSuggestionsSection(false); setMovieTitleSuggestions(null); setOriginalUserMovieTitle(null);
-  };
+
 
   const handleEditLayerText = (layerId: ReviewLayer, newText: string) => setLayerAnalyses(prev => prev.map(l => l.id === layerId ? { ...l, editedText: newText } : l));
   const handleLayerScoreChange = (layerId: ReviewLayer, score?: number) => setLayerAnalyses(prev => prev.map(l => l.id === layerId ? { ...l, userScore: score } : l));
@@ -325,7 +309,7 @@ const App: React.FC = () => {
   const analysisAttempted = layerAnalyses.some(l => l.isLoading || l.aiGeneratedText || l.error);
   const showPersonnelAnalysis = allLayersAnalyzedOrError && !isAnalyzingLayers && analysisAttempted && (personnelData.director || (personnelData.mainCast && personnelData.mainCast.length > 0));
   const canGenerateReport = allLayersAnalyzedOrError && !isAnalyzingLayers && analysisAttempted && !layerAnalyses.some(l => l.isLoading || (!l.editedText && !l.error));
-  const isCurrentlyProcessing = isFetchingSuggestions || isAnalyzingLayers || isGeneratingReport || isAnalyzingMagicQuotient || isAnalyzingMorphokinetics || isGeneratingCreativeSpark || isEnhancingSpark || (analyzingMagicFactorFor !== null) || financialAnalysisData?.isLoadingBudget || financialAnalysisData?.isLoadingROI ;
+  const isCurrentlyProcessing = isAnalyzingLayers || isGeneratingReport || isAnalyzingMagicQuotient || isAnalyzingMorphokinetics || isGeneratingCreativeSpark || isEnhancingSpark || (analyzingMagicFactorFor !== null) || financialAnalysisData?.isLoadingBudget || financialAnalysisData?.isLoadingROI ;
 
   return (
     <AuthWrapper>
@@ -339,56 +323,22 @@ const App: React.FC = () => {
             <TokenBudgetDashboard config={tokenBudgetConfig} setConfig={saveTokenBudgetConfig} usageLog={tokenUsageLog} clearLog={() => { setTokenUsageLog([]); localStorage.removeItem('tokenUsageLog'); }} onClose={() => setShowTokenDashboard(false)} />
           )}
 
-          <MovieInputForm movieInput={movieInput} setMovieInput={setMovieInput} reviewStages={REVIEW_STAGES_OPTIONS} onAnalyze={handleAnalyzeMovie} isAnalyzing={isFetchingSuggestions || isAnalyzingLayers} />
+          <MovieInputForm
+            movieInput={movieInput}
+            setMovieInput={setMovieInput}
+            reviewStages={REVIEW_STAGES_OPTIONS}
+            onAnalyze={handleAnalyzeMovie}
+            isAnalyzing={isAnalyzingLayers}
+            onGetSuggestions={handleGetSuggestions}
+          />
 
-          {/* Movie Title Suggestions - Positioned right after input form */}
-          {showSuggestionsSection && movieTitleSuggestions && originalUserMovieTitle && (
-            <div className="mb-6 p-4 bg-slate-700/80 rounded-lg shadow-lg border border-indigo-500/50">
-              <div className="flex items-center mb-3">
-                <LightBulbIcon className="w-6 h-6 text-yellow-400 mr-2" />
-                <h3 className="text-lg font-semibold text-yellow-300">Did you mean?</h3>
-              </div>
-              <p className="text-sm text-slate-300 mb-3">
-                You entered: <strong className="italic">"{originalUserMovieTitle}"</strong>. We found some similar titles:
-              </p>
-              <div className="space-y-2">
-                {movieTitleSuggestions.map((suggestion, index) => (
-                  <button
-                    key={index}
-                    onClick={() => handleSuggestionSelected(suggestion)}
-                    className="w-full text-left px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md transition-colors text-sm flex items-center justify-between group"
-                  >
-                    <span>{suggestion}</span>
-                    {index === 0 && (
-                      <span className="text-xs bg-indigo-500 px-2 py-1 rounded-full opacity-75 group-hover:opacity-100">
-                        Best Match
-                      </span>
-                    )}
-                  </button>
-                ))}
-              </div>
-              <div className="mt-4 pt-3 border-t border-slate-600/70 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-                <button
-                  onClick={handleProceedWithOriginalTitle}
-                  className="w-full sm:w-auto px-4 py-2 bg-slate-500 hover:bg-slate-400 text-white rounded-md transition-colors text-sm"
-                >
-                  No, proceed with "{originalUserMovieTitle}"
-                </button>
-                <button
-                  onClick={handleCancelSuggestions}
-                  className="w-full sm:w-auto px-4 py-2 bg-transparent hover:bg-slate-600/50 text-slate-300 border border-slate-500 rounded-md transition-colors text-sm"
-                >
-                  Clear & Edit My Input
-                </button>
-              </div>
-            </div>
-          )}
+
 
           <ApiStatusChecker />
           {overallError && (<div className={`my-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}>{overallError}</div>)}
-          {(isFetchingSuggestions || (isAnalyzingLayers && !analysisAttempted) || financialAnalysisData?.isLoadingBudget) && !showSuggestionsSection && (<div className="flex justify-center items-center my-10"><LoadingSpinner /><span className="ml-3 text-xl">{isFetchingSuggestions ? "Checking title..." : financialAnalysisData?.isLoadingBudget ? "Fetching financial estimates..." : "Initializing analysis..."}</span></div>)}
+          {((isAnalyzingLayers && !analysisAttempted) || financialAnalysisData?.isLoadingBudget) && (<div className="flex justify-center items-center my-10"><LoadingSpinner /><span className="ml-3 text-xl">{financialAnalysisData?.isLoadingBudget ? "Fetching financial estimates..." : "Initializing analysis..."}</span></div>)}
           
-          <div className="mt-8 space-y-6"> {layerAnalyses.map((layer) => (<LayerAnalysisCard key={layer.id} layerData={layer} onEdit={handleEditLayerText} onScoreChange={handleLayerScoreChange} isOverallAnalyzing={isAnalyzingLayers || isFetchingSuggestions} maxScore={MAX_SCORE}/>))} </div>
+          <div className="mt-8 space-y-6"> {layerAnalyses.map((layer) => (<LayerAnalysisCard key={layer.id} layerData={layer} onEdit={handleEditLayerText} onScoreChange={handleLayerScoreChange} isOverallAnalyzing={isAnalyzingLayers} maxScore={MAX_SCORE}/>))} </div>
 
           {showPersonnelAnalysis && (
               <PersonnelDisplay personnelData={personnelData} magicFactorAnalyses={magicFactorAnalyses} onAnalyzeMagicFactor={handleAnalyzeMagicFactor} analyzingMagicFactorFor={analyzingMagicFactorFor} />
