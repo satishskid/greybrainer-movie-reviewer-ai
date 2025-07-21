@@ -1117,10 +1117,20 @@ export const getMovieTitleSuggestions = async (
   const prompt = `
     You are an assistant that helps find correct or similar movie/series titles.
     Based on the user input "${currentTitle}", suggest 3-5 alternative, correctly spelled, or closely related existing movie or series titles.
-    Return your suggestions as a JSON array of strings. For example: ["Suggested Title 1", "Suggested Title 2"].
+
+    IMPORTANT: Order your suggestions by relevance/similarity to the input, with the CLOSEST MATCH FIRST.
+
+    Return your suggestions as a JSON array of strings. For example: ["Closest Match", "Second Best Match", "Third Match"].
     If the input seems very accurate and you have no better suggestions, you can return an empty array or an array with just the original title if you can confirm its existence.
     Only include titles that are actual existing movies or series. Do not invent titles.
     If the input is gibberish or too vague, return an empty array.
+
+    Consider these factors for ordering:
+    1. Exact spelling corrections (highest priority)
+    2. Same title with different years
+    3. Very similar titles (sequels, prequels, remakes)
+    4. Related titles in same franchise
+    5. Thematically similar titles (lowest priority)
   `;
 
   try {

@@ -341,19 +341,50 @@ const App: React.FC = () => {
 
           <MovieInputForm movieInput={movieInput} setMovieInput={setMovieInput} reviewStages={REVIEW_STAGES_OPTIONS} onAnalyze={handleAnalyzeMovie} isAnalyzing={isFetchingSuggestions || isAnalyzingLayers} />
 
-          <ApiStatusChecker />
-
+          {/* Movie Title Suggestions - Positioned right after input form */}
           {showSuggestionsSection && movieTitleSuggestions && originalUserMovieTitle && (
-            <div className="my-4 p-4 bg-slate-700/80 rounded-lg shadow-lg border border-indigo-500/50">
-              <div className="flex items-center mb-3"> <LightBulbIcon className="w-6 h-6 text-yellow-400 mr-2" /> <h3 className="text-lg font-semibold text-yellow-300">Did you mean?</h3> </div>
-              <p className="text-sm text-slate-300 mb-3"> You entered: <strong className="italic">"{originalUserMovieTitle}"</strong>. We found some similar titles: </p>
-              <div className="space-y-2"> {movieTitleSuggestions.map((suggestion, index) => (<button key={index} onClick={() => handleSuggestionSelected(suggestion)} className="w-full text-left px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md transition-colors text-sm">{suggestion}</button>))} </div>
+            <div className="mb-6 p-4 bg-slate-700/80 rounded-lg shadow-lg border border-indigo-500/50">
+              <div className="flex items-center mb-3">
+                <LightBulbIcon className="w-6 h-6 text-yellow-400 mr-2" />
+                <h3 className="text-lg font-semibold text-yellow-300">Did you mean?</h3>
+              </div>
+              <p className="text-sm text-slate-300 mb-3">
+                You entered: <strong className="italic">"{originalUserMovieTitle}"</strong>. We found some similar titles:
+              </p>
+              <div className="space-y-2">
+                {movieTitleSuggestions.map((suggestion, index) => (
+                  <button
+                    key={index}
+                    onClick={() => handleSuggestionSelected(suggestion)}
+                    className="w-full text-left px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-md transition-colors text-sm flex items-center justify-between group"
+                  >
+                    <span>{suggestion}</span>
+                    {index === 0 && (
+                      <span className="text-xs bg-indigo-500 px-2 py-1 rounded-full opacity-75 group-hover:opacity-100">
+                        Best Match
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
               <div className="mt-4 pt-3 border-t border-slate-600/70 flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-3">
-                <button onClick={handleProceedWithOriginalTitle} className="w-full sm:w-auto px-4 py-2 bg-slate-500 hover:bg-slate-400 text-white rounded-md transition-colors text-sm">No, proceed with "{originalUserMovieTitle}"</button>
-                <button onClick={handleCancelSuggestions} className="w-full sm:w-auto px-4 py-2 bg-transparent hover:bg-slate-600/50 text-slate-300 border border-slate-500 rounded-md transition-colors text-sm">Clear & Edit My Input</button>
+                <button
+                  onClick={handleProceedWithOriginalTitle}
+                  className="w-full sm:w-auto px-4 py-2 bg-slate-500 hover:bg-slate-400 text-white rounded-md transition-colors text-sm"
+                >
+                  No, proceed with "{originalUserMovieTitle}"
+                </button>
+                <button
+                  onClick={handleCancelSuggestions}
+                  className="w-full sm:w-auto px-4 py-2 bg-transparent hover:bg-slate-600/50 text-slate-300 border border-slate-500 rounded-md transition-colors text-sm"
+                >
+                  Clear & Edit My Input
+                </button>
               </div>
             </div>
           )}
+
+          <ApiStatusChecker />
           {overallError && (<div className={`my-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}>{overallError}</div>)}
           {(isFetchingSuggestions || (isAnalyzingLayers && !analysisAttempted) || financialAnalysisData?.isLoadingBudget) && !showSuggestionsSection && (<div className="flex justify-center items-center my-10"><LoadingSpinner /><span className="ml-3 text-xl">{isFetchingSuggestions ? "Checking title..." : financialAnalysisData?.isLoadingBudget ? "Fetching financial estimates..." : "Initializing analysis..."}</span></div>)}
           
