@@ -8,7 +8,12 @@ interface ApiStatus {
   message: string;
 }
 
-export const ApiStatusChecker: React.FC = () => {
+interface ApiStatusCheckerProps {
+  onStatusChange?: (status: 'unknown' | 'testing' | 'success' | 'error') => void;
+  isModal?: boolean;
+}
+
+export const ApiStatusChecker: React.FC<ApiStatusCheckerProps> = ({ onStatusChange, isModal = false }) => {
   const [apiStatuses, setApiStatuses] = useState<ApiStatus[]>([
     { name: 'Gemini', status: 'checking', message: 'Not tested' },
     { name: 'Groq', status: 'checking', message: 'Not tested' },
@@ -98,7 +103,8 @@ export const ApiStatusChecker: React.FC = () => {
 
   const checkAllApis = async () => {
     setIsChecking(true);
-    
+    onStatusChange?.('testing');
+
     const checks = [
       { name: 'Gemini', checker: checkGeminiStatus },
       {
@@ -113,28 +119,44 @@ export const ApiStatusChecker: React.FC = () => {
     ];
 
     for (const check of checks) {
-      setApiStatuses(prev => prev.map(api => 
-        api.name === check.name 
+      setApiStatuses(prev => prev.map(api =>
+        api.name === check.name
           ? { ...api, status: 'checking', message: 'Testing...' }
           : api
       ));
 
       const result = await check.checker();
-      
-      setApiStatuses(prev => prev.map(api => 
-        api.name === check.name 
+
+      setApiStatuses(prev => prev.map(api =>
+        api.name === check.name
           ? { ...api, status: result.status, message: result.message }
           : api
       ));
     }
 
     setIsChecking(false);
+
+    // Report overall status after a brief delay to ensure state is updated
+    setTimeout(() => {
+      const hasErrors = apiStatuses.some(api => api.status === 'error');
+      const allSuccess = apiStatuses.every(api => api.status === 'success');
+
+      if (allSuccess) {
+        onStatusChange?.('success');
+      } else if (hasErrors) {
+        onStatusChange?.('error');
+      } else {
+        onStatusChange?.('unknown');
+      }
+    }, 100);
   };
 
   return (
-    <div className="bg-slate-800 rounded-lg p-6 mb-6">
+    <div className={isModal ? '' : 'bg-slate-800 rounded-lg p-6 mb-6'}>
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-slate-100">API Status Checker</h3>
+        <h3 className={`text-lg font-semibold text-slate-100 ${isModal ? 'sr-only' : ''}`}>
+          {isModal ? '' : 'API Status Checker'}
+        </h3>
         <button
           onClick={checkAllApis}
           disabled={isChecking}

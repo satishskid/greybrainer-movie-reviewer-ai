@@ -4,6 +4,7 @@ import { ReviewStage, MovieAnalysisInput } from '../types';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { LoadingSpinner } from './LoadingSpinner';
 import { LightBulbIcon } from './icons/LightBulbIcon';
+import { ApiStatusIndicator } from './ApiStatusIndicator';
 
 interface MovieInputFormProps {
   movieInput: MovieAnalysisInput;
@@ -27,6 +28,7 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [originalInput, setOriginalInput] = useState('');
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
+  const [showBudgetEstimates, setShowBudgetEstimates] = useState(false);
 
   // Debounced suggestion fetching
   const debouncedGetSuggestions = useCallback(
@@ -225,9 +227,42 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
           </select>
         </div>
         <div className="md:col-span-2 lg:col-span-1"> {/* Ensure this takes full width on medium, one third on large */}
-          <label htmlFor="productionBudget" className="block text-sm font-medium text-indigo-300 mb-1">
-            Est. Production Budget (USD)
-          </label>
+          <div className="flex items-center justify-between mb-1">
+            <label htmlFor="productionBudget" className="text-sm font-medium text-indigo-300">
+              Est. Production Budget (USD)
+            </label>
+            <div className="flex items-center space-x-2">
+              {/* Green budget estimates icon */}
+              <button
+                type="button"
+                onClick={() => setShowBudgetEstimates(!showBudgetEstimates)}
+                className="flex items-center space-x-1 text-green-400 hover:text-green-300 transition-colors"
+              >
+                <span className="w-3 h-3 bg-green-500 rounded-full"></span>
+                <svg
+                  className={`w-3 h-3 transition-transform ${showBudgetEstimates ? 'rotate-180' : ''}`}
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {/* ROI toggle button */}
+              <button
+                type="button"
+                onClick={handleROIToggle}
+                className={`flex items-center space-x-1 px-2 py-1 rounded text-xs transition-colors ${
+                  movieInput.enableROIAnalysis
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                }`}
+              >
+                <span>💰</span>
+                <span>ROI</span>
+              </button>
+            </div>
+          </div>
           <input
             type="number"
             id="productionBudget"
@@ -239,31 +274,30 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
             className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-slate-100 placeholder-slate-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Hide number spinners
             aria-label="Estimated Production Budget Input"
           />
-           <p className="text-xs text-slate-400 mt-1">
-             Optional. If not provided, AI may estimate. Used for ROI insights & future service tiering.
-           </p>
-        </div>
-      </div>
 
-      {/* ROI Analysis Opt-in */}
-      <div className="mt-6 p-4 bg-slate-700/50 rounded-lg border border-slate-600/50">
-        <div className="flex items-start space-x-3">
-          <input
-            type="checkbox"
-            id="enableROIAnalysis"
-            checked={movieInput.enableROIAnalysis || false}
-            onChange={handleROIToggle}
-            className="mt-1 w-4 h-4 text-indigo-600 bg-slate-700 border-slate-500 rounded focus:ring-indigo-500 focus:ring-2"
-          />
-          <div className="flex-1">
-            <label htmlFor="enableROIAnalysis" className="text-sm font-medium text-slate-200 cursor-pointer">
-              💰 Enable ROI & Financial Analysis
-            </label>
-            <p className="text-xs text-slate-400 mt-1">
-              Include budget estimation, production duration analysis, and qualitative ROI insights.
-              This feature uses additional AI processing and may increase analysis time.
-            </p>
-          </div>
+
+          {/* Collapsible Budget Estimates - moved to label area */}
+          {showBudgetEstimates && (
+            <div className="mt-2 p-3 bg-green-900/20 border border-green-700/30 rounded-lg">
+              <div className="space-y-2 text-xs text-green-300">
+                <div className="flex justify-between">
+                  <span>Independent Film:</span>
+                  <span className="font-mono">$100K - $2M</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Studio Film:</span>
+                  <span className="font-mono">$20M - $200M</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Blockbuster:</span>
+                  <span className="font-mono">$100M - $400M+</span>
+                </div>
+                <div className="pt-2 border-t border-green-700/30 text-green-400">
+                  <p>💡 These ranges help calibrate ROI analysis accuracy</p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 

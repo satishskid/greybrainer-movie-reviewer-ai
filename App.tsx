@@ -22,7 +22,7 @@ import { MorphokineticsDisplay } from './components/MorphokineticsDisplay';
 import { MonthlyMagicScoreboard } from './components/MonthlyMagicScoreboard';
 import { LightBulbIcon } from './components/icons/LightBulbIcon';
 import { GreybrainerInsights } from './components/GreybrainerInsights';
-import { ApiStatusChecker } from './components/ApiStatusChecker';
+
 import { AuthWrapper } from './components/AuthWrapper';
 
 
@@ -334,7 +334,6 @@ const App: React.FC = () => {
 
 
 
-          <ApiStatusChecker />
           {overallError && (<div className={`my-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}>{overallError}</div>)}
           {((isAnalyzingLayers && !analysisAttempted) || financialAnalysisData?.isLoadingBudget) && (<div className="flex justify-center items-center my-10"><LoadingSpinner /><span className="ml-3 text-xl">{financialAnalysisData?.isLoadingBudget ? "Fetching financial estimates..." : "Initializing analysis..."}</span></div>)}
           
