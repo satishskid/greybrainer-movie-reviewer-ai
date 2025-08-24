@@ -64,8 +64,7 @@ The Greybrainer methodology posits that cinematic impact is primarily derived fr
 *   **Framework:** React, TypeScript
 *   **Build Tool:** Vite
 *   **Styling:** Tailwind CSS
-*   **AI (Primary):** Google Gemini API (`@google/genai` SDK for `gemini-2.5-flash`)
-*   **AI (Fallback):** Groq API (`llama3-8b-8192`)
+*   **AI Engine:** Groq API (`llama3-8b-8192`)
 
 ## Project Structure
 The project is structured as a standard Vite + React application.
@@ -75,7 +74,7 @@ The project is structured as a standard Vite + React application.
 ├── public/                 # Public assets
 ├── src/                    # Source code
 │   ├── components/         # React UI components
-│   ├── services/           # API services (e.g., geminiService.ts)
+│   ├── services/           # API services (e.g., groqService.ts)
 │   ├── types.ts            # TypeScript type definitions
 │   ├── constants.ts        # Application-wide constants
 │   └── index.tsx           # Main React application entry point
@@ -114,14 +113,10 @@ The application requires API keys to function.
     ```
 2.  **Edit the `.env` file:** Open the newly created `.env` file and add your API keys.
     ```env
-    # Get your Gemini API key from Google AI Studio
-    VITE_API_KEY="YOUR_GEMINI_API_KEY_HERE"
-
-    # (Optional) Get your Groq API key from https://console.groq.com/keys
+    # Get your Groq API key from https://console.groq.com/keys
     VITE_GROQ_API_KEY="YOUR_GROQ_API_KEY_HERE"
     ```
     *   **Note:** The `VITE_` prefix is required by Vite to expose these variables to the application.
-    *   If the Groq key is omitted, the high-speed fallback functionality will be disabled.
 
 ### 4. Run the Development Server
 ```bash
@@ -147,7 +142,7 @@ This command will generate a `dist` folder containing the compiled and minified 
 
 **For any real-world deployment (beyond personal hobby use), you MUST use a backend proxy.** This means your frontend application should call your own secure backend endpoint, which then makes the call to the Gemini/Groq API using the key stored securely on the server.
 
-*   **Recommended Solution:** Use serverless functions provided by platforms like Vercel or Netlify. Move all logic from `src/services/geminiService.ts` into a serverless function.
+*   **Recommended Solution:** Use serverless functions provided by platforms like Vercel or Netlify. Move all logic from `src/services/groqService.ts` into a serverless function.
 
 ### Deploying to Vercel or Netlify (Recommended)
 These platforms make deploying frontend applications incredibly simple.
@@ -157,34 +152,33 @@ These platforms make deploying frontend applications incredibly simple.
 3.  **Configure Build Settings:** The platform will likely auto-detect the Vite project. Use these settings:
     *   **Build Command:** `npm run build` (or `yarn build`)
     *   **Output Directory:** `dist`
-4.  **Set Environment Variables:** This is the most important step for deployment. In your project's settings on Vercel/Netlify, add the following environment variables:
-    *   `VITE_API_KEY`: Your Gemini API Key.
+4.  **Set Environment Variables:** This is the most important step for deployment. In your project's settings on Vercel/Netlify, add the following environment variable:
     *   `VITE_GROQ_API_KEY`: Your Groq API Key.
 5.  **Deploy:** Trigger a new deployment. The platform will build your project and deploy the contents of the `dist` folder.
 
-## API Strategy: Fallbacks & Recommendations
+## AI Engine: Groq Integration
 
-To ensure reliability and explore different AI capabilities, Greybrainer AI is designed with a fallback strategy.
+Greybrainer AI is powered by Groq's lightning-fast inference engine for all analytical and creative tasks.
 
-*   **Primary AI: Google Gemini (`gemini-2.5-flash`)**
-    *   **Strengths:** A powerful, fast, and multi-modal model that serves as the main engine for all analytical and creative tasks. It offers a great balance of performance and intelligence.
-
-*   **Integrated Fallback: Groq (`llama3-8b-8192`)**
-    *   **How it's used:** If a call to the Gemini API fails for a layer analysis, the application automatically retries the request using the Groq API.
-    *   **Strengths:** **Extreme speed.** Groq's LPU™ Inference Engine provides incredibly fast responses, which is excellent for maintaining a smooth user experience during fallback scenarios.
-    *   **Considerations:** Llama 3 8B is a smaller model than Gemini 2.5 Flash. While highly capable, its analysis may be less nuanced. It's best suited for the more straightforward textual analysis tasks.
+*   **Primary AI: Groq (`llama3-8b-8192`)**
+    *   **Strengths:** **Extreme speed.** Groq's LPU™ Inference Engine provides incredibly fast responses, ensuring a smooth and responsive user experience across all features.
+    *   **Capabilities:** Highly capable model that handles all analytical tasks including story analysis, conceptualization insights, performance evaluation, creative spark generation, and script analysis.
+    *   **Reliability:** Consistent and reliable performance for all movie analysis and creative generation tasks.
 
 ### Recommendations for Future Integration
 If you want to expand the AI capabilities, consider these top-tier alternatives:
 
 *   **Best for Quality & Nuance: Anthropic Claude 3.5 Sonnet**
-    *   Claude models are widely praised for their sophisticated understanding, detailed and nuanced writing style, and strong performance in creative and analytical tasks. Integrating Claude 3.5 Sonnet would be an excellent choice for offering a premium or alternative analysis engine, especially for the final report generation and script analysis where writing quality is paramount.
+    *   Claude models are widely praised for their sophisticated understanding, detailed and nuanced writing style, and strong performance in creative and analytical tasks. Integrating Claude 3.5 Sonnet would be an excellent choice for offering a premium analysis engine, especially for final report generation and script analysis where writing quality is paramount.
 
 *   **Powerful All-Rounder: OpenAI GPT-4o**
-    *   Another state-of-the-art model with excellent performance across a wide range of tasks. It's a reliable and powerful option, particularly if you are already in the OpenAI ecosystem. It can be more expensive than other options.
+    *   Another state-of-the-art model with excellent performance across a wide range of tasks. It's a reliable and powerful option, particularly if you are already in the OpenAI ecosystem.
 
-**Conclusion:** The current Gemini+Groq setup provides an excellent blend of top-tier quality and high-speed reliability. For future expansion, **Anthropic's Claude 3.5 Sonnet is highly recommended** as the next integration to offer an alternative high-quality voice for analysis.
+*   **Google Gemini 2.5 Flash**
+    *   A powerful, fast, and multi-modal model that offers excellent balance of performance and intelligence for analytical and creative tasks.
+
+**Conclusion:** The current Groq setup provides excellent speed and reliability. For future expansion, **Anthropic's Claude 3.5 Sonnet is highly recommended** as the next integration to offer an alternative high-quality voice for analysis.
 
 ## Protecting Your Intellectual Property
-*   **Prompts (`src/services/geminiService.ts`):** This file contains the "secret sauce" of Greybrainer AI. For commercial use, it **must** be moved to a secure backend to prevent others from copying your methodology.
+*   **Prompts (`src/services/groqService.ts`):** This file contains the "secret sauce" of Greybrainer AI. For commercial use, it **must** be moved to a secure backend to prevent others from copying your methodology.
 *   **Theory (`MOVIE_MAGIC_THEORY.md`):** This document outlines your unique framework. Consider copyright and appropriate sharing strategies.

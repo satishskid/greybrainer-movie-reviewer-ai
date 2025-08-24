@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
 import { LoadingSpinner } from './LoadingSpinner';
-import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, LogTokenUsageFn } from '../services/geminiService';
+import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, LogTokenUsageFn } from '../services/groqService';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon'; // New Icon for detailed report
 import { ClipboardIcon } from './icons/ClipboardIcon';

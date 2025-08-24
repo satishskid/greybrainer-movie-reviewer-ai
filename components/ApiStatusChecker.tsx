@@ -15,7 +15,6 @@ interface ApiStatusCheckerProps {
 
 export const ApiStatusChecker: React.FC<ApiStatusCheckerProps> = ({ onStatusChange, isModal = false }) => {
   const [apiStatuses, setApiStatuses] = useState<ApiStatus[]>([
-    { name: 'Gemini', status: 'checking', message: 'Not tested' },
     { name: 'Groq', status: 'checking', message: 'Not tested' },
   ]);
   const [isChecking, setIsChecking] = useState(false);
@@ -69,44 +68,13 @@ export const ApiStatusChecker: React.FC<ApiStatusCheckerProps> = ({ onStatusChan
     }
   };
 
-  const checkGeminiStatus = async () => {
-    const apiKey = import.meta.env.VITE_API_KEY;
-    if (!apiKey) {
-      return { status: 'error' as const, message: 'API key not configured' };
-    }
 
-    try {
-      // Simple test with Gemini API
-      const { GoogleGenAI } = await import("@google/genai");
-      const ai = new GoogleGenAI({ apiKey });
-      const model = ai.models.generateContent;
-
-      const result = await model({
-        model: "gemini-1.5-flash",
-        contents: [{ parts: [{ text: "Say 'Hello' in one word." }] }],
-        generationConfig: { maxOutputTokens: 10, temperature: 0.1 }
-      });
-
-      const text = result.text?.trim();
-      if (text) {
-        return { status: 'success' as const, message: `✓ Working - Response: "${text}"` };
-      } else {
-        return { status: 'error' as const, message: 'No response content received' };
-      }
-    } catch (error) {
-      return {
-        status: 'error' as const,
-        message: error instanceof Error ? error.message : 'Unknown error'
-      };
-    }
-  };
 
   const checkAllApis = async () => {
     setIsChecking(true);
     onStatusChange?.('testing');
 
     const checks = [
-      { name: 'Gemini', checker: checkGeminiStatus },
       {
         name: 'Groq',
         checker: () => checkApiStatus(
@@ -162,13 +130,13 @@ export const ApiStatusChecker: React.FC<ApiStatusCheckerProps> = ({ onStatusChan
           disabled={isChecking}
           className="px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isChecking ? 'Checking...' : 'Test All APIs'}
+          {isChecking ? 'Checking...' : 'Test API'}
         </button>
       </div>
 
       <div className="mb-4 p-3 bg-slate-700 rounded-lg">
         <p className="text-sm text-slate-300">
-          <strong>AI Services:</strong> Testing Gemini (primary) and Groq (fallback) APIs for movie analysis functionality.
+          <strong>AI Services:</strong> Testing Groq API for movie analysis functionality.
         </p>
       </div>
       
