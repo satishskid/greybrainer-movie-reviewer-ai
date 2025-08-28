@@ -1,0 +1,100 @@
+{
+  "testUsers": [
+    {
+      "id": 1,
+      "email": "test1@greybrainer.ai",
+      "password": "TestPass123!",
+      "role": "tester",
+      "name": "Alice Johnson",
+      "department": "Product Testing"
+    },
+    {
+      "id": 2,
+      "email": "test2@greybrainer.ai",
+      "password": "TestPass123!",
+      "role": "tester",
+      "name": "Bob Smith",
+      "department": "QA Engineering"
+    },
+    {
+      "id": 3,
+      "email": "test3@greybrainer.ai",
+      "password": "TestPass123!",
+      "role": "tester",
+      "name": "Carol Davis",
+      "department": "User Experience"
+    },
+    {
+      "id": 4,
+      "email": "test4@greybrainer.ai",
+      "password": "TestPass123!",
+      "role": "tester",
+      "name": "David Wilson",
+      "department": "Content Review"
+    },
+    {
+      "id": 5,
+      "email": "test5@greybrainer.ai",
+      "password": "TestPass123!",
+      "role": "tester",
+      "name": "Emma Brown",
+      "department": "Film Analysis"
+    },
+    {
+      "id": 6,
+      "email": "test6@greybrainer.ai",
+      "password": "TestPass123!",
+      "role": "admin",
+      "name": "Frank Miller",
+      "department": "Administration"
+    },
+    {
+      "id": 7,
+      "email": "test7@greybrainer.ai",
+      "password": "TestPass123!",
+      "role": "tester",
+      "name": "Grace Lee",
+      "department": "Creative Testing"
+    },
+    {
+      "id": 8,
+      "email": "test8@greybrainer.ai",
+      "password": "TestPass123!",
+      "role": "tester",
+      "name": "Henry Taylor",
+      "department": "Technical Review"
+    },
+    {
+      "id": 9,
+      "email": "test9@greybrainer.ai",
+      "password": "TestPass123!",
+      "role": "tester",
+      "name": "Ivy Chen",
+      "department": "Performance Testing"
+    },
+    {
+      "id": 10,
+      "email": "test10@greybrainer.ai",
+      "password": "TestPass123!",
+      "role": "tester",
+      "name": "Jack Anderson",
+      "department": "Integration Testing"
+    }
+  ],
+  "instructions": {
+    "setup": "To add these users to Firebase Authentication:",
+    "steps": [
+      "1. Go to Firebase Console: https://console.firebase.google.com/project/greybrainer",
+      "2. Navigate to Authentication > Users",
+      "3. Click 'Add user' for each test user",
+      "4. Use the email and password provided above",
+      "5. Users can then log in with these credentials"
+    ],
+    "notes": [
+      "All passwords are set to 'TestPass123!' for simplicity",
+      "test6@greybrainer.ai has admin role for testing admin features",
+      "These are temporary test accounts - change passwords in production",
+      "Consider using Firebase Admin SDK for bulk user creation"
+    ]
+  }
+}

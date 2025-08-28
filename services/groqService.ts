@@ -221,7 +221,15 @@ const generatePromptForLayer = (
   return `
 ${context}
 
-You are an expert film and television critic with deep knowledge of cinema history, storytelling techniques, and industry trends. Your task is to analyze the "${layerTitle}" layer of this movie/series.
+You are a distinguished film and television critic with 20+ years of experience, comparable to critics from The New York Times, The Guardian, or Variety. You have extensive knowledge of:
+- Cinema history across all eras and movements
+- Advanced storytelling techniques and narrative theory
+- Industry trends, box office patterns, and audience psychology
+- Technical filmmaking aspects (cinematography, editing, sound design)
+- Cultural and social context of films
+- Comparative analysis across genres and decades
+
+Your task is to analyze the "${layerTitle}" layer of this movie/series with the depth and sophistication expected from top-tier film criticism.
 
 ${layerDescription}
 
@@ -231,12 +239,27 @@ ${searchInstructions}
 
 ${castingAnalysisInstructions}
 
-Provide a detailed, insightful analysis (200-350 words) that:
-- Evaluates the originality and potential impact of this layer
-- Considers unique elements, innovations, and overall effectiveness
-- Uses an analytical, academic, yet engaging tone
-- Highlights standout or derivative aspects
-- Provides specific examples where possible
+Provide a comprehensive, insightful analysis (250-400 words) that demonstrates:
+
+**Critical Analysis Framework:**
+- Evaluate originality vs. derivative elements with specific comparisons to other films
+- Assess potential cultural and commercial impact
+- Identify unique innovations or missed opportunities
+- Consider both artistic merit and mainstream appeal
+- Reference relevant film theory, genre conventions, or historical context where applicable
+
+**Writing Style Requirements:**
+- Use sophisticated, analytical language befitting professional film criticism
+- Include specific examples and concrete details
+- Balance academic rigor with engaging, accessible prose
+- Avoid generic praise or criticism - be specific and substantive
+- Reference comparable films, directors, or industry trends when relevant
+
+**Quality Benchmarks:**
+- Your analysis should read like it could appear in a major film publication
+- Demonstrate deep understanding of both the specific element and broader cinematic context
+- Provide insights that go beyond surface-level observations
+- Show awareness of how this element contributes to the overall film experience
 
 ${scoreSuggestionInstruction}
 
@@ -244,7 +267,7 @@ ${enhancementInstruction}
 
 ${vonnegutAnalysisInstruction}
 
-Begin your analysis:
+Begin your professional film criticism analysis:
   `.trim();
 };
 
@@ -495,31 +518,47 @@ export const generateCreativeSpark = async (
   const inspirationText = inspiration ? `Drawing inspiration from: ${inspiration}` : "";
   
   const prompt = `
-Generate 3 unique and creative story ideas for the ${genre} genre. ${inspirationText}
+You are a seasoned Hollywood story developer and screenwriter with expertise in creating commercially viable, critically acclaimed concepts. Your task is to generate 3 exceptional story ideas for the ${genre} genre. ${inspirationText}
+
+**Quality Standards:**
+- Each concept should feel like it could be pitched to major studios or streaming platforms
+- Demonstrate deep understanding of genre conventions while offering fresh perspectives
+- Create concepts that balance commercial appeal with artistic merit
+- Ensure each idea has clear dramatic stakes and emotional resonance
+- Avoid clichéd or overdone concepts unless you're subverting them cleverly
+
+**Research Context:**
+Consider successful ${genre} films/shows from the past decade. What made them work? How can you innovate within established frameworks? Think about current cultural zeitgeist and audience interests.
 
 For each idea, provide:
-1. **Logline**: A compelling one-sentence summary (25-35 words)
-2. **Synopsis**: A detailed 3-4 sentence expansion (75-100 words)
-3. **Character Ideas**: 2-3 main characters with brief descriptions
-4. **Scene Ideas**: 2-3 key scenes that would be memorable
+
+1. **Logline**: A compelling, marketable one-sentence summary (25-40 words) that immediately hooks the reader
+2. **Synopsis**: A detailed expansion (100-150 words) that reveals the story's unique angle and emotional core
+3. **Character Ideas**: 2-3 main characters with specific, memorable traits and clear motivations
+4. **Scene Ideas**: 2-3 key scenes that would be visually striking and emotionally powerful
 5. **Mind Map**: ${MIND_MAP_PROMPT_STRUCTURE}
 
-Make each idea distinctive, original, and engaging. Focus on unique twists, compelling characters, and strong dramatic potential.
+**Execution Guidelines:**
+- Make each idea distinctly different from the others
+- Focus on specific, concrete details rather than generic descriptions
+- Ensure strong protagonist agency and clear character arcs
+- Include elements that would translate well to visual media
+- Consider both domestic and international market appeal
 
 Format each idea as:
 **IDEA [NUMBER]:**
-Logline: [logline]
-Synopsis: [synopsis]
+Logline: [compelling, specific logline]
+Synopsis: [detailed, engaging synopsis]
 Characters:
-- [Character 1]: [description]
-- [Character 2]: [description]
+- [Character 1]: [specific name and detailed description with motivation]
+- [Character 2]: [specific name and detailed description with motivation]
 Key Scenes:
-- [Scene 1]: [description]
-- [Scene 2]: [description]
+- [Scene 1]: [specific, visual scene description]
+- [Scene 2]: [specific, visual scene description]
 Mind Map:
-[mind map markdown]
+[comprehensive mind map markdown]
 
-Begin generating ideas:
+Begin generating professional-quality story concepts:
   `.trim();
 
   const messages = [
@@ -888,7 +927,166 @@ Begin your analysis:
   }
 };
 
-// Movie Title Suggestions
+// Enhanced Movie Name Matching for Indian and International Cinema
+// Enhanced movie matching with web search for real-time data
+export const findMovieMatchesWithWebSearch = async (
+  userInput: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string[]> => {
+  try {
+    // Search the web for recent movie information
+    const searchQuery = `"${userInput}" movie 2025 2024 bollywood hollywood tamil telugu recent release`;
+    
+    // This function would need to be called from the frontend with web search capability
+    // For now, we'll create an enhanced prompt that simulates web search context
+    const enhancedPrompt = `
+You are an expert film database consultant with access to the most current movie information as of 2025. 
+
+User is searching for: "${userInput}"
+
+**CRITICAL: You must provide ONLY real, existing movies/series that match this search term.**
+
+**Priority Order (search in this sequence):**
+1. **2025 New Releases** - Latest theatrical and OTT releases
+2. **2024 Recent Hits** - Popular films from last year
+3. **2023-2024 Streaming** - Netflix, Prime, Disney+, Hotstar exclusives
+4. **Regional Cinema** - Latest Bollywood, Tamil, Telugu, Malayalam, etc.
+5. **International** - Hollywood and global cinema
+6. **Classic Matches** - Only if highly relevant to search term
+
+**Matching Techniques:**
+- Exact title matches (highest priority)
+- Phonetic similarities ("Pushpa" vs "Pusha")
+- Transliteration variants ("Baahubali" vs "Bahubali")
+- English/regional title variations
+- Franchise/sequel patterns ("KGF Chapter 3", "Pushpa 2")
+- Popular abbreviations and nicknames
+
+**Output Requirements:**
+- Provide exactly 8-12 matches
+- Include release year in parentheses
+- Order by relevance (most recent/popular first)
+- Focus on real, verifiable titles only
+
+**Format:**
+1. [Exact or closest match] (2025)
+2. [Second best match] (2024/2025)
+3. [Phonetic/variant match] (Year)
+...
+
+Begin your search and matching:
+    `.trim();
+
+    const messages = [
+      { role: "system", content: "You are a comprehensive, up-to-date film database expert with real-time knowledge of current movie releases, trending content, and regional cinema across all major film industries as of 2025." },
+      { role: "user", content: enhancedPrompt }
+    ];
+
+    const response = await callGroqAPI(messages, "Enhanced Movie Matching", logTokenUsage, 1500);
+    
+    // Parse the enhanced response
+    const matches: string[] = [];
+    const lines = response.split('\n').filter(line => line.trim());
+    
+    lines.forEach(line => {
+      const match = line.match(/^\s*\d+[.)\s]+(.+)$/) || line.match(/^\s*[-*•]\s*(.+)$/);
+      if (match && match[1]) {
+        let title = match[1].trim().replace(/["']/g, '');
+        // Clean up the title to extract just the movie name
+        title = title.split(' - ')[0].split(' (')[0];
+        if (title.length > 0 && title.length < 100) {
+          matches.push(title);
+        }
+      }
+    });
+    
+    return matches.length > 0 ? matches.slice(0, 12) : [userInput];
+  } catch (error) {
+    console.error('Error in enhanced movie matching:', error);
+    // Fallback to original function
+    return findMovieMatches(userInput, logTokenUsage);
+  }
+};
+
+// Original function as fallback
+export const findMovieMatches = async (
+  userInput: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string[]> => {
+  const prompt = `
+You are an expert film database consultant with comprehensive knowledge of:
+- Latest Bollywood/Hindi cinema (2023-2025) and current releases
+- Recent Regional Indian cinema (Tamil, Telugu, Malayalam, Kannada, Bengali, Marathi, etc.)
+- Current Hollywood and international English-language films (2024-2025)
+- Latest popular TV series and web series (Netflix, Amazon Prime, Disney+, Hotstar, etc.)
+- 2025 new releases, trending movies, and current box office hits
+- Film transliterations and alternate spellings
+
+User input: "${userInput}"
+
+Find and suggest the most likely movie/series matches for this input. **PRIORITIZE 2024-2025 RELEASES AND CURRENT FILMS** but also include relevant classics if they match well.
+
+**Matching Strategies:**
+- Exact title matches (prioritize recent releases)
+- Phonetic similarities and common misspellings
+- Transliteration variations (e.g., "Baahubali" vs "Bahubali")
+- English translations of foreign titles
+- Alternate release titles (regional vs international)
+- Popular abbreviations or nicknames
+- Series vs movie variations (e.g., "KGF" could be "KGF: Chapter 1" or "KGF: Chapter 2")
+- Recent sequels, prequels, and franchise entries
+
+**Regional Considerations:**
+- Include both original language titles and English translations
+- Consider year variations for remakes or sequels
+- Account for different romanization systems
+- Include popular streaming platform titles and OTT releases
+- Focus on current trending and recently released content
+
+**Output Format:**
+Provide 8-12 most likely matches as a numbered list, ordered by relevance (recent films first):
+
+1. [Most likely recent/current match]
+2. [Close recent phonetic match]
+3. [Recent alternate spelling/transliteration]
+...
+
+Focus on real, existing movies and series. **Strongly prioritize 2024-2025 releases and current year films** and currently popular titles. Include release years when helpful for disambiguation.
+
+Begin matching:
+  `.trim();
+
+  const messages = [
+    { role: "system", content: "You are a comprehensive film database expert specializing in Indian and international cinema with deep knowledge of title variations, transliterations, and regional naming conventions." },
+    { role: "user", content: prompt }
+  ];
+
+  try {
+    const response = await callGroqAPI(messages, "Movie Name Matching", logTokenUsage, 1000);
+    
+    // Parse the numbered list with improved regex
+    const matches: string[] = [];
+    const lines = response.split('\n').filter(line => line.trim());
+    
+    lines.forEach(line => {
+      // More flexible parsing to handle various numbering formats
+      const match = line.match(/^\s*\d+[.)\s]+(.+)$/) || line.match(/^\s*[-*•]\s*(.+)$/);
+      if (match && match[1]) {
+        const title = match[1].trim().replace(/["']/g, ''); // Remove quotes
+        if (title.length > 0 && title.length < 100) { // Reasonable title length
+          matches.push(title);
+        }
+      }
+    });
+    
+    return matches.length > 0 ? matches.slice(0, 12) : [userInput]; // Return original if no matches
+  } catch (error) {
+    console.error('Error finding movie matches:', error);
+    return [userInput]; // Return original input as fallback
+  }
+};
+
+// Movie Title Suggestions (for creative generation)
 export const getMovieTitleSuggestions = async (
   logline: string,
   genre?: string,
@@ -897,21 +1095,27 @@ export const getMovieTitleSuggestions = async (
   const genreText = genre ? ` in the ${genre} genre` : '';
   
   const prompt = `
-Generate 10 creative and compelling movie titles for this concept${genreText}:
+You are a professional film industry consultant specializing in movie title development. Based on this logline${genreText}, suggest 10-15 realistic and compelling movie or TV series titles:
 
 **Logline:** ${logline}
 
-Provide titles that are:
-- Memorable and catchy
-- Appropriate for the genre and tone
-- Marketable and audience-friendly
-- Varied in style (some literal, some metaphorical, some intriguing)
+Create titles that:
+- Sound like actual Hollywood productions (study successful films in similar genres)
+- Capture the essence and tone of the story
+- Are memorable, marketable, and audience-friendly
+- Avoid generic phrases like "The Last", "Dark", "Blood", "Final" unless truly fitting
+- Consider both literal and metaphorical approaches
+- Range from 1-4 words typically
+- Could realistically appear on movie posters or streaming platforms
 
-Format as a simple numbered list:
-1. [Title 1]
-2. [Title 2]
-3. [Title 3]
-[Continue for all 10]
+Provide ONLY a numbered list, one title per line:
+
+1. [Title]
+2. [Title]
+3. [Title]
+...
+
+Focus on quality over quantity - each title should feel professionally crafted.
 
 Begin generating titles:
   `.trim();
@@ -922,20 +1126,24 @@ Begin generating titles:
   ];
 
   try {
-    const response = await callGroqAPI(messages, "Title Suggestions", logTokenUsage, 800);
+    const response = await callGroqAPI(messages, "Title Suggestions", logTokenUsage, 1200);
     
-    // Parse the numbered list
+    // Parse the numbered list with improved regex
     const titles: string[] = [];
-    const lines = response.split('\n');
+    const lines = response.split('\n').filter(line => line.trim());
     
     lines.forEach(line => {
-      const match = line.match(/^\d+\.\s*(.+)$/);
-      if (match) {
-        titles.push(match[1].trim());
+      // More flexible parsing to handle various numbering formats
+      const match = line.match(/^\s*\d+[.)\s]+(.+)$/) || line.match(/^\s*[-*•]\s*(.+)$/);
+      if (match && match[1]) {
+        const title = match[1].trim().replace(/["']/g, ''); // Remove quotes
+        if (title.length > 0 && title.length < 100) { // Reasonable title length
+          titles.push(title);
+        }
       }
     });
     
-    return titles.length > 0 ? titles : ['Title Generation Failed'];
+    return titles.length > 0 ? titles.slice(0, 15) : ['Title Generation Failed'];
     
   } catch (error) {
     console.error('Error generating title suggestions:', error);
@@ -1069,25 +1277,37 @@ export const generateGreybrainerInsightWithGemini = async (
   analyses: LayerAnalysisData[],
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<{ insight: string; isFallbackResult?: boolean }> => {
+  // Add null check for analyses array
+  if (!analyses || !Array.isArray(analyses) || analyses.length === 0) {
+    throw new Error('No analysis data provided for insight generation');
+  }
+  
   const analysisContext = analyses.map(analysis => {
     const score = analysis.userScore || analysis.aiSuggestedScore || 'N/A';
-    const text = analysis.editedText || analysis.aiGeneratedText;
+    const text = analysis.editedText || analysis.aiGeneratedText || 'No analysis text available';
     return `**${analysis.title} (${score}/${MAX_SCORE}):** ${text.substring(0, 200)}...`;
   }).join('\n\n');
   
   const prompt = `
-Generate a unique "Greybrainer Insight" for "${movieTitle}" (${reviewStage}).
+As an expert film analyst, generate a unique "Greybrainer Insight" for "${movieTitle}" (${reviewStage}).
 
-Based on this analysis:
+Based on this comprehensive analysis:
 ${analysisContext}
 
-Provide a distinctive, thought-provoking insight (150-200 words) that:
-1. Offers a fresh perspective on the film's creative elements
-2. Connects themes or techniques to broader cinematic trends
-3. Provides actionable wisdom for filmmakers or audiences
-4. Demonstrates deep understanding of storytelling craft
+Provide a distinctive, thought-provoking insight (150-250 words) that:
+1. Offers a fresh perspective on the film's creative elements and storytelling techniques
+2. Connects themes, character arcs, or cinematic techniques to broader industry trends
+3. Provides actionable wisdom that filmmakers, writers, or audiences can apply
+4. Demonstrates deep understanding of narrative craft and cinematic language
+5. Identifies what makes this film unique or significant in its genre
 
-Make this insight memorable, quotable, and uniquely valuable - something that could only come from deep analysis.
+Your insight should be:
+- Memorable and quotable
+- Backed by specific examples from the analysis
+- Uniquely valuable - something only deep analysis could reveal
+- Written in an engaging, authoritative tone
+
+Focus on the film's most compelling aspects and what they reveal about effective storytelling.
 
 Begin your insight:
   `.trim();

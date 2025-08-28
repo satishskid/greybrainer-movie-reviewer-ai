@@ -6,8 +6,7 @@ import App from '../App';
 import './firebase'; // Initialize Firebase
 import './index.css'; // Import Tailwind CSS
 
-const GEMINI_API_KEY = import.meta.env.VITE_API_KEY;
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY; // For fallback
+const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -43,18 +42,15 @@ const renderErrorScreen = (title: string, messages: string[]) => {
   );
 };
 
-if (!GEMINI_API_KEY) {
-  console.error("Critical Error: Missing Gemini API Key. AI features will not function.");
+if (!GROQ_API_KEY) {
+  console.error("Critical Error: Missing Groq API Key. AI features will not function.");
   renderErrorScreen("AI Service Configuration Error", [
-    "The Gemini API Key (<code>VITE_API_KEY</code>) is missing.",
-    "This key is essential for primary AI-powered analysis features.",
-    "Please ensure <code>VITE_API_KEY</code> is correctly set in your <code>.env</code> file."
+    "The Groq API Key (<code>VITE_GROQ_API_KEY</code>) is missing.",
+    "This key is essential for AI-powered analysis features.",
+    "Please ensure <code>VITE_GROQ_API_KEY</code> is correctly set in your <code>.env</code> file."
   ]);
 } else {
-  if (!GROQ_API_KEY) {
-    console.warn("Warning: Missing Groq API Key (VITE_GROQ_API_KEY). Fallback API functionality will be unavailable. Primary Gemini API will still function.");
-  }
-  // Render the full application if Gemini API key is present
+  // Render the full application if Groq API key is present
   // Firebase authentication can be handled within the App component or specific routes
   root.render(
     <React.StrictMode>

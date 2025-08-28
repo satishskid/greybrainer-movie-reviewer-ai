@@ -4,6 +4,12 @@ import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'f
 import { LoadingSpinner } from './LoadingSpinner';
 import { LockClosedIcon } from './icons/LockClosedIcon';
 import { KeyIcon } from './icons/KeyIcon';
+import { GeminiKeyPrompt } from './GeminiKeyPrompt';
+import { GeminiKeyManager } from './GeminiKeyManager';
+import GeminiDebugTest from './GeminiDebugTest';
+import { hasGeminiApiKey } from '../utils/geminiKeyStorage';
+import { hasGoogleSearchApiKey } from '../utils/googleSearchKeyStorage';
+import { GoogleSearchKeyPrompt } from './GoogleSearchKeyPrompt';
 
 interface AuthWrapperProps {
   children: React.ReactNode;
@@ -16,11 +22,20 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [showGeminiKeyPrompt, setShowGeminiKeyPrompt] = useState(false);
+  const [showGoogleSearchKeyPrompt, setShowGoogleSearchKeyPrompt] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       setUser(user);
       setLoading(false);
+      
+      // Check if user is authenticated but doesn't have API keys
+      if (user && !hasGeminiApiKey()) {
+        setShowGeminiKeyPrompt(true);
+      } else if (user && hasGeminiApiKey() && !hasGoogleSearchApiKey()) {
+        setShowGoogleSearchKeyPrompt(true);
+      }
     });
 
     return () => unsubscribe();
@@ -139,6 +154,58 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
     );
   }
 
+  const handleGeminiKeySubmit = (apiKey: string) => {
+    // The key storage is handled inside the GeminiKeyPrompt component
+    setShowGeminiKeyPrompt(false);
+    // After Gemini key is set, check for Google Search key
+    if (!hasGoogleSearchApiKey()) {
+      setShowGoogleSearchKeyPrompt(true);
+    }
+  };
+
+  const handleGeminiKeySkip = () => {
+    setShowGeminiKeyPrompt(false);
+    // After skipping Gemini key, still check for Google Search key
+    if (!hasGoogleSearchApiKey()) {
+      setShowGoogleSearchKeyPrompt(true);
+    }
+  };
+
+  const handleGoogleSearchKeySubmit = (apiKey: string) => {
+    // The key storage is handled inside the GoogleSearchKeyPrompt component
+    setShowGoogleSearchKeyPrompt(false);
+  };
+
+  const handleGoogleSearchKeySkip = () => {
+    setShowGoogleSearchKeyPrompt(false);
+  };
+
+  // Show Gemini key prompt if user is authenticated but no API key is stored
+  if (user && showGeminiKeyPrompt) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <GeminiKeyPrompt 
+          isOpen={true}
+          onSubmit={handleGeminiKeySubmit}
+          onSkip={handleGeminiKeySkip}
+        />
+      </div>
+    );
+  }
+
+  // Show Google Search key prompt after Gemini key is configured
+  if (user && showGoogleSearchKeyPrompt) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+        <GoogleSearchKeyPrompt 
+          isOpen={true}
+          onSubmit={handleGoogleSearchKeySubmit}
+          onSkip={handleGoogleSearchKeySkip}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* User Info Bar */}
@@ -154,17 +221,25 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
               {user.email}
             </span>
           </div>
-          <button
-            onClick={handleLogout}
-            className="text-slate-400 hover:text-slate-200 text-sm transition-colors duration-200"
-          >
-            Sign Out
-          </button>
+          <div className="flex items-center space-x-4">
+            <GeminiKeyManager />
+            <button
+              onClick={handleLogout}
+              className="text-slate-400 hover:text-slate-200 text-sm transition-colors duration-200"
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
+      </div>
+
+      {/* Debug Section */}
+      <div className="max-w-7xl mx-auto p-4">
+        <GeminiDebugTest />
       </div>
 
       {/* Main App Content */}
       {children}
     </div>
   );
-};
+  };

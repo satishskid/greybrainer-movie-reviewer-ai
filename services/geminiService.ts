@@ -1,9 +1,10 @@
 
 
 
-import { GoogleGenAI, GenerateContentResponse, GenerateContentParameters } from "@google/genai";
+import { GoogleGenerativeAI, GenerateContentResult } from "@google/generative-ai";
 import { ReviewLayer, ReviewStage, LayerAnalysisData, GroundingChunkWeb, GroundingMetadata, PersonnelData, SummaryReportData, CreativeSparkResult, VonnegutShapeData, PlotPoint, ScriptIdeaInput, MagicQuotientAnalysis, MorphokineticsAnalysis, FinancialAnalysisData, SocialSnippets } from '../types';
 import { GEMINI_MODEL_TEXT, MAX_SCORE, MAGIC_QUOTIENT_DISCLAIMER } from '../constants';
+import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
 
 // --- IP PROTECTION & COMMERCIAL SERVICE NOTE ---
 // For a commercial application requiring IP protection and robust user management/metering:
@@ -15,22 +16,247 @@ import { GEMINI_MODEL_TEXT, MAX_SCORE, MAGIC_QUOTIENT_DISCLAIMER } from '../cons
 // The current setup with API_KEY in process.env (replaced at build time for client) is for simplicity in this dev environment.
 // ---------------------------------------------
 
-const GEMINI_API_KEY = import.meta.env.VITE_API_KEY;
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
+const GROQ_API_KEY = (import.meta as any).env?.VITE_GROQ_API_KEY;
 
-if (!GEMINI_API_KEY) {
-  throw new Error("VITE_API_KEY environment variable is not set. Please ensure it's configured in your .env file.");
-}
+// Function to get Gemini AI instance with user-provided API key
+const getGeminiAI = (): GoogleGenerativeAI => {
+  const apiKey = getGeminiApiKeyString();
+  if (!apiKey) {
+    throw new Error("Gemini API key not found. Please provide your API key to continue.");
+  }
+  return new GoogleGenerativeAI(apiKey);
+};
 
-if (GEMINI_API_KEY && !GROQ_API_KEY) { 
+if (!GROQ_API_KEY) { 
   console.warn("GROQ_API_KEY environment variable is not set. Fallback API (Groq) will not function. Primary Gemini API will be used."); 
 }
-
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
 const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
 const GROQ_MODEL = "llama3-8b-8192"; 
 
 export type LogTokenUsageFn = (operation: string, inputChars: number, outputChars: number) => void;
+
+// Quota monitoring types and interfaces
+interface QuotaStatus {
+  isExceeded: boolean;
+  resetTime?: Date;
+  nextWindowAvailable?: string;
+  errorMessage?: string;
+}
+
+interface QuotaMonitor {
+  checkQuotaStatus(): QuotaStatus;
+  handleQuotaError(error: Error): QuotaStatus;
+  getNextResetWindow(): string;
+}
+
+// Gemini API quota monitoring implementation
+class GeminiQuotaMonitor implements QuotaMonitor {
+  private static instance: GeminiQuotaMonitor;
+  private quotaExceededUntil: Date | null = null;
+  private lastQuotaCheck: Date | null = null;
+
+  static getInstance(): GeminiQuotaMonitor {
+    if (!GeminiQuotaMonitor.instance) {
+      GeminiQuotaMonitor.instance = new GeminiQuotaMonitor();
+    }
+    return GeminiQuotaMonitor.instance;
+  }
+
+  checkQuotaStatus(): QuotaStatus {
+    const now = new Date();
+    
+    if (this.quotaExceededUntil && now < this.quotaExceededUntil) {
+      return {
+        isExceeded: true,
+        resetTime: this.quotaExceededUntil,
+        nextWindowAvailable: this.getNextResetWindow(),
+        errorMessage: `Gemini API quota exceeded. Next window available: ${this.getNextResetWindow()}`
+      };
+    }
+    
+    // Reset quota status if time has passed
+    if (this.quotaExceededUntil && now >= this.quotaExceededUntil) {
+      this.quotaExceededUntil = null;
+    }
+    
+    return { isExceeded: false };
+  }
+
+  handleQuotaError(error: Error): QuotaStatus {
+    const errorMessage = error.message.toLowerCase();
+    
+    if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
+      // Set quota exceeded for 24 hours (typical daily reset)
+      this.quotaExceededUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      
+      return {
+        isExceeded: true,
+        resetTime: this.quotaExceededUntil,
+        nextWindowAvailable: this.getNextResetWindow(),
+        errorMessage: `Gemini API quota exceeded. Next window available: ${this.getNextResetWindow()}`
+      };
+    }
+    
+    return { isExceeded: false, errorMessage: error.message };
+  }
+
+  getNextResetWindow(): string {
+    if (!this.quotaExceededUntil) {
+      return 'Available now';
+    }
+    
+    const now = new Date();
+    const timeDiff = this.quotaExceededUntil.getTime() - now.getTime();
+    
+    if (timeDiff <= 0) {
+      return 'Available now';
+    }
+    
+    const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+    
+    if (hours > 0) {
+      return `${hours}h ${minutes}m ${seconds}s`;
+    } else if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    } else {
+      return `${seconds}s`;
+    }
+  }
+  
+  getResetTimestamp(): Date | null {
+    return this.quotaExceededUntil;
+  }
+  
+  getDetailedQuotaInfo(): {
+    isExceeded: boolean;
+    resetTime?: Date;
+    timeRemaining?: {
+      hours: number;
+      minutes: number;
+      seconds: number;
+      totalMs: number;
+    };
+    nextWindowFormatted?: string;
+  } {
+    if (!this.quotaExceededUntil) {
+      return { isExceeded: false };
+    }
+    
+    const now = new Date();
+    const timeDiff = this.quotaExceededUntil.getTime() - now.getTime();
+    
+    if (timeDiff <= 0) {
+      return { isExceeded: false };
+    }
+    
+    const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
+    
+    return {
+      isExceeded: true,
+      resetTime: this.quotaExceededUntil,
+      timeRemaining: {
+        hours,
+        minutes,
+        seconds,
+        totalMs: timeDiff
+      },
+      nextWindowFormatted: this.getNextResetWindow()
+    };
+  }
+  
+  resetQuotaStatus(): void {
+    this.quotaExceededUntil = null;
+    console.log('Quota status has been manually reset');
+  }
+}
+
+// Global quota monitor instance
+const quotaMonitor = GeminiQuotaMonitor.getInstance();
+
+// Enhanced error handling with quota monitoring
+const handleGeminiError = (error: Error, operation: string): never => {
+  const quotaStatus = quotaMonitor.handleQuotaError(error);
+  
+  if (quotaStatus.isExceeded) {
+    // Show user-friendly quota exceeded message
+    const alertMessage = `🚫 Gemini API Daily Quota Exceeded\n\n` +
+      `The Gemini API has reached its daily usage limit.\n\n` +
+      `⏰ Next available window: ${quotaStatus.nextWindowAvailable}\n\n` +
+      `💡 Tip: You can:\n` +
+      `• Wait for the quota to reset\n` +
+      `• Upgrade your Gemini API plan\n` +
+      `• Check your API usage in Google AI Studio`;
+    
+    // Show alert to user
+    if (typeof window !== 'undefined' && window.alert) {
+      window.alert(alertMessage);
+    } else {
+      console.error(alertMessage);
+    }
+    
+    throw new Error(quotaStatus.errorMessage || `Gemini API quota exceeded for operation: ${operation}`);
+  }
+  
+  // Handle other API errors
+  if (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID')) {
+    throw new Error('Invalid Gemini API Key. Please check your API key configuration.');
+  }
+  
+  throw new Error(`Gemini API error in ${operation}: ${error.message}`);
+};
+
+// Export quota monitoring functions for external use
+export const getQuotaStatus = (): QuotaStatus => quotaMonitor.checkQuotaStatus();
+export const getNextQuotaResetWindow = (): string => quotaMonitor.getNextResetWindow();
+export const getQuotaResetTimestamp = (): Date | null => quotaMonitor.getResetTimestamp();
+export const getDetailedQuotaInfo = () => quotaMonitor.getDetailedQuotaInfo();
+export const resetQuotaStatus = (): void => {
+  quotaMonitor.resetQuotaStatus();
+};
+
+// Add missing type definitions
+interface CharacterIdea {
+  name: string;
+  description: string;
+}
+
+interface SceneIdea {
+  title: string;
+  description: string;
+}
+
+// Add missing generateAnalysisPrompt function
+const generateAnalysisPrompt = (movieTitle: string, reviewStage: ReviewStage, layer: ReviewLayer, layerTitle: string, layerDescription: string): string => {
+  return `
+    You are an expert film critic analyzing "${movieTitle}" (${reviewStage}).
+    Focus on the ${layerTitle}: ${layerDescription}
+    
+    Provide a comprehensive analysis including:
+    1. Detailed critique of this specific aspect
+    2. Strengths and weaknesses
+    3. How it contributes to the overall film
+    4. Suggested improvements
+    
+    Include the following structured data:
+    Director: [Director Name]
+    Main Cast: [Cast Names]
+    Suggested Score: [Score]/${MAX_SCORE}
+    Potential Enhancements: [List of suggestions]
+    
+    ${layer === ReviewLayer.STORY ? `
+    Also include Vonnegut Story Shape analysis:
+    ---VONNEGUT STORY SHAPE START---
+    [Analysis of story shape and emotional arc]
+    ---VONNEGUT STORY SHAPE END---
+    ` : ''}
+    
+    Provide your analysis:
+  `;
+};
 
 
 export interface ParsedLayerAnalysis {
@@ -326,8 +552,8 @@ const parseVonnegutShapeData = (text: string): VonnegutShapeData | undefined => 
 };
 
 
-const extractGroundingSources = (response: GenerateContentResponse): GroundingChunkWeb[] => {
-    const groundingMetadata = response.candidates?.[0]?.groundingMetadata as GroundingMetadata | undefined;
+const extractGroundingSources = (response: GenerateContentResult): GroundingChunkWeb[] => {
+    const groundingMetadata = response.response.candidates?.[0]?.groundingMetadata as GroundingMetadata | undefined;
     let sources: GroundingChunkWeb[] = [];
     if (groundingMetadata?.groundingAttribution?.web) {
         sources = groundingMetadata.groundingAttribution.web.map(chunk => ({
@@ -336,8 +562,8 @@ const extractGroundingSources = (response: GenerateContentResponse): GroundingCh
         }));
     }
      // Also check the old groundingChunks if new one is empty (for backward compatibility or variations in response)
-    if (sources.length === 0 && response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
-        sources = (response.candidates[0].groundingMetadata.groundingChunks as any[])
+    if (sources.length === 0 && response.response.candidates?.[0]?.groundingMetadata?.groundingChunks) {
+        sources = (response.response.candidates[0].groundingMetadata.groundingChunks as any[])
             .filter(chunk => chunk.web && chunk.web.uri)
             .map(chunk => ({
                 uri: chunk.web.uri,
@@ -415,100 +641,7 @@ const filterRelevantSources = (sources: GroundingChunkWeb[]): GroundingChunkWeb[
     }).slice(0, 5); // Limit to top 5 most relevant sources
 };
 
-export const analyzeLayerWithGemini = async (
-  movieTitle: string,
-  reviewStage: ReviewStage,
-  layer: ReviewLayer,
-  layerTitle: string,
-  layerDescription: string,
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<ParsedLayerAnalysis> => {
-  // In a backend model, this function receives params from your API endpoint.
-  const prompt = generatePromptForLayer(movieTitle, reviewStage, layer, layerTitle, layerDescription);
-  
-  const generateContentParams: GenerateContentParameters = {
-    model: GEMINI_MODEL_TEXT,
-    contents: prompt,
-    config: {
-      temperature: 0.7, 
-      topP: 0.9,
-      topK: 40,
-    }
-  };
-
-  if (layer === ReviewLayer.CONCEPTUALIZATION || layer === ReviewLayer.PERFORMANCE) {
-    if (generateContentParams.config) { 
-        generateContentParams.config.tools = [{googleSearch: {}}];
-    }
-  }
-
-  try {
-    // This ai.models.generateContent call happens on your backend.
-    const response: GenerateContentResponse = await ai.models.generateContent(generateContentParams);
-    const rawAnalysisText = response.text.trim();
-    
-    logTokenUsage?.(`Layer Analysis (Gemini): ${layerTitle}`, prompt.length, rawAnalysisText.length);
-    
-    // Parsing logic also on the backend.
-    let director = parseDirector(rawAnalysisText);
-    let mainCast = parseMainCast(rawAnalysisText);
-    let aiSuggestedScore = parseAISuggestedScore(rawAnalysisText);
-    let improvementSuggestions = parseImprovementSuggestions(rawAnalysisText);
-    let vonnegutShape: VonnegutShapeData | undefined;
-
-    if (layer === ReviewLayer.STORY) {
-      vonnegutShape = parseVonnegutShapeData(rawAnalysisText);
-    }
-    
-    let cleanedAnalysisText = rawAnalysisText;
-    const vonnegutBlockRegex = /---VONNEGUT STORY SHAPE START---[\s\S]*?---VONNEGUT STORY SHAPE END---/i;
-    cleanedAnalysisText = cleanedAnalysisText.replace(vonnegutBlockRegex, '').trim();
-
-    if (director) cleanedAnalysisText = cleanedAnalysisText.replace(/Director:\s*(.*)/i, '').trim();
-    if (mainCast && mainCast.length > 0) cleanedAnalysisText = cleanedAnalysisText.replace(/Main Cast:\s*([\w\s,]+)/i, '').trim();
-    
-    const scoreRegex = new RegExp(`Suggested Score:\\s*(\\d*\\.?\\d+)\\s*/\\s*${MAX_SCORE}[\\s\\S]*?(Potential Enhancements:|$)`, "i");
-    cleanedAnalysisText = cleanedAnalysisText.replace(scoreRegex, '$1').trim(); 
-        
-    cleanedAnalysisText = cleanedAnalysisText.replace(/Potential Enhancements:[\s\S]*/i, '').trim();
-    
-    cleanedAnalysisText = cleanedAnalysisText.replace(/\n\s*\n/g, '\n').trim();
-
-    const groundingSources = extractGroundingSources(response);
-
-    // The backend returns this structured object to the client.
-    return {
-      analysisText: cleanedAnalysisText,
-      director,
-      mainCast,
-      groundingSources,
-      aiSuggestedScore,
-      improvementSuggestions,
-      vonnegutShape,
-      isFallbackResult: false,
-    };
-
-  } catch (error) {
-    console.error(`Gemini API error for layer ${layer}:`, error);
-    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
-    }
-    
-    if (GROQ_API_KEY) {
-      try {
-        console.warn(`Gemini failed for layer ${layerTitle}, attempting Groq fallback.`);
-        return await callGroqApiForLayer(prompt, movieTitle, reviewStage, layer, layerTitle, logTokenUsage);
-      } catch (fallbackError) {
-        console.error(`Groq Fallback API also failed for layer ${layerTitle}:`, fallbackError);
-        if (fallbackError instanceof Error) {
-            throw new Error(`Primary AI (Gemini) failed for ${layerTitle}. Fallback AI (Groq) also failed: ${fallbackError.message}`);
-        }
-        throw new Error(`Primary AI (Gemini) failed for ${layerTitle}. Fallback AI (Groq) also failed with an unknown error.`);
-      }
-    }
-    throw new Error(`Failed to get analysis for ${layerTitle} from AI. Primary API (Gemini) failed and fallback is not configured or also failed.`);
-  }
-};
+// Duplicate function removed - using the one at the end of the file
 
 const generatePromptForFinalReport = (
   movieTitle: string, 
@@ -647,90 +780,9 @@ const parseFinalReportAndMore = (fullResponse: string, existingFinancialData?: F
 };
 
 
-export const generateFinalReportWithGemini = async (
-  movieTitle: string,
-  reviewStage: ReviewStage,
-  analyses: LayerAnalysisData[],
-  personnelData: PersonnelData | undefined,
-  financialData: FinancialAnalysisData | null, // Pass full financial data
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<SummaryReportData> => {
-  const prompt = generatePromptForFinalReport(movieTitle, reviewStage, analyses, personnelData, financialData);
-  try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: GEMINI_MODEL_TEXT,
-      contents: prompt,
-      config: {
-        temperature: 0.75, 
-        topP: 0.9,
-        topK: 50,
-      }
-    });
-    const responseText = response.text.trim();
-    logTokenUsage?.('Final Report Generation (Gemini)', prompt.length, responseText.length);
-    
-    // Pass financialData to parser so it's included in the returned SummaryReportData
-    const parsedReport = parseFinalReportAndMore(responseText, financialData);
-    return { ...parsedReport, isFallbackResult: false };
-  } catch (error) {
-    console.error('Gemini API error for final report:', error);
-     if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
-    }
-    throw new Error('Failed to generate final report from AI. Primary API (Gemini) failed and fallback is not configured or also failed.');
-  }
-};
+// Duplicate function removed - using the one at the end of the file
 
-export const analyzeStakeholderMagicFactor = async (
-  name: string,
-  type: 'Director' | 'Actor',
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<{ analysisText: string; groundingSources?: GroundingChunkWeb[]; isFallbackResult?: boolean }> => {
-  // In a backend model, this function receives params from your API endpoint.
-  const prompt = `
-    You are a film historian and expert critic. Analyze ${type} ${name}.
-    Describe their "magic factor": unique signature style, recurring themes, notable techniques, qualities in performances/direction defining their contribution, and what makes their work recognizable/impactful.
-    Use Google Search for info on filmography, reception, artistic approaches. Provide specific examples.
-    Analysis: concise, engaging, ~150-200 words.
-    Conclude with web sources under "Sources:" if available.
-  `;
-
-  try {
-    // This ai.models.generateContent call happens on your backend.
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: GEMINI_MODEL_TEXT,
-      contents: prompt,
-      config: {
-        tools: [{googleSearch: {}}],
-        temperature: 0.6,
-        topP: 0.9,
-        topK: 30,
-      }
-    });
-    
-    let analysisText = response.text.trim();
-    logTokenUsage?.(`Magic Factor (Gemini): ${name}`, prompt.length, analysisText.length);
-    const groundingSources = extractGroundingSources(response);
-    
-    const sourcesMarker = "Sources:";
-    const sourcesIndex = analysisText.lastIndexOf(sourcesMarker);
-    if (sourcesIndex !== -1) {
-        analysisText = analysisText.substring(0, sourcesIndex).trim();
-    }
-    // The backend returns this structured object to the client.
-    return {
-      analysisText,
-      groundingSources,
-      isFallbackResult: false,
-    };
-  } catch (error) {
-    console.error(`Gemini API error analyzing magic factor for ${name}:`, error);
-    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
-    }
-    throw new Error(`Failed to analyze magic factor for ${name}. Primary API (Gemini) failed and fallback is not configured or also failed.`);
-  }
-};
+// Duplicate analyzeStakeholderMagicFactor function removed - using the implementation at the end of the file
 
 const MIND_MAP_PROMPT_STRUCTURE = `
 Provide a mindMapMarkdown string using Markdown for a hierarchical mind map.
@@ -756,90 +808,7 @@ Structure:
 - [Description of the core unique element if applicable]
 `;
 
-export const generateCreativeSpark = async (
-  genre: string,
-  inspiration: string | undefined,
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<CreativeSparkResult[]> => {
-  // In a backend model, this function receives params from your API endpoint.
-  const prompt = `
-    You are a creative screenwriter and story generator.
-    Generate 3 distinct new movie/series concepts.
-    For each concept:
-    Genre: ${genre}
-    ${inspiration ? `User Inspiration/Keywords for all concepts: "${inspiration}"` : ""}
-
-    Provide the output as a JSON array, where each element is an object with the following structure:
-    {
-      "logline": "A compelling one-sentence logline.",
-      "synopsis": "A brief synopsis of the story (around 150-200 words).",
-      "characterIdeas": [
-        { "name": "Character Name 1", "description": "Brief description of Character 1, their motivations, and core conflict." },
-        { "name": "Character Name 2", "description": "Brief description of Character 2, their motivations, and core conflict." }
-      ],
-      "sceneIdeas": [
-        { "title": "Key Scene Idea 1 Title", "description": "A brief description of a pivotal or interesting scene." },
-        { "title": "Key Scene Idea 2 Title", "description": "Another brief description of a pivotal or interesting scene." }
-      ],
-      "mindMapMarkdown": "${MIND_MAP_PROMPT_STRUCTURE.replace(/\n/g, "\\n").replace(/"/g, '\\"')}" 
-    }
-    Ensure the JSON is valid. Each concept in the array must be unique.
-    Focus on creativity and distinctness for each of the 3 ideas.
-  `;
-
-  try {
-    // This ai.models.generateContent call happens on your backend.
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: GEMINI_MODEL_TEXT,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.85, 
-        topP: 0.9,
-        topK: 50,
-      }
-    });
-
-    const responseText = response.text.trim();
-    logTokenUsage?.('Creative Spark Generation (Gemini)', prompt.length, responseText.length);
-
-    let jsonStr = responseText;
-    const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-    const match = jsonStr.match(fenceRegex);
-    if (match && match[2]) {
-      jsonStr = match[2].trim();
-    }
-
-    try {
-      let parsedData = JSON.parse(jsonStr) as CreativeSparkResult[];
-      if (!Array.isArray(parsedData) || parsedData.length === 0) {
-        const singleAttempt = JSON.parse(jsonStr) as CreativeSparkResult;
-        if (singleAttempt.logline) {
-             parsedData = [singleAttempt];
-        } else {
-            throw new Error("Generated JSON is not an array of Creative Spark results and not a single valid result.");
-        }
-      }
-      // The backend returns this structured object to the client.
-      return parsedData.map((item, index) => ({
-        ...item,
-        id: item.id || `${Date.now()}-${index}`, 
-        characterIdeas: item.characterIdeas || [],
-        sceneIdeas: item.sceneIdeas || [],
-        isFallbackResult: false 
-      }));
-    } catch (e) {
-      console.error("Failed to parse JSON response for Creative Spark (Multiple):", e, "\nRaw response:", responseText);
-      throw new Error("AI returned an invalid format for the story ideas. Please try again.");
-    }
-  } catch (error) {
-    console.error('Gemini API error for creative spark (Multiple):', error);
-    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
-    }
-    throw new Error('Failed to generate creative sparks from AI. Primary API (Gemini) failed and fallback is not configured or also failed.');
-  }
-};
+// Duplicate generateCreativeSpark function removed - using the one at line 1384
 
 export const enhanceCreativeSpark = async (
   baseIdea: Omit<CreativeSparkResult, 'id' | 'mindMapMarkdown'>, 
@@ -877,19 +846,11 @@ export const enhanceCreativeSpark = async (
   `;
 
   try {
-    // This ai.models.generateContent call happens on your backend.
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: GEMINI_MODEL_TEXT,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.75,
-        topP: 0.9,
-        topK: 50,
-      }
-    });
+    // This getGeminiAI().models.generateContent call happens on your backend.
+    const model = getGeminiAI().getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const response: GenerateContentResult = await model.generateContent(prompt);
     
-    const responseText = response.text.trim();
+    const responseText = response.response.text().trim();
     logTokenUsage?.('Creative Spark Enhancement (Gemini)', prompt.length, responseText.length);
 
     let jsonStr = responseText;
@@ -957,18 +918,10 @@ export const analyzeIdeaMagicQuotient = async (
 
   try {
     // This ai.models.generateContent call happens on your backend.
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: GEMINI_MODEL_TEXT,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.7, 
-        topP: 0.9,
-        topK: 40,
-      }
-    });
+    const model = getGeminiAI().getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const response: GenerateContentResult = await model.generateContent(prompt);
 
-    const responseText = response.text.trim();
+    const responseText = response.response.text().trim();
     logTokenUsage?.('Magic Quotient Analysis (Gemini)', prompt.length, responseText.length);
 
     let jsonStr = responseText;
@@ -1012,103 +965,7 @@ export const analyzeIdeaMagicQuotient = async (
   }
 };
 
-export const analyzeMovieMorphokinetics = async (
-  movieTitle: string,
-  reviewStage: ReviewStage,
-  existingAnalysesSummary?: string, // Optional summary of prior analyses for context
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<MorphokineticsAnalysis> => {
-  // In a backend model, this function receives params from your API endpoint.
-  const prompt = `
-    You are an expert film analyst specializing in narrative dynamics, pacing, and emotional arcs ("Morphokinetics").
-    Analyze the movie/series "${movieTitle}" (${reviewStage}).
-    ${existingAnalysesSummary ? `Consider this existing context if helpful: ${existingAnalysesSummary.substring(0,500)}...` : ""}
-
-    Provide your analysis as a single JSON object with the following structure:
-    {
-      "overallSummary": "A concise (150-250 words) textual summary of the movie's overall dynamic flow. Discuss its pacing strategy (e.g., slow burn, relentless, varied), how it builds and releases tension, and the overall emotional journey it takes the audience on.",
-      "timelineStructureNotes": "Briefly describe the film's timeline structure (e.g., linear, non-linear with frequent flashbacks, chronological with a framing device, etc.) and comment on its effectiveness or any notable aspects (50-100 words).",
-      "keyMoments": [ 
-        { 
-          "time": 0.1, // Normalized time (0.0 to 1.0)
-          "intensityScore": 3, // 0 (low intensity/calm) to 10 (max intensity/action/emotion)
-          "emotionalValence": 1, // -1 (negative emotion), 0 (neutral), 1 (positive emotion)
-          "dominantEmotion": "Hopeful Introduction", 
-          "eventDescription": "Protagonist introduced with their initial situation and goals.",
-          "isTwist": false,
-          "isPacingShift": false 
-        } 
-        // ... (Provide ~10-15 such key moments, chronologically, that define the film's morphokinetics)
-      ]
-    }
-
-    Instructions for "keyMoments":
-    - Identify around 10-15 pivotal moments that best represent the film's dynamic and emotional trajectory.
-    - "time": Estimate the normalized time (0.0 for beginning, 1.0 for end).
-    - "intensityScore": Rate the scene's energy/intensity from 0 (very calm) to 10 (peak action/emotion/tension).
-    - "emotionalValence": Rate the dominant emotion as -1 (negative, e.g., sad, fear, anger), 0 (neutral, e.g., expositional, calm), or 1 (positive, e.g., joy, hope, relief).
-    - "dominantEmotion": A short (1-3 words) descriptor of the primary emotion conveyed (e.g., "Tense Suspense", "Heartwarming Joy", "Deep Sorrow", "Exciting Action", "Anxious Anticipation").
-    - "eventDescription": A brief (10-20 words) description of what is happening or what this moment signifies in the narrative.
-    - "isTwist": Set to true if this moment involves a significant plot twist or major surprise.
-    - "isPacingShift": Set to true if this moment marks a notable acceleration or deceleration in narrative pacing.
-
-    Ensure the JSON is valid. Focus on delivering insightful analysis of the film's "motion".
-  `;
-
-  try {
-    // This ai.models.generateContent call happens on your backend.
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: GEMINI_MODEL_TEXT,
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-        temperature: 0.7,
-        topP: 0.9,
-        topK: 40,
-      }
-    });
-
-    const responseText = response.text.trim();
-    logTokenUsage?.(`Morphokinetics Analysis (Gemini): ${movieTitle}`, prompt.length, responseText.length);
-
-    let jsonStr = responseText;
-    const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-    const match = jsonStr.match(fenceRegex);
-    if (match && match[2]) {
-      jsonStr = match[2].trim();
-    }
-
-    try {
-      const parsedData = JSON.parse(jsonStr) as MorphokineticsAnalysis;
-      if (!parsedData.overallSummary || !parsedData.timelineStructureNotes || !Array.isArray(parsedData.keyMoments) || parsedData.keyMoments.length === 0) {
-        console.error("Generated JSON for morphokinetics is missing required fields or keyMoments is empty:", parsedData);
-        throw new Error("Generated JSON for morphokinetics is missing required fields or keyMoments is empty.");
-      }
-      // Validate/sanitize keyMoments
-      parsedData.keyMoments = parsedData.keyMoments.map(moment => ({
-        ...moment,
-        time: Number(moment.time) || 0,
-        intensityScore: Number(moment.intensityScore) || 0,
-        emotionalValence: Number(moment.emotionalValence) || 0,
-        isTwist: Boolean(moment.isTwist),
-        isPacingShift: Boolean(moment.isPacingShift),
-      }));
-      // The backend returns this structured object to the client.
-      return { ...parsedData, isFallbackResult: false };
-    } catch (e) {
-      console.error("Failed to parse JSON response for Morphokinetics:", e, "\nRaw response:", responseText);
-      throw new Error("AI returned an invalid format for the morphokinetics analysis. Please try again.");
-    }
-  } catch (error) {
-    console.error(`Gemini API error for morphokinetics analysis of ${movieTitle}:`, error);
-    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
-    }
-    // Conceptual: Add fallback for morphokinetics if desired, similar to layer analysis.
-    // For now, it will just throw if Gemini fails.
-    throw new Error(`Failed to get morphokinetics analysis for ${movieTitle}. Primary API (Gemini) failed.`);
-  }
-};
+// Duplicate analyzeMovieMorphokinetics function removed - using the one at line 1445
 
 export const getMovieTitleSuggestions = async (
   currentTitle: string,
@@ -1134,17 +991,16 @@ export const getMovieTitleSuggestions = async (
   `;
 
   try {
-    const response: GenerateContentResponse = await ai.models.generateContent({
-      model: GEMINI_MODEL_TEXT,
-      contents: prompt,
-      config: {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
         responseMimeType: "application/json",
-        temperature: 0.3, // Lower temperature for more factual/less creative suggestions
+        temperature: 0.3,
         topK: 20,
       }
     });
-
-    const responseText = response.text.trim();
+    const response: GenerateContentResult = await model.generateContent(prompt);
+    const responseText = response.response.text().trim();
     logTokenUsage?.(`Movie Title Suggestions (Gemini): ${currentTitle}`, prompt.length, responseText.length);
 
     let jsonStr = responseText;
@@ -1191,15 +1047,15 @@ export const fetchMovieFinancialsWithGemini = async (
     If no specific numerical budget is found, set budget to null. Prioritize USD if multiple currencies are mentioned or if a common currency for international films is expected.
   `;
   try {
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL_TEXT,
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        temperature: 0.2, // More factual
-      }
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        temperature: 0.2
+      },
+      tools: [{ googleSearchRetrieval: {} }]
     });
-    const responseText = response.text.trim();
+    const response = await model.generateContent(prompt);
+    const responseText = response.response.text().trim();
     logTokenUsage?.(`Fetch Movie Financials (Gemini): ${movieTitle}`, prompt.length, responseText.length);
 
     let jsonStr = responseText;
@@ -1272,14 +1128,14 @@ export const generateQualitativeROIAnalysisWithGemini = async (
     The entire response should be plain text.
   `;
   try {
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL_TEXT,
-      contents: prompt,
-      config: {
-        temperature: 0.6, // More analytical, less overly creative
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        temperature: 0.6
       }
     });
-    const analysisText = response.text.trim();
+    const response = await model.generateContent(prompt);
+    const analysisText = response.response.text().trim();
     logTokenUsage?.(`Qualitative ROI Analysis (Gemini): ${movieTitle}`, prompt.length, analysisText.length);
     return { analysisText, isFallbackResult: false };
   } catch (error) {
@@ -1308,17 +1164,16 @@ export const generateGreybrainerInsightWithGemini = async (
     Another example: "AI-driven virtual production techniques are increasingly democratizing high-concept visuals, allowing independent filmmakers to explore genres previously limited by budget, which could lead to more diverse sci-fi and fantasy offerings."
   `;
   try {
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL_TEXT,
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        temperature: 0.75, // Allow for some creativity in formulating the insight
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        temperature: 0.75,
         topP: 0.9,
         topK: 50,
       }
     });
-    const insightText = response.text.trim();
+    const response = await model.generateContent(prompt);
+    const insightText = response.response.text().trim();
     logTokenUsage?.('Greybrainer Insight Generation (Gemini)', prompt.length, insightText.length);
     return insightText;
   } catch (error) {
@@ -1327,6 +1182,530 @@ export const generateGreybrainerInsightWithGemini = async (
          throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
     }
     throw new Error('Failed to generate Greybrainer insight from AI.');
+  }
+};
+
+// Layer Analysis Function
+export const analyzeLayerWithGemini = async (
+  movieTitle: string,
+  reviewStage: ReviewStage,
+  layer: ReviewLayer,
+  layerTitle: string,
+  layerDescription: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<ParsedLayerAnalysis> => {
+  const prompt = generateAnalysisPrompt(movieTitle, reviewStage, layer, layerTitle, layerDescription);
+  
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        temperature: 0.7
+      },
+      tools: [{ googleSearchRetrieval: {} }]
+    });
+    const response = await model.generateContent(prompt);
+    const rawAnalysisText = response.response.text().trim();
+    logTokenUsage?.(`Layer Analysis (Gemini): ${layerTitle}`, prompt.length, rawAnalysisText.length);
+    
+    // Parse the response
+    let director = parseDirector(rawAnalysisText);
+    let mainCast = parseMainCast(rawAnalysisText);
+    let aiSuggestedScore = parseAISuggestedScore(rawAnalysisText);
+    let improvementSuggestions = parseImprovementSuggestions(rawAnalysisText);
+    let vonnegutShape: VonnegutShapeData | undefined;
+
+    if (layer === ReviewLayer.STORY) {
+      vonnegutShape = parseVonnegutShapeData(rawAnalysisText);
+    }
+    
+    // Clean the analysis text by removing parsed sections
+    let cleanedAnalysisText = rawAnalysisText;
+    const vonnegutBlockRegex = /---VONNEGUT STORY SHAPE START---[\s\S]*?---VONNEGUT STORY SHAPE END---/i;
+    cleanedAnalysisText = cleanedAnalysisText.replace(vonnegutBlockRegex, '').trim();
+
+    if (director) cleanedAnalysisText = cleanedAnalysisText.replace(/Director:\s*(.*)/i, '').trim();
+    if (mainCast && mainCast.length > 0) cleanedAnalysisText = cleanedAnalysisText.replace(/Main Cast:\s*([\w\s,]+)/i, '').trim();
+    
+    const scoreRegex = new RegExp(`Suggested Score:\\s*(\\d*\\.?\\d+)\\s*/\\s*${MAX_SCORE}[\\s\\S]*?(Potential Enhancements:|$)`, "i");
+    cleanedAnalysisText = cleanedAnalysisText.replace(scoreRegex, '$1').trim();
+    
+    cleanedAnalysisText = cleanedAnalysisText.replace(/Potential Enhancements:[\s\S]*/i, '').trim();
+    cleanedAnalysisText = cleanedAnalysisText.replace(/\n\s*\n/g, '\n').trim();
+
+    return {
+      analysisText: cleanedAnalysisText,
+      director,
+      mainCast,
+      groundingSources: extractGroundingSources(response) || [],
+      aiSuggestedScore,
+      improvementSuggestions,
+      vonnegutShape,
+      isFallbackResult: false,
+    };
+
+  } catch (error) {
+    console.error(`Gemini API error for layer ${layer}:`, error);
+    handleGeminiError(error as Error, `Layer Analysis: ${layerTitle}`);
+    // This line should never be reached as handleGeminiError always throws
+    throw new Error('Unexpected error in layer analysis');
+  }
+};
+
+// Final Report Generation
+export const generateFinalReportWithGemini = async (
+  movieTitle: string,
+  reviewStage: ReviewStage,
+  analyses: LayerAnalysisData[],
+  personnelData: PersonnelData | undefined,
+  financialData: FinancialAnalysisData | null,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<SummaryReportData> => {
+  const storyAnalysis = analyses.find(a => a.id === ReviewLayer.STORY);
+  const conceptAnalysis = analyses.find(a => a.id === ReviewLayer.CONCEPTUALIZATION);
+  const performanceAnalysis = analyses.find(a => a.id === ReviewLayer.PERFORMANCE);
+
+  let analysisContext = `Based on the detailed analysis of "${movieTitle}" (${reviewStage}), here are the key findings:\n\n`;
+  
+  if (storyAnalysis) {
+    analysisContext += `**Story/Script Analysis (Score: ${storyAnalysis.userScore || storyAnalysis.aiSuggestedScore || 'N/A'}/${MAX_SCORE}):**\n${storyAnalysis.editedText || storyAnalysis.aiGeneratedText}\n\n`;
+  }
+  
+  if (conceptAnalysis) {
+    analysisContext += `**Conceptualization Analysis (Score: ${conceptAnalysis.userScore || conceptAnalysis.aiSuggestedScore || 'N/A'}/${MAX_SCORE}):**\n${conceptAnalysis.editedText || conceptAnalysis.aiGeneratedText}\n\n`;
+  }
+  
+  if (performanceAnalysis) {
+    analysisContext += `**Performance Analysis (Score: ${performanceAnalysis.userScore || performanceAnalysis.aiSuggestedScore || 'N/A'}/${MAX_SCORE}):**\n${performanceAnalysis.editedText || performanceAnalysis.aiGeneratedText}\n\n`;
+  }
+
+  if (personnelData?.director) {
+    analysisContext += `**Director:** ${personnelData.director}\n`;
+  }
+  if (personnelData?.mainCast && personnelData.mainCast.length > 0) {
+    analysisContext += `**Main Cast:** ${personnelData.mainCast.join(', ')}\n`;
+  }
+
+  const prompt = `
+You are a film industry expert creating a comprehensive summary report for "${movieTitle}".
+
+${analysisContext}
+
+Create a well-structured final report (300-500 words) that:
+1. Synthesizes the key insights from all three analysis layers
+2. Provides an overall assessment of the film's creative merit and potential impact
+3. Highlights the most significant strengths and areas for improvement
+4. Offers a balanced perspective on the film's place within its genre and the broader cinematic landscape
+
+Additionally, create social media snippets:
+- Twitter: A compelling 280-character summary highlighting the most intriguing aspect
+- LinkedIn: A professional 150-word analysis suitable for industry professionals
+
+Format your response as:
+**FINAL REPORT:**
+[Your comprehensive report]
+
+**SOCIAL SNIPPETS:**
+Twitter: [280-character snippet]
+LinkedIn: [150-word professional snippet]
+
+Begin your analysis:
+  `.trim();
+  
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        temperature: 0.7
+      }
+    });
+    const response = await model.generateContent(prompt);
+    const fullResponse = response.response.text().trim();
+    logTokenUsage?.('Final Report Generation (Gemini)', prompt.length, fullResponse.length);
+    
+    const reportMatch = fullResponse.match(/\*\*FINAL REPORT:\*\*\s*([\s\S]*?)(?=\*\*SOCIAL SNIPPETS:\*\*|$)/i);
+    const socialMatch = fullResponse.match(/\*\*SOCIAL SNIPPETS:\*\*\s*([\s\S]*)/i);
+    
+    let reportText = reportMatch ? reportMatch[1].trim() : fullResponse;
+    let socialSnippets: SocialSnippets = {};
+    
+    if (socialMatch) {
+      const socialContent = socialMatch[1];
+      const twitterMatch = socialContent.match(/Twitter:\s*([^\n]+)/i);
+      const linkedinMatch = socialContent.match(/LinkedIn:\s*([\s\S]*?)(?=Twitter:|$)/i);
+      
+      if (twitterMatch) socialSnippets.twitter = twitterMatch[1].trim();
+      if (linkedinMatch) socialSnippets.linkedin = linkedinMatch[1].trim();
+    }
+    
+    return {
+      reportText,
+      socialSnippets,
+      financialAnalysis: financialData || undefined,
+      isFallbackResult: false
+    };
+  } catch (error) {
+    console.error('Gemini API error generating final report:', error);
+    handleGeminiError(error as Error, 'Final Report Generation');
+    throw new Error('Unexpected error in final report generation');
+  }
+};
+
+// Personnel Analysis
+export const analyzeStakeholderMagicFactor = async (
+  name: string,
+  type: 'Director' | 'Actor',
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<{ analysisText: string; groundingSources?: GroundingChunkWeb[]; isFallbackResult?: boolean }> => {
+  const prompt = `
+Analyze the unique "Magic Factor" of ${type.toLowerCase()} ${name}.
+
+Provide a comprehensive analysis (200-300 words) covering:
+1. Signature style and distinctive approach
+2. Notable works and career highlights
+3. Unique contributions to cinema
+4. What makes them stand out in the industry
+5. Their impact on storytelling and filmmaking
+
+Focus on what makes ${name} distinctive and valuable in the film industry.
+
+Begin your analysis:
+  `.trim();
+
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        temperature: 0.7
+      },
+      tools: [{ googleSearchRetrieval: {} }]
+    });
+    const response = await model.generateContent(prompt);
+    const analysisText = response.response.text().trim();
+    logTokenUsage?.(`Personnel Analysis (Gemini): ${name}`, prompt.length, analysisText.length);
+    return {
+      analysisText,
+      groundingSources: extractGroundingSources(response) || [],
+      isFallbackResult: false
+    };
+  } catch (error) {
+    console.error(`Gemini API error analyzing ${type} ${name}:`, error);
+    handleGeminiError(error as Error, `Personnel Analysis: ${name}`);
+    throw new Error('Unexpected error in personnel analysis');
+  }
+};
+
+// Creative Spark Generation
+export const generateCreativeSpark = async (
+  genre: string,
+  inspiration: string | undefined,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<CreativeSparkResult[]> => {
+  const inspirationText = inspiration ? `Drawing inspiration from: ${inspiration}` : "";
+  
+  const prompt = `
+You are a seasoned Hollywood story developer and screenwriter with expertise in creating commercially viable, critically acclaimed concepts. Your task is to generate 3 exceptional story ideas for the ${genre} genre. ${inspirationText}
+
+**Quality Standards:**
+- Each concept should feel like it could be pitched to major studios or streaming platforms
+- Demonstrate deep understanding of genre conventions while offering fresh perspectives
+- Create concepts that balance commercial appeal with artistic merit
+- Ensure each idea has clear dramatic stakes and emotional resonance
+- Avoid clichéd or overdone concepts unless you're subverting them cleverly
+
+**Research Context:**
+Consider successful ${genre} films/shows from the past decade. What made them work? How can you innovate within established frameworks? Think about current cultural zeitgeist and audience interests.
+
+For each idea, provide:
+
+1. **Logline**: A compelling, marketable one-sentence summary (25-40 words) that immediately hooks the reader
+2. **Synopsis**: A detailed expansion (100-150 words) that reveals the story's unique angle and emotional core
+3. **Character Ideas**: 2-3 main characters with specific, memorable traits and clear motivations
+4. **Scene Ideas**: 2-3 key scenes that would be visually striking and emotionally powerful
+5. **Mind Map**: Provide a mindMapMarkdown string using Markdown for a hierarchical mind map.
+
+**Execution Guidelines:**
+- Make each idea distinctly different from the others
+- Focus on specific, concrete details rather than generic descriptions
+- Ensure strong protagonist agency and clear character arcs
+- Include elements that would translate well to visual media
+- Consider both domestic and international market appeal
+
+Format each idea as:
+**IDEA [NUMBER]:**
+Logline: [compelling, specific logline]
+Synopsis: [detailed, engaging synopsis]
+Characters:
+- [Character 1]: [specific name and detailed description with motivation]
+- [Character 2]: [specific name and detailed description with motivation]
+Key Scenes:
+- [Scene 1]: [specific, visual scene description]
+- [Scene 2]: [specific, visual scene description]
+Mind Map:
+[comprehensive mind map markdown]
+
+Begin generating professional-quality story concepts:
+  `.trim();
+
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        temperature: 0.8
+      }
+    });
+    const response = await model.generateContent(prompt);
+    const responseText = response.response.text().trim();
+    logTokenUsage?.('Creative Spark Generation (Gemini)', prompt.length, responseText.length);
+    
+    // Parse the response into individual ideas
+    const ideas: CreativeSparkResult[] = [];
+    const ideaMatches = responseText.match(/\*\*IDEA \d+:\*\*[\s\S]*?(?=\*\*IDEA \d+:\*\*|$)/g);
+    
+    if (ideaMatches) {
+      ideaMatches.forEach((ideaText, index) => {
+        const loglineMatch = ideaText.match(/Logline:\s*([^\n]+)/i);
+        const synopsisMatch = ideaText.match(/Synopsis:\s*([^\n]+(?:\n[^\n]+)*?)(?=Characters:|$)/i);
+        const charactersMatch = ideaText.match(/Characters:\s*([\s\S]*?)(?=Key Scenes:|$)/i);
+        const scenesMatch = ideaText.match(/Key Scenes:\s*([\s\S]*?)(?=Mind Map:|$)/i);
+        const mindMapMatch = ideaText.match(/Mind Map:\s*([\s\S]*?)(?=\*\*IDEA|$)/i);
+        
+        if (loglineMatch && synopsisMatch) {
+          const characterIdeas: CharacterIdea[] = [];
+          const sceneIdeas: SceneIdea[] = [];
+          
+          if (charactersMatch) {
+            const charLines = charactersMatch[1].split('\n').filter(line => line.trim().startsWith('-'));
+            charLines.forEach(line => {
+              const charMatch = line.match(/-\s*([^:]+):\s*(.+)/);
+              if (charMatch) {
+                characterIdeas.push({
+                  name: charMatch[1].trim(),
+                  description: charMatch[2].trim()
+                });
+              }
+            });
+          }
+          
+          if (scenesMatch) {
+            const sceneLines = scenesMatch[1].split('\n').filter(line => line.trim().startsWith('-'));
+            sceneLines.forEach(line => {
+              const sceneMatch = line.match(/-\s*([^:]+):\s*(.+)/);
+              if (sceneMatch) {
+                sceneIdeas.push({
+                  title: sceneMatch[1].trim(),
+                  description: sceneMatch[2].trim()
+                });
+              }
+            });
+          }
+          
+          ideas.push({
+            id: `idea-${Date.now()}-${index}`,
+            logline: loglineMatch[1].trim(),
+            synopsis: synopsisMatch[1].trim(),
+            characterIdeas,
+            sceneIdeas,
+            mindMapMarkdown: mindMapMatch ? mindMapMatch[1].trim() : undefined,
+            isFallbackResult: false
+          });
+        }
+      });
+    }
+    
+    return ideas.length > 0 ? ideas : [{
+      id: `fallback-${Date.now()}`,
+      logline: "Creative spark generation encountered an issue",
+      synopsis: "Unable to parse generated ideas properly",
+      characterIdeas: [],
+      sceneIdeas: [],
+      isFallbackResult: true
+    }];
+    
+  } catch (error) {
+    console.error('Gemini API error generating creative spark:', error);
+    handleGeminiError(error as Error, 'Creative Spark Generation');
+    throw new Error('Unexpected error in creative spark generation');
+  }
+};
+
+// Movie Morphokinetics Analysis
+export const analyzeMovieMorphokinetics = async (
+  movieTitle: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<MorphokineticsAnalysis> => {
+  const prompt = `
+Analyze the "Morphokinetics" (dynamic flow and emotional journey) of the movie "${movieTitle}".
+
+Provide:
+
+1. **Overall Summary** (200-250 words): Describe the film's pacing, emotional rhythm, and how tension/energy builds and releases throughout.
+
+2. **Timeline Structure Notes** (100-150 words): Analyze the narrative structure - is it linear, non-linear, uses flashbacks, multiple timelines, etc.?
+
+3. **Key Moments** (10-15 moments): Identify pivotal moments that define the film's emotional and narrative flow. For each moment, provide:
+   - Time position (0.0 = beginning, 1.0 = end)
+   - Intensity score (0-10)
+   - Emotional valence (-1 to 1)
+   - Dominant emotion
+   - Event description
+   - Whether it's a twist or pacing shift
+
+Format your response as:
+**OVERALL SUMMARY:**
+[Your summary]
+
+**TIMELINE STRUCTURE:**
+[Your analysis]
+
+**KEY MOMENTS:**
+1. Time: [0.0-1.0] | Intensity: [0-10] | Valence: [-1 to 1] | Emotion: [emotion] | Twist: [yes/no] | Pacing: [yes/no] | Description: [description]
+2. Time: [0.0-1.0] | Intensity: [0-10] | Valence: [-1 to 1] | Emotion: [emotion] | Twist: [yes/no] | Pacing: [yes/no] | Description: [description]
+[Continue for all moments]
+
+Begin your analysis:
+  `.trim();
+
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        temperature: 0.7
+      },
+      tools: [{ googleSearchRetrieval: {} }]
+    });
+    const response = await model.generateContent(prompt);
+    const responseText = response.response.text().trim();
+    logTokenUsage?.('Morphokinetics Analysis (Gemini)', prompt.length, responseText.length);
+    
+    // Parse the response
+    const summaryMatch = responseText.match(/\*\*OVERALL SUMMARY:\*\*\s*([\s\S]*?)(?=\*\*TIMELINE STRUCTURE:\*\*|$)/i);
+    const timelineMatch = responseText.match(/\*\*TIMELINE STRUCTURE:\*\*\s*([\s\S]*?)(?=\*\*KEY MOMENTS:\*\*|$)/i);
+    const momentsMatch = responseText.match(/\*\*KEY MOMENTS:\*\*\s*([\s\S]*?)$/i);
+    
+    const keyMoments: any[] = [];
+    
+    if (momentsMatch) {
+      const momentLines = momentsMatch[1].split('\n').filter(line => line.trim().match(/^\d+\./));
+      
+      momentLines.forEach(line => {
+        const match = line.match(/Time:\s*([\d.]+)\s*\|\s*Intensity:\s*(\d+)\s*\|\s*Valence:\s*([-\d.]+)\s*\|\s*Emotion:\s*([^|]+)\s*\|\s*Twist:\s*([^|]+)\s*\|\s*Pacing:\s*([^|]+)\s*\|\s*Description:\s*(.+)/i);
+        
+        if (match) {
+          keyMoments.push({
+            time: parseFloat(match[1]),
+            intensityScore: parseInt(match[2]),
+            emotionalValence: parseFloat(match[3]),
+            dominantEmotion: match[4].trim(),
+            isTwist: match[5].trim().toLowerCase() === 'yes',
+            isPacingShift: match[6].trim().toLowerCase() === 'yes',
+            eventDescription: match[7].trim()
+          });
+        }
+      });
+    }
+    
+    return {
+      overallSummary: summaryMatch ? summaryMatch[1].trim() : 'Analysis could not be parsed properly.',
+      timelineStructureNotes: timelineMatch ? timelineMatch[1].trim() : 'Timeline analysis not available.',
+      keyMoments,
+      isFallbackResult: false
+    };
+    
+  } catch (error) {
+    console.error('Gemini API error analyzing morphokinetics:', error);
+    handleGeminiError(error as Error, 'Morphokinetics Analysis');
+    throw new Error('Unexpected error in morphokinetics analysis');
+  }
+};
+
+// Movie Matching Functions
+export const findMovieMatches = async (
+  userInput: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string[]> => {
+  const prompt = `
+You are an expert film database consultant with comprehensive knowledge of:
+- Latest Bollywood/Hindi cinema (2023-2025) and current releases
+- Recent Regional Indian cinema (Tamil, Telugu, Malayalam, Kannada, Bengali, Marathi, etc.)
+- Current Hollywood and international English-language films (2024-2025)
+- Latest popular TV series and web series (Netflix, Amazon Prime, Disney+, Hotstar, etc.)
+- 2025 new releases, trending movies, and current box office hits
+- Film transliterations and alternate spellings
+
+User input: "${userInput}"
+
+Find and suggest the most likely movie/series matches for this input. **PRIORITIZE 2024-2025 RELEASES AND CURRENT FILMS** but also include relevant classics if they match well.
+
+**Matching Strategies:**
+- Exact title matches (prioritize recent releases)
+- Phonetic similarities and common misspellings
+- Transliteration variations (e.g., "Baahubali" vs "Bahubali")
+- English translations of foreign titles
+- Alternate release titles (regional vs international)
+- Popular abbreviations or nicknames
+- Series vs movie variations (e.g., "KGF" could be "KGF: Chapter 1" or "KGF: Chapter 2")
+- Recent sequels, prequels, and franchise entries
+
+**Regional Considerations:**
+- Include both original language titles and English translations
+- Consider year variations for remakes or sequels
+- Account for different romanization systems
+- Include popular streaming platform titles and OTT releases
+- Focus on current trending and recently released content
+
+**Output Format:**
+Provide 8-12 most likely matches as a numbered list, ordered by relevance (recent films first):
+
+1. [Most likely recent/current match]
+2. [Close recent phonetic match]
+3. [Recent alternate spelling/transliteration]
+...
+
+Focus on real, existing movies and series. **Strongly prioritize 2024-2025 releases and current year films** and currently popular titles. Include release years when helpful for disambiguation.
+
+Begin matching:
+  `.trim();
+
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        temperature: 0.3
+      },
+      tools: [{ googleSearchRetrieval: {} }]
+    });
+    const response = await model.generateContent(prompt);
+    const responseText = response.response.text().trim();
+    logTokenUsage?.('Movie Name Matching (Gemini)', prompt.length, responseText.length);
+    
+    // Parse the numbered list with improved regex
+    const matches: string[] = [];
+    const lines = responseText.split('\n').filter(line => line.trim());
+    
+    lines.forEach(line => {
+      // More flexible parsing to handle various numbering formats
+      const match = line.match(/^\s*\d+[.)\s]+(.+)$/) || line.match(/^\s*[-*•]\s*(.+)$/);
+      if (match && match[1]) {
+        const title = match[1].trim().replace(/["']/g, ''); // Remove quotes
+        if (title.length > 0 && title.length < 100) { // Reasonable title length
+          matches.push(title);
+        }
+      }
+    });
+    
+    return matches.length > 0 ? matches.slice(0, 12) : [userInput]; // Return original if no matches
+  } catch (error) {
+    console.error('Gemini API error finding movie matches:', error);
+    const quotaStatus = quotaMonitor.handleQuotaError(error as Error);
+    if (quotaStatus.isExceeded) {
+      // For movie matching, show alert but return fallback instead of throwing
+      const alertMessage = `🚫 Gemini API Daily Quota Exceeded\n\nMovie search will use basic matching until quota resets.\n\n⏰ Next available window: ${quotaStatus.nextWindowAvailable}`;
+      if (typeof window !== 'undefined' && window.alert) {
+        window.alert(alertMessage);
+      }
+    }
+    return [userInput]; // Return original input as fallback
   }
 };
 
@@ -1356,24 +1735,22 @@ export const generateDetailedReportFromInsightWithGemini = async (
     The output should be the full text of the report. Format with clear paragraph breaks. You can use simple headings for sections if it improves readability (e.g., "## Introduction"), but avoid complex markdown.
   `;
   try {
-    const response = await ai.models.generateContent({
-      model: GEMINI_MODEL_TEXT,
-      contents: prompt,
-      config: {
-        tools: [{ googleSearch: {} }],
-        temperature: 0.7, 
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        temperature: 0.7,
         topP: 0.85,
         topK: 60,
-      }
+      },
+      tools: [{ googleSearchRetrieval: {} }]
     });
-    const reportText = response.text.trim();
+    const response = await model.generateContent(prompt);
+    const reportText = response.response.text().trim();
     logTokenUsage?.('Detailed Insight Report Generation (Gemini)', prompt.length, reportText.length);
     return reportText;
   } catch (error) {
     console.error('Gemini API error generating detailed insight report:', error);
-    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
-    }
-    throw new Error('Failed to generate detailed insight report from AI.');
+    handleGeminiError(error as Error, 'Detailed Report Generation');
+    throw new Error('Unexpected error in detailed report generation');
   }
 };

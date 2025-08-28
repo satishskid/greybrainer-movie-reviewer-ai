@@ -105,18 +105,22 @@ yarn install
 ```
 
 ### 3. Configure API Keys (Crucial)
-The application requires API keys to function.
+The application uses a secure "Bring Your Own Key" (BYOK) system:
 
 1.  **Create a `.env` file:** Copy the example file.
     ```bash
     cp .env.example .env
     ```
-2.  **Edit the `.env` file:** Open the newly created `.env` file and add your API keys.
+2.  **Edit the `.env` file:** Open the newly created `.env` file and add your Groq API key.
     ```env
     # Get your Groq API key from https://console.groq.com/keys
     VITE_GROQ_API_KEY="YOUR_GROQ_API_KEY_HERE"
+    
+    # Gemini API key is optional - users provide their own via the interface
+    # VITE_GEMINI_API_KEY="" # Optional, leave empty for BYOK system
     ```
     *   **Note:** The `VITE_` prefix is required by Vite to expose these variables to the application.
+    *   **Gemini API Key:** Users will be prompted to enter their own Gemini API key through the application interface for enhanced features.
 
 ### 4. Run the Development Server
 ```bash
@@ -156,14 +160,38 @@ These platforms make deploying frontend applications incredibly simple.
     *   `VITE_GROQ_API_KEY`: Your Groq API Key.
 5.  **Deploy:** Trigger a new deployment. The platform will build your project and deploy the contents of the `dist` folder.
 
-## AI Engine: Groq Integration
+## AI Engine: Dual-Engine Architecture with BYOK System
 
-Greybrainer AI is powered by Groq's lightning-fast inference engine for all analytical and creative tasks.
+Greybrainer AI features a sophisticated dual-engine architecture with a secure "Bring Your Own Key" system for maximum flexibility and user control.
 
-*   **Primary AI: Groq (`llama3-8b-8192`)**
-    *   **Strengths:** **Extreme speed.** Groq's LPU™ Inference Engine provides incredibly fast responses, ensuring a smooth and responsive user experience across all features.
-    *   **Capabilities:** Highly capable model that handles all analytical tasks including story analysis, conceptualization insights, performance evaluation, creative spark generation, and script analysis.
-    *   **Reliability:** Consistent and reliable performance for all movie analysis and creative generation tasks.
+### Primary Engines
+
+*   **Groq API (`llama3-8b-8192`) - Pre-configured**
+    *   **Strengths:** **Extreme speed.** Groq's LPU™ Inference Engine provides incredibly fast responses, ensuring a smooth and responsive user experience.
+    *   **Capabilities:** Handles core analytical tasks including story analysis, conceptualization insights, performance evaluation, and creative generation.
+    *   **Reliability:** Consistent and reliable performance for all movie analysis and creative tasks.
+    *   **Setup:** Pre-configured, no additional user setup required.
+
+*   **Google Gemini API - User-Provided (BYOK)**
+    *   **Strengths:** **Enhanced analysis depth.** Advanced reasoning capabilities for comprehensive insights and detailed creative analysis.
+    *   **Capabilities:** Deep analysis, advanced creative features, comprehensive report generation, and nuanced creative feedback.
+    *   **Security:** Users provide their own API keys through the secure interface - keys never stored on Greybrainer servers.
+    *   **Setup:** Optional - users enter their own Google AI Studio API key for enhanced features.
+
+### BYOK (Bring Your Own Key) System
+
+**Security Features:**
+*   API keys stored only in user's browser local storage
+*   Keys never transmitted to Greybrainer servers
+*   Automatic key validation and expiration handling
+*   Easy key rotation and management
+
+**Quota Management:**
+*   Real-time quota monitoring and usage tracking
+*   Intelligent fallback between engines based on availability
+*   Smart request optimization and batching
+*   Visual quota indicators and alerts
+*   Automatic retry logic and graceful degradation
 
 ### Recommendations for Future Integration
 If you want to expand the AI capabilities, consider these top-tier alternatives:

@@ -11,7 +11,8 @@ import { LoadingSpinner } from './components/LoadingSpinner';
 import { SparklesIcon } from './components/icons/SparklesIcon';
 import { ReviewStage, LayerAnalysisData, ReviewLayer, PersonnelData, SummaryReportData, MagicFactorAnalysis, CreativeSparkResult, TokenUsageEntry, TokenBudgetConfig, ActualPerformanceData, ScriptIdeaInput, MagicQuotientAnalysis, MovieAnalysisInput, MorphokineticsAnalysis, MonthlyScoreboardItem, FinancialAnalysisData } from './types';
 import { initialLayerAnalyses, LAYER_DEFINITIONS, REVIEW_STAGES_OPTIONS, MAX_SCORE, COMMON_GENRES, INITIAL_TOKEN_BUDGET_CONFIG, CHARS_PER_TOKEN_ESTIMATE, MAX_TOKEN_LOG_ENTRIES, MOCK_MONTHLY_SCOREBOARD_DATA } from './constants';
-import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, getMovieTitleSuggestions, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini } from './services/groqService';
+import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, findMovieMatches, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini } from './services/geminiService';
+import { googleSearchService } from './services/googleSearchService';
 import { PersonnelDisplay } from './components/PersonnelDisplay';
 import { CreativeSparkGenerator } from './components/CreativeSparkGenerator';
 import { TokenBudgetDashboard } from './components/TokenBudgetDashboard'; 
@@ -22,6 +23,8 @@ import { MorphokineticsDisplay } from './components/MorphokineticsDisplay';
 import { MonthlyMagicScoreboard } from './components/MonthlyMagicScoreboard';
 import { LightBulbIcon } from './components/icons/LightBulbIcon';
 import { GreybrainerInsights } from './components/GreybrainerInsights';
+import QuotaCountdownTimer from './components/QuotaCountdownTimer';
+import { GoogleSearchKeyManager } from './components/GoogleSearchKeyManager';
 
 import { AuthWrapper } from './components/AuthWrapper';
 
@@ -173,12 +176,13 @@ const App: React.FC = () => {
 
   const handleGetSuggestions = useCallback(async (title: string): Promise<string[]> => {
     try {
-      return await getMovieTitleSuggestions(title, logTokenUsage);
+      const movieResults = await googleSearchService.suggestMovies(title);
+      return movieResults.map(movie => movie.year ? `${movie.title} (${movie.year})` : movie.title);
     } catch (error) {
-      console.error('Error fetching movie title suggestions:', error);
+      console.error('Error getting movie title suggestions:', error);
       return [];
     }
-  }, [logTokenUsage]);
+  }, []);
   
 
 
@@ -210,7 +214,7 @@ const App: React.FC = () => {
         currentFinancialData = { ...currentFinancialData, isLoadingROI: true, errorROI: null };
         setFinancialAnalysisData(currentFinancialData);
         try {
-          const roiResult = await generateQualitativeROIAnalysisWithGemini(movieInput.movieTitle, budgetForROI, currentFinancialData.fetchedDuration, movieInput.productionBudget === undefined, layerAnalyses, logTokenUsage);
+          const roiResult = await generateQualitativeROIAnalysisWithGemini(movieInput.movieTitle, budgetForROI!, currentFinancialData.fetchedDuration, currentFinancialData.isFallbackBudgetResult || false, layerAnalyses, logTokenUsage);
           currentFinancialData = { ...currentFinancialData, qualitativeROIAnalysis: roiResult.analysisText, isLoadingROI: false, isFallbackROIResult: roiResult.isFallbackResult };
           setFinancialAnalysisData(currentFinancialData);
         } catch (error) {
@@ -297,7 +301,7 @@ const App: React.FC = () => {
       existingAnalysesSummary = layerAnalyses.filter(la => la.editedText).map(la => `${la.shortTitle}: ${la.editedText.substring(0, 100)}...`).join('\n');
     }
     try {
-      const result = await analyzeMovieMorphokinetics(movieInput.movieTitle, movieInput.reviewStage, existingAnalysesSummary, logTokenUsage);
+      const result = await analyzeMovieMorphokinetics(movieInput.movieTitle, logTokenUsage);
       setMorphokineticsAnalysis(result);
     } catch (error) { 
       const errorMessage = error instanceof Error ? error.message : 'Unknown error analyzing movie motion.';
@@ -309,7 +313,7 @@ const App: React.FC = () => {
   const analysisAttempted = layerAnalyses.some(l => l.isLoading || l.aiGeneratedText || l.error);
   const showPersonnelAnalysis = allLayersAnalyzedOrError && !isAnalyzingLayers && analysisAttempted && (personnelData.director || (personnelData.mainCast && personnelData.mainCast.length > 0));
   const canGenerateReport = allLayersAnalyzedOrError && !isAnalyzingLayers && analysisAttempted && !layerAnalyses.some(l => l.isLoading || (!l.editedText && !l.error));
-  const isCurrentlyProcessing = isAnalyzingLayers || isGeneratingReport || isAnalyzingMagicQuotient || isAnalyzingMorphokinetics || isGeneratingCreativeSpark || isEnhancingSpark || (analyzingMagicFactorFor !== null) || financialAnalysisData?.isLoadingBudget || financialAnalysisData?.isLoadingROI ;
+  const isCurrentlyProcessing = isAnalyzingLayers || isGeneratingReport || isAnalyzingMagicQuotient || isAnalyzingMorphokinetics || isGeneratingCreativeSpark || isEnhancingSpark || (analyzingMagicFactorFor !== null) || !!financialAnalysisData?.isLoadingBudget || !!financialAnalysisData?.isLoadingROI;
 
   return (
     <AuthWrapper>
@@ -323,6 +327,9 @@ const App: React.FC = () => {
             <TokenBudgetDashboard config={tokenBudgetConfig} setConfig={saveTokenBudgetConfig} usageLog={tokenUsageLog} clearLog={() => { setTokenUsageLog([]); localStorage.removeItem('tokenUsageLog'); }} onClose={() => setShowTokenDashboard(false)} />
           )}
 
+          <QuotaCountdownTimer className="mb-6" />
+          <GoogleSearchKeyManager className="mb-6" />
+          
           <MovieInputForm
             movieInput={movieInput}
             setMovieInput={setMovieInput}
@@ -331,8 +338,6 @@ const App: React.FC = () => {
             isAnalyzing={isAnalyzingLayers}
             onGetSuggestions={handleGetSuggestions}
           />
-
-
 
           {overallError && (<div className={`my-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}>{overallError}</div>)}
           {((isAnalyzingLayers && !analysisAttempted) || financialAnalysisData?.isLoadingBudget) && (<div className="flex justify-center items-center my-10"><LoadingSpinner /><span className="ml-3 text-xl">{financialAnalysisData?.isLoadingBudget ? "Fetching financial estimates..." : "Initializing analysis..."}</span></div>)}

@@ -50,7 +50,11 @@ Welcome to Greybrainer AI! This manual will guide you through using the applicat
     *   [Token Usage Estimator](#token-usage-estimator)
         *   [Understanding the Dashboard](#understanding-the-dashboard)
         *   [Important Disclaimers](#important-disclaimers)
-6.  [Troubleshooting & FAQ](#troubleshooting--faq)
+6.  [API Quota Management](#api-quota-management)
+    *   [Understanding Quotas](#understanding-quotas)
+    *   [Monitoring Usage](#monitoring-usage)
+    *   [Managing Quota Limits](#managing-quota-limits)
+7.  [Troubleshooting & FAQ](#troubleshooting--faq)
 
 ---
 
@@ -70,10 +74,31 @@ The Greybrainer AI interface is divided into several key sections:
 *   **Greybrainer Insights & Research:** Section for AI-generated industry trends and detailed report generation.
 *   **Footer:** Copyright information.
 
-### API Key Setup (Important for Local Use)
-Greybrainer AI requires a Google Gemini API Key to function.
-*   Ensure the `API_KEY` (and optionally `GROQ_API_KEY` for fallback) is correctly embedded during the build process as described in the `README.md`.
-*   If the Gemini API key is missing or invalid, an "AI Service Configuration Error" screen will be displayed.
+### API Key Setup - BYOK (Bring Your Own Key) System
+Greybrainer AI uses a secure "Bring Your Own Key" approach for maximum security and control:
+
+**Groq API (Pre-configured)**
+*   Primary AI engine for fast analysis
+*   No additional setup required
+*   Handles most core functionality
+
+**Gemini API (Optional - User Provided)**
+*   Enhanced analysis capabilities
+*   Deep analysis and advanced features
+*   Requires your own Google AI Studio API key
+
+**Setting Up Your Gemini API Key:**
+1.  Visit [Google AI Studio](https://makersuite.google.com/app/apikey)
+2.  Create or copy an existing API key (starts with "AIza")
+3.  In Greybrainer AI, you'll be prompted to enter your key after login
+4.  Your key is stored securely in your browser's local storage
+5.  Keys are validated every 24 hours for security
+
+**Security Features:**
+*   Keys never leave your browser except to call the respective AI services
+*   Automatic key validation and expiration handling
+*   Easy key rotation and management
+*   No keys stored on Greybrainer servers
 
 ## 2. Core Movie Analysis
 
@@ -277,15 +302,132 @@ Accessed via the "Estimator" button in the header.
 *   Actual token usage and costs are determined by Google. Always refer to your Google Cloud Console or AI Studio for accurate information.
 *   This tool is for general awareness and relative comparison of operations only.
 
-## 6. Troubleshooting & FAQ
+## 6. API Quota Management
 
-*   **Q: I see an "AI Service Configuration Error." What do I do?**
-    *   A: This means the Google Gemini API Key (`API_KEY`) is missing or invalid. Ensure it's correctly set up as per the `README.md` instructions, especially the build step that embeds the key.
+Greybrainer AI includes comprehensive quota monitoring to help you manage your API usage effectively.
+
+### Understanding Quotas
+
+**Groq API Quotas**
+*   Pre-configured with generous limits
+*   Handles most core functionality
+*   Automatic rate limiting and retry logic
+*   Fast response times for quick analysis
+
+**Gemini API Quotas**
+*   Based on your Google AI Studio/Cloud account
+*   Varies by subscription tier (free, pay-as-you-go, etc.)
+*   Used for enhanced analysis and deep insights
+*   More comprehensive but with usage limits
+
+**Quota Types:**
+*   **Requests per minute (RPM):** Short-term rate limits
+*   **Requests per day (RPD):** Daily usage caps
+*   **Tokens per minute (TPM):** Content-based limits
+*   **Tokens per day (TPD):** Daily token allowances
+
+### Monitoring Usage
+
+**Real-Time Quota Display**
+*   Live usage indicators in the interface
+*   Percentage of quota consumed
+*   Estimated remaining requests
+*   Time until quota reset
+
+**Quota Status Indicators:**
+*   🟢 **Green (0-70%):** Normal usage, full functionality available
+*   🟡 **Yellow (71-90%):** Moderate usage, consider pacing requests
+*   🟠 **Orange (91-95%):** High usage, automatic optimization enabled
+*   🔴 **Red (96-100%):** Quota nearly exhausted, fallback modes active
+
+**Usage Tracking Features:**
+*   Historical usage patterns
+*   Peak usage times identification
+*   Request type breakdown (analysis vs. generation)
+*   Efficiency recommendations
+
+### Managing Quota Limits
+
+**Smart Quota Management:**
+*   Automatic fallback to Groq when Gemini quota is low
+*   Intelligent request batching
+*   Priority queuing for critical analyses
+*   Usage optimization suggestions
+
+**When Quotas Are Exceeded:**
+1.  **Automatic Fallbacks:** System switches to alternative AI engines
+2.  **Graceful Degradation:** Reduced functionality rather than complete failure
+3.  **Clear Messaging:** Informative error messages with suggested actions
+4.  **Retry Logic:** Automatic retries after quota reset
+
+**Quota Optimization Tips:**
+*   Use quick analysis for preliminary reviews
+*   Batch similar analyses together
+*   Monitor usage during peak hours
+*   Consider upgrading API plans for heavy usage
+*   Use Groq for speed, Gemini for depth
+
+**Quota Reset Information:**
+*   Daily quotas typically reset at midnight UTC
+*   Monthly quotas reset on the first day of each month
+*   Real-time countdown to next reset displayed
+*   Automatic notifications when quotas refresh
+
+**Managing Multiple Projects:**
+*   Consider separate API keys for different projects
+*   Monitor usage across all applications
+*   Set up alerts in Google Cloud Console
+*   Plan usage around quota limits
+
+## 7. Troubleshooting & FAQ
+
+**API Key and Authentication Issues:**
+
+*   **Q: I'm prompted to enter a Gemini API key. Is this required?**
+    *   A: No, Gemini API key is optional. Greybrainer AI works with Groq API for core functionality. Gemini provides enhanced analysis capabilities. You can skip Gemini setup and use Groq-only features.
+
+*   **Q: My Gemini API key shows as "invalid" or "expired."**
+    *   A: Verify your key format (should start with "AIza"), check it's active in Google AI Studio, and ensure you have sufficient quota. Keys are re-validated every 24 hours automatically.
+
+*   **Q: How do I update or change my API key?**
+    *   A: Go to Settings/API Keys section, clear the existing key, and enter your new one. The system will validate and store the new key securely.
+
+**Analysis and Performance Issues:**
+
 *   **Q: An analysis for a layer failed or shows an error.**
-    *   A: This can happen due to various reasons: API issues, network problems, or the AI couldn't process the request for that specific title/layer. Try again, or if the problem persists for many titles, check your API key and network. The app also has a Groq API fallback for layer analysis if configured; errors will indicate if both primary and fallback failed.
-*   **Q: The Token Usage Estimator shows high numbers. Am I being billed for this?**
-    *   A: The estimator is a ROUGH GUIDE ONLY. Actual billing is managed by Google based on your Gemini API usage. Monitor your Google Cloud Console for official usage and costs. The estimator helps you understand which operations are relatively more token-intensive within the app.
+    *   A: This can happen due to API issues, network problems, quota limits, or processing difficulties. The system automatically tries fallback options. Check your quota status and try again.
+
+*   **Q: Analysis is slower than expected.**
+    *   A: This may indicate quota throttling or high API load. Check quota status indicators. Consider using quick analysis mode or trying during off-peak hours.
+
+*   **Q: I'm getting "quota exceeded" errors.**
+    *   A: Your API quota is exhausted. Check the quota management section for current usage. Wait for quota reset or consider upgrading your API plan. The system will automatically fall back to available services.
+
+**Data and Storage Questions:**
+
+*   **Q: Are my API keys and data secure?**
+    *   A: Yes. API keys are stored only in your browser's local storage and never transmitted to Greybrainer servers. Keys are only sent to the respective AI services (Google, Groq) for analysis.
+
 *   **Q: Can I save my analyses?**
-    *   A: Edited text and scores are saved in your browser's local storage for the current session and subsequent visits from the same browser. However, there's no explicit "save file" or cloud account system in this version. For permanent storage, copy the generated reports or download the Markdown versions where available.
+    *   A: Edited text and scores are saved in your browser's local storage for the current session and subsequent visits. For permanent storage, copy generated reports or download Markdown versions where available.
+
+*   **Q: What happens if I clear my browser data?**
+    *   A: You'll lose stored API keys and analysis data. You'll need to re-enter your API keys and any custom analyses will be lost.
+
+**Quota and Billing Questions:**
+
+*   **Q: How do I monitor my API usage and costs?**
+    *   A: Use the built-in quota monitoring features for estimates. For official usage and billing, check your Google AI Studio or Google Cloud Console. Greybrainer's estimates are for guidance only.
+
+*   **Q: Why do I see different quota limits than expected?**
+    *   A: Quota limits depend on your Google AI Studio/Cloud account tier, region, and current API policies. Check your Google account for official quota information.
+
+**Feature-Specific Issues:**
+
+*   **Q: Some advanced features aren't working.**
+    *   A: Advanced features may require Gemini API access. Ensure you have a valid Gemini API key and sufficient quota. Some features automatically fall back to basic functionality when Gemini is unavailable.
+
+*   **Q: Movie search isn't finding my title.**
+    *   A: Try alternative spellings, include release year, or use the original language title. The search uses multiple databases and may have coverage limitations for very recent or obscure titles.
 
 For further assistance or consultancy inquiries, please refer to contact information provided by the Greybrainer AI team.
