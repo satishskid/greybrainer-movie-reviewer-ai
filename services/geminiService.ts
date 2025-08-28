@@ -16,8 +16,6 @@ import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
 // The current setup with API_KEY in process.env (replaced at build time for client) is for simplicity in this dev environment.
 // ---------------------------------------------
 
-const GROQ_API_KEY = (import.meta as any).env?.VITE_GROQ_API_KEY;
-
 // Function to get Gemini AI instance with user-provided API key
 const getGeminiAI = (): GoogleGenerativeAI => {
   const apiKey = getGeminiApiKeyString();
@@ -25,13 +23,7 @@ const getGeminiAI = (): GoogleGenerativeAI => {
     throw new Error("Gemini API key not found. Please provide your API key to continue.");
   }
   return new GoogleGenerativeAI(apiKey);
-};
-
-if (!GROQ_API_KEY) { 
-  console.warn("GROQ_API_KEY environment variable is not set. Fallback API (Groq) will not function. Primary Gemini API will be used."); 
-}
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama3-8b-8192"; 
+}; 
 
 export type LogTokenUsageFn = (operation: string, inputChars: number, outputChars: number) => void;
 
@@ -285,81 +277,6 @@ export interface ParsedROIAnalysis {
     error?: string;
 }
 
-
-async function callGroqApiForLayer(
-  promptForGemini: string, 
-  movieTitle: string,
-  reviewStage: ReviewStage,
-  layer: ReviewLayer,
-  layerTitle: string,
-  logTokenUsage?: LogTokenUsageFn
-): Promise<ParsedLayerAnalysis> {
-  if (!GROQ_API_KEY) {
-    throw new Error(`Groq API key not available. Cannot use fallback for layer ${layerTitle}.`);
-  }
-  console.warn(`Attempting Groq fallback API for layer ${layerTitle}`);
-
-  const groqPrompt = `
-    You are an expert film and television critic.
-    Analyze the movie/series "${movieTitle}" (${reviewStage}) focusing on the layer: "${layerTitle}".
-    Provide a concise (150-250 words) insightful analysis of the originality and potential impact of this layer.
-    Consider unique elements, innovations, and overall effectiveness.
-    Your tone: analytical, academic, engaging. Highlight standout or derivative aspects.
-    Focus on delivering a quality textual analysis for the specified layer.
-    Do not try to find director/cast or provide scores or structured data like Vonnegut shapes unless explicitly part of this core text.
-    The output should be plain text analysis.
-    ---
-    Original detailed context (for your information, adapt your response based on the instructions above):
-    ${promptForGemini.substring(0, 1000)} 
-    ---
-    Begin Analysis:
-  `;
-  
-  const requestBody = {
-    messages: [
-      { role: "system", content: "You are a helpful film critic." },
-      { role: "user", content: groqPrompt }
-    ],
-    model: GROQ_MODEL,
-    temperature: 0.7,
-    max_tokens: 500,
-  };
-
-  try {
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(`Groq API error (${response.status}): ${errorData.error?.message || errorData.message || 'Unknown error'}`);
-    }
-
-    const data = await response.json();
-    const analysisText = data.choices?.[0]?.message?.content?.trim() || "Fallback analysis could not be generated.";
-    
-    logTokenUsage?.(`Layer Analysis (Groq Fallback): ${layerTitle}`, groqPrompt.length, analysisText.length);
-
-    return {
-      analysisText: analysisText,
-      isFallbackResult: true,
-      director: undefined,
-      mainCast: undefined,
-      groundingSources: [],
-      aiSuggestedScore: undefined,
-      improvementSuggestions: undefined,
-      vonnegutShape: undefined,
-    };
-  } catch (error) {
-    console.error(`Groq Fallback API call failed for layer ${layerTitle}:`, error);
-    throw new Error(`Fallback API (Groq) also failed for layer ${layerTitle}.`);
-  }
-}
 
 
 const generatePromptForLayer = (
@@ -1080,7 +997,6 @@ export const fetchMovieFinancialsWithGemini = async (
     if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
          throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
     }
-    // Add Groq fallback here if desired, for now just throw
     throw new Error(`Failed to fetch financial data for ${movieTitle}.`);
   }
 };
@@ -1143,7 +1059,6 @@ export const generateQualitativeROIAnalysisWithGemini = async (
     if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
          throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
     }
-    // Add Groq fallback here if desired
     throw new Error(`Failed to generate qualitative ROI analysis for ${movieTitle}.`);
   }
 };

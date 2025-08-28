@@ -4,7 +4,7 @@
 import React from 'react';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { ChartBarIcon } from './icons/ChartBarIcon';
-import { ApiStatusIndicator } from './ApiStatusIndicator';
+
 
 interface HeaderProps {
   onToggleTokenDashboard: () => void;
@@ -29,7 +29,7 @@ export const Header: React.FC<HeaderProps> = ({ onToggleTokenDashboard }) => {
           >
             <ChartBarIcon className="w-4 h-4 md:mr-1.5" /> <span className="hidden md:inline">Estimator</span>
           </button>
-          <ApiStatusIndicator />
+
         </div>
       </div>
     </header>

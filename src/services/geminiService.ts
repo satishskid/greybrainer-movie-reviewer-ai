@@ -18,15 +18,12 @@ if (!import.meta.env.VITE_API_KEY) {
   throw new Error("VITE_API_KEY environment variable is not set. Please ensure it's configured in your .env file.");
 }
 const GEMINI_API_KEY = import.meta.env.VITE_API_KEY;
-const GROQ_API_KEY = import.meta.env.VITE_GROQ_API_KEY;
 
-if (GEMINI_API_KEY && !GROQ_API_KEY) {
-  console.warn("VITE_GROQ_API_KEY environment variable is not set. Fallback API (Groq) will not function. Primary Gemini API will be used.");
-}
+
+
 
 const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY });
-const GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions";
-const GROQ_MODEL = "llama3-8b-8192";
+
 
 export type LogTokenUsageFn = (operation: string, inputChars: number, outputChars: number) => void;
 
@@ -56,83 +53,6 @@ export interface ParsedROIAnalysis {
     isFallbackResult?: boolean;
     error?: string;
 }
-
-
-async function callGroqApiForLayer(
-  promptForGemini: string, 
-  movieTitle: string,
-  reviewStage: ReviewStage,
-  _layer: ReviewLayer,
-  layerTitle: string,
-  logTokenUsage?: LogTokenUsageFn
-): Promise<ParsedLayerAnalysis> {
-  if (!GROQ_API_KEY) {
-    throw new Error(`Groq API key not available. Cannot use fallback for layer ${layerTitle}.`);
-  }
-  console.warn(`Attempting Groq fallback API for layer ${layerTitle}`);
-
-  const groqPrompt = `
-    You are an expert film and television critic.
-    Analyze the movie/series "${movieTitle}" (${reviewStage}) focusing on the layer: "${layerTitle}".
-    Provide a concise (150-250 words) insightful analysis of the originality and potential impact of this layer.
-    Consider unique elements, innovations, and overall effectiveness.
-    Your tone: analytical, academic, engaging. Highlight standout or derivative aspects.
-    Focus on delivering a quality textual analysis for the specified layer.
-    Do not try to find director/cast or provide scores or structured data like Vonnegut shapes unless explicitly part of this core text.
-    The output should be plain text analysis.
-    ---
-    Original detailed context (for your information, adapt your response based on the instructions above):
-    ${promptForGemini.substring(0, 1000)} 
-    ---
-    Begin Analysis:
-  `;
-  
-  const requestBody = {
-    messages: [
-      { role: "system", content: "You are a helpful film critic." },
-      { role: "user", content: groqPrompt }
-    ],
-    model: GROQ_MODEL,
-    temperature: 0.7,
-    max_tokens: 500,
-  };
-
-  try {
-    const response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROQ_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(requestBody)
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({ message: response.statusText }));
-      throw new Error(`Groq API error (${response.status}): ${errorData.error?.message || errorData.message || 'Unknown error'}`);
-    }
-
-    const data = await response.json();
-    const analysisText = data.choices?.[0]?.message?.content?.trim() || "Fallback analysis could not be generated.";
-    
-    logTokenUsage?.(`Layer Analysis (Groq Fallback): ${layerTitle}`, groqPrompt.length, analysisText.length);
-
-    return {
-      analysisText: analysisText,
-      isFallbackResult: true,
-      director: undefined,
-      mainCast: undefined,
-      groundingSources: [],
-      aiSuggestedScore: undefined,
-      improvementSuggestions: undefined,
-      vonnegutShape: undefined,
-    };
-  } catch (error) {
-    console.error(`Groq Fallback API call failed for layer ${layerTitle}:`, error);
-    throw new Error(`Fallback API (Groq) also failed for layer ${layerTitle}.`);
-  }
-}
-
 
 
 
@@ -426,20 +346,7 @@ export const analyzeLayerWithGemini = async (
          throw new Error('Invalid Gemini API Key. Please check your VITE_API_KEY environment variable.');
     }
     
-    // Try Groq fallback
-    if (GROQ_API_KEY) {
-      try {
-        console.warn(`Gemini failed for layer ${layerTitle}, attempting Groq fallback.`);
-        return await callGroqApiForLayer(prompt, movieTitle, reviewStage, layer, layerTitle, logTokenUsage);
-      } catch (fallbackError) {
-        console.error(`Groq Fallback API also failed for layer ${layerTitle}:`, fallbackError);
-        if (fallbackError instanceof Error) {
-            throw new Error(`Primary AI (Gemini) failed for ${layerTitle}. Fallback AI (Groq) also failed: ${fallbackError.message}`);
-        }
-        throw new Error(`Primary AI (Gemini) failed for ${layerTitle}. Fallback AI (Groq) also failed with an unknown error.`);
-      }
-    }
-    throw new Error(`Failed to get analysis for ${layerTitle} from AI. Primary API (Gemini) failed and fallback is not configured or also failed.`);
+    throw new Error(`Failed to get analysis for ${layerTitle} from Gemini AI.`);
   }
 };
 

@@ -14,16 +14,15 @@
 
 ## 🔑 Environment Variables Setup
 
-In your Netlify dashboard, go to **Site Settings > Environment Variables** and add:
+**Note**: This application now uses a Bring Your Own Key (BYOK) system. API keys are managed through the application interface rather than environment variables.
 
+For legacy deployments that still require environment variables:
 ```
 VITE_API_KEY = your_gemini_api_key_here
-VITE_GROQ_API_KEY = your_groq_api_key_here
 ```
 
 ### 🔑 API Key Sources:
-- **Gemini**: ✅ Working (Google AI Studio)
-- **Groq**: ✅ Working (console.groq.com)
+- **Gemini**: ✅ Working (Google AI Studio) - Managed through BYOK system
 
 ## 📋 Deployment Checklist
 
@@ -31,7 +30,7 @@ VITE_GROQ_API_KEY = your_groq_api_key_here
 - [ ] All API keys configured in `.env` (for local testing)
 - [ ] `npm run build` completes successfully
 - [ ] `npm run preview` works locally
-- [ ] All APIs tested with ApiStatusChecker component
+- [ ] Gemini API tested through application interface
 
 ### ✅ Netlify Configuration
 - [ ] `netlify.toml` file present in root directory
@@ -42,7 +41,7 @@ VITE_GROQ_API_KEY = your_groq_api_key_here
 
 ### ✅ Post-Deployment
 - [ ] Site loads without errors
-- [ ] API Status Checker shows all APIs working
+- [ ] Gemini API functionality works through BYOK system
 - [ ] Movie analysis functionality works
 - [ ] Firebase authentication works (if using)
 
@@ -57,8 +56,7 @@ The `netlify.toml` file includes:
 ## 🌐 API Endpoints
 
 The application uses these external APIs:
-- **Gemini AI**: `https://generativelanguage.googleapis.com/`
-- **Groq**: `https://api.groq.com/openai/v1/chat/completions`
+- **Gemini AI**: `https://generativelanguage.googleapis.com/` (via BYOK system)
 - **Firebase**: `https://greybrainer.firebaseapp.com`
 
 ## 🚨 Troubleshooting
@@ -71,7 +69,7 @@ The application uses these external APIs:
 ### APIs Not Working
 - Verify environment variables in Netlify dashboard
 - Check API key validity
-- Use the built-in API Status Checker component
+- Test API functionality through the application interface
 
 ### Performance Issues
 - Enable Netlify's asset optimization

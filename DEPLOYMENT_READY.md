@@ -6,9 +6,9 @@ The application has been successfully built and tested with no critical issues.
 
 ### 🔑 API Keys Configured
 - ✅ **Gemini API**: Configured (get from Google AI Studio)
-- ✅ **Groq API**: Configured (get from Groq Console)
-- ✅ **DeepSeek API**: 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
-- ✅ **Kimi API**: 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
+- ✅ **Gemini API**: Configured via BYOK system
+- ⚠️ **Legacy APIs**: Removed for security (DeepSeek, Kimi keys redacted)
+- 🔒 **Security**: All API keys now managed through secure BYOK interface
 
 ### 🔥 Firebase Integration
 - ✅ **Project**: greybrainer.firebaseapp.com

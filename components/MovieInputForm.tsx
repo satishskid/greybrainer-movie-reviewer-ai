@@ -4,7 +4,7 @@ import { ReviewStage, MovieAnalysisInput } from '../types';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { LoadingSpinner } from './LoadingSpinner';
 import { LightBulbIcon } from './icons/LightBulbIcon';
-import { ApiStatusIndicator } from './ApiStatusIndicator';
+
 
 interface MovieInputFormProps {
   movieInput: MovieAnalysisInput;
