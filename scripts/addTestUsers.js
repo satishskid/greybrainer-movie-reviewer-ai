@@ -1,6 +1,11 @@
-const admin = require('firebase-admin');
-const fs = require('fs');
-const path = require('path');
+import admin from 'firebase-admin';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Load test users data
 const testUsersPath = path.join(__dirname, '../testUsers.json');
@@ -10,7 +15,7 @@ const testUsersData = JSON.parse(fs.readFileSync(testUsersPath, 'utf8'));
 // You'll need to download your service account key from Firebase Console
 // and place it in the scripts folder as 'serviceAccountKey.json'
 try {
-  const serviceAccount = require('./serviceAccountKey.json');
+  const serviceAccount = JSON.parse(fs.readFileSync(path.join(__dirname, 'serviceAccountKey.json'), 'utf8'));
   
   admin.initializeApp({
     credential: admin.credential.cert(serviceAccount),
