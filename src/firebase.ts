@@ -8,7 +8,7 @@ import { getAuth } from "firebase/auth";
 // Your web app's Firebase configuration
 // For Firebase JS SDK v7.20.0 and later, measurementId is optional
 const firebaseConfig = {
-  apiKey: import.meta.env.VITE_FIREBASE_API_KEY || "your-firebase-api-key-here",
+  apiKey: "AIzaSyDQJ8K9Z1X2Y3V4W5U6T7R8S9Q0P1O2N3M4",
   authDomain: "greybrainer.firebaseapp.com",
   projectId: "greybrainer",
   storageBucket: "greybrainer.firebasestorage.app",
