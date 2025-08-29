@@ -28,11 +28,11 @@ export const GeminiKeyPrompt: React.FC<GeminiKeyPromptProps> = ({
         // Basic format validation
         const isValidFormat = isValidGeminiKeyFormat(apiKey.trim());
         
-        // Store the API key
-        storeGeminiApiKey(apiKey.trim(), isValidFormat);
+        // Store the API key (now async and resets quota status)
+        await storeGeminiApiKey(apiKey.trim(), isValidFormat);
         
         // Update validation status
-        updateGeminiKeyValidation(isValidFormat);
+        await updateGeminiKeyValidation(isValidFormat);
         
         // Call the parent's onSubmit callback
         onSubmit(apiKey.trim());

@@ -156,10 +156,25 @@ http://localhost:6734/test-auth.html
 The application requires several API keys for full functionality:
 
 1. **Gemini API Key**: For AI movie analysis
-2. **Brave Search API Key**: For enhanced search
-3. **Google Search API Key**: For additional search capabilities
+2. **Google Search API Key**: For search capabilities
 
 These keys are managed through the application's key management system and are required for optimal performance.
+
+### Quota Management and Reset Behavior
+
+**Important**: When you encounter a "Gemini API Daily Quota Exceeded" message, entering a new API key will automatically reset the quota status. This means:
+
+- **Fresh API Keys**: When you input a new Gemini API key, any existing quota exceeded status is immediately cleared
+- **Instant Reset**: You don't need to wait for the 24-hour quota reset period when switching to a new key
+- **Seamless Experience**: The application will immediately attempt to use the new key without quota restrictions
+
+**How to Reset Quota Status**:
+1. Navigate to the API Key Management section
+2. Enter your new Gemini API key
+3. Click "Save" - this automatically resets any quota exceeded status
+4. The application will immediately be ready to process requests with the new key
+
+**Note**: This quota reset only applies when you change to a different API key. Using the same key that has exceeded its quota will not reset the status.
 
 ## Support and Contact
 

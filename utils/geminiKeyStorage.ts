@@ -3,6 +3,22 @@
 const GEMINI_API_KEY_STORAGE_KEY = 'greybrainer_gemini_api_key';
 const GEMINI_KEY_VALIDATION_STORAGE_KEY = 'greybrainer_gemini_key_validated';
 
+// Import quota reset function to clear quota status when new key is stored
+let resetQuotaStatus: (() => void) | null = null;
+
+// Lazy import to avoid circular dependency
+const getResetQuotaFunction = async () => {
+  if (!resetQuotaStatus) {
+    try {
+      const geminiService = await import('../services/geminiService');
+      resetQuotaStatus = geminiService.resetQuotaStatus;
+    } catch (error) {
+      console.warn('Could not import resetQuotaStatus function:', error);
+    }
+  }
+  return resetQuotaStatus;
+};
+
 export interface GeminiKeyInfo {
   apiKey: string;
   isValidated: boolean;
@@ -12,7 +28,7 @@ export interface GeminiKeyInfo {
 /**
  * Store Gemini API key in localStorage
  */
-export const storeGeminiApiKey = (apiKey: string, isValidated: boolean = false): void => {
+export const storeGeminiApiKey = async (apiKey: string, isValidated: boolean = false): Promise<void> => {
   try {
     const keyInfo: GeminiKeyInfo = {
       apiKey,
@@ -20,6 +36,13 @@ export const storeGeminiApiKey = (apiKey: string, isValidated: boolean = false):
       lastValidated: isValidated ? Date.now() : undefined,
     };
     localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, JSON.stringify(keyInfo));
+    
+    // Reset quota status when new API key is stored to clear any persisting quota exceeded status
+    const resetFn = await getResetQuotaFunction();
+    if (resetFn) {
+      resetFn();
+      console.log('Quota status reset for new API key');
+    }
   } catch (error) {
     console.error('Failed to store Gemini API key:', error);
   }
@@ -79,10 +102,10 @@ export const removeGeminiApiKey = (): void => {
 /**
  * Update validation status of stored key
  */
-export const updateGeminiKeyValidation = (isValidated: boolean): void => {
+export const updateGeminiKeyValidation = async (isValidated: boolean): Promise<void> => {
   const keyInfo = getGeminiApiKey();
   if (keyInfo) {
-    storeGeminiApiKey(keyInfo.apiKey, isValidated);
+    await storeGeminiApiKey(keyInfo.apiKey, isValidated);
   }
 };
 

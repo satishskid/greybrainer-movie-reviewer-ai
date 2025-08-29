@@ -59,15 +59,16 @@ export const GeminiKeyManager: React.FC<GeminiKeyManagerProps> = ({ className = 
 
     try {
       const isValidFormat = isValidGeminiKeyFormat(apiKey.trim());
-      storeGeminiApiKey(apiKey.trim(), isValidFormat);
-      updateGeminiKeyValidation(isValidFormat);
+      await storeGeminiApiKey(apiKey.trim(), isValidFormat);
+      await updateGeminiKeyValidation(isValidFormat);
       
       setMessage({ 
         type: 'success', 
-        text: isValidFormat ? 'API key saved successfully!' : 'API key saved (format validation failed)'
+        text: isValidFormat ? 'API key saved and quota status reset!' : 'API key saved (format validation failed)'
       });
       
       checkStoredKey();
+      updateQuotaInfo(); // Refresh quota info after saving new key
       
       // Auto-close after success
       setTimeout(() => {
