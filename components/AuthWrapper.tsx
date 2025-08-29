@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { auth } from '../src/firebase';
-import { signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { authService, User, AuthState } from '../src/services/authService';
 import { LoadingSpinner } from './LoadingSpinner';
 import { LockClosedIcon } from './icons/LockClosedIcon';
 import { KeyIcon } from './icons/KeyIcon';
@@ -26,14 +25,14 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
   const [showGoogleSearchKeyPrompt, setShowGoogleSearchKeyPrompt] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    const unsubscribe = authService.onAuthStateChanged((authState: AuthState) => {
+      setUser(authState.user);
       setLoading(false);
       
       // Check if user is authenticated but doesn't have API keys
-      if (user && !hasGeminiApiKey()) {
+      if (authState.user && !hasGeminiApiKey()) {
         setShowGeminiKeyPrompt(true);
-      } else if (user && hasGeminiApiKey() && !hasGoogleSearchApiKey()) {
+      } else if (authState.user && hasGeminiApiKey() && !hasGoogleSearchApiKey()) {
         setShowGoogleSearchKeyPrompt(true);
       }
     });
@@ -47,7 +46,7 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
     setLoginError('');
 
     try {
-      await signInWithEmailAndPassword(auth, email, password);
+      await authService.signIn(email, password);
     } catch (error: any) {
       setLoginError(error.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -57,7 +56,7 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth);
+      await authService.signOut();
     } catch (error) {
       console.error('Logout error:', error);
     }
@@ -214,12 +213,17 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
               <span className="text-white text-sm font-medium">
-                {user.email?.charAt(0).toUpperCase()}
+                {user.name?.charAt(0).toUpperCase()}
               </span>
             </div>
-            <span className="text-slate-300 text-sm">
-              {user.email}
-            </span>
+            <div className="flex flex-col">
+              <span className="text-slate-300 text-sm font-medium">
+                {user.name}
+              </span>
+              <span className="text-slate-400 text-xs">
+                {user.role} • {user.department}
+              </span>
+            </div>
           </div>
           <div className="flex items-center space-x-4">
             <GeminiKeyManager />
