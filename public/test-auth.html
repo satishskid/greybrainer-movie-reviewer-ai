@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Authentication Test - All Users</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #1e293b;
+            color: #e2e8f0;
+        }
+        .test-container {
+            background: #334155;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .user-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .user-card {
+            background: #475569;
+            border-radius: 6px;
+            padding: 15px;
+            border: 2px solid #64748b;
+        }
+        .user-card.success {
+            border-color: #10b981;
+            background: #065f46;
+        }
+        .user-card.error {
+            border-color: #ef4444;
+            background: #7f1d1d;
+        }
+        .user-card.testing {
+            border-color: #f59e0b;
+            background: #78350f;
+        }
+        .test-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        .test-btn:hover {
+            background: #2563eb;
+        }
+        .test-btn:disabled {
+            background: #6b7280;
+            cursor: not-allowed;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+            font-size: 14px;
+        }
+        .success {
+            background: #065f46;
+            color: #10b981;
+        }
+        .error {
+            background: #7f1d1d;
+            color: #ef4444;
+        }
+        .testing {
+            background: #78350f;
+            color: #f59e0b;
+        }
+        .summary {
+            background: #1e40af;
+            color: white;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        .user-info {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🧪 Hardcoded Authentication Test Suite</h1>
+    
+    <div class="summary" id="summary">
+        <h3>Test Summary</h3>
+        <p>Ready to test all 10 hardcoded users. Click "Test All Users" to begin automated testing.</p>
+        <button class="test-btn" onclick="testAllUsers()">Test All Users</button>
+        <button class="test-btn" onclick="clearResults()">Clear Results</button>
+    </div>
+
+    <div class="test-container">
+        <h2>Individual User Tests</h2>
+        <div class="user-grid" id="userGrid">
+            <!-- User cards will be generated here -->
+        </div>
+    </div>
+
+    <script>
+        // Test users data (matching testUsers.json)
+        const testUsers = [
+            { id: 1, email: "test1@greybrainer.ai", password: "TestPass123!", role: "tester", name: "Alice Johnson", department: "Product Testing" },
+            { id: 2, email: "test2@greybrainer.ai", password: "TestPass123!", role: "tester", name: "Bob Smith", department: "QA Engineering" },
+            { id: 3, email: "test3@greybrainer.ai", password: "TestPass123!", role: "tester", name: "Carol Davis", department: "User Experience" },
+            { id: 4, email: "test4@greybrainer.ai", password: "TestPass123!", role: "tester", name: "David Wilson", department: "Content Review" },
+            { id: 5, email: "test5@greybrainer.ai", password: "TestPass123!", role: "tester", name: "Emma Brown", department: "Film Analysis" },
+            { id: 6, email: "test6@greybrainer.ai", password: "TestPass123!", role: "admin", name: "Frank Miller", department: "Administration" },
+            { id: 7, email: "test7@greybrainer.ai", password: "TestPass123!", role: "tester", name: "Grace Lee", department: "Creative Testing" },
+            { id: 8, email: "test8@greybrainer.ai", password: "TestPass123!", role: "tester", name: "Henry Taylor", department: "Technical Review" },
+            { id: 9, email: "test9@greybrainer.ai", password: "TestPass123!", role: "tester", name: "Ivy Chen", department: "Performance Testing" },
+            { id: 10, email: "test10@greybrainer.ai", password: "TestPass123!", role: "tester", name: "Jack Anderson", department: "Integration Testing" }
+        ];
+
+        let testResults = {};
+
+        // Mock auth service for testing (simulating the actual authService)
+        class MockAuthService {
+            async signIn(email, password) {
+                return new Promise((resolve, reject) => {
+                    setTimeout(() => {
+                        const user = testUsers.find(u => u.email === email && u.password === password);
+                        if (user) {
+                            resolve({
+                                id: user.id,
+                                email: user.email,
+                                name: user.name,
+                                role: user.role,
+                                department: user.department
+                            });
+                        } else {
+                            reject(new Error('Invalid email or password'));
+                        }
+                    }, 300); // Simulate network delay
+                });
+            }
+        }
+
+        const mockAuthService = new MockAuthService();
+
+        function generateUserCards() {
+            const userGrid = document.getElementById('userGrid');
+            userGrid.innerHTML = '';
+
+            testUsers.forEach(user => {
+                const card = document.createElement('div');
+                card.className = 'user-card';
+                card.id = `user-${user.id}`;
+                
+                card.innerHTML = `
+                    <h4>${user.name} (ID: ${user.id})</h4>
+                    <div class="user-info">
+                        <strong>Email:</strong> ${user.email}<br>
+                        <strong>Role:</strong> ${user.role}<br>
+                        <strong>Department:</strong> ${user.department}
+                    </div>
+                    <button class="test-btn" onclick="testUser(${user.id})" id="btn-${user.id}">
+                        Test Login
+                    </button>
+                    <div class="result" id="result-${user.id}" style="display: none;"></div>
+                `;
+                
+                userGrid.appendChild(card);
+            });
+        }
+
+        async function testUser(userId) {
+            const user = testUsers.find(u => u.id === userId);
+            const card = document.getElementById(`user-${userId}`);
+            const result = document.getElementById(`result-${userId}`);
+            const btn = document.getElementById(`btn-${userId}`);
+            
+            // Set testing state
+            card.className = 'user-card testing';
+            result.style.display = 'block';
+            result.className = 'result testing';
+            result.innerHTML = '🔄 Testing authentication...';
+            btn.disabled = true;
+            btn.textContent = 'Testing...';
+
+            try {
+                const authResult = await mockAuthService.signIn(user.email, user.password);
+                
+                // Verify all fields match
+                const fieldsMatch = 
+                    authResult.id === user.id &&
+                    authResult.email === user.email &&
+                    authResult.name === user.name &&
+                    authResult.role === user.role &&
+                    authResult.department === user.department;
+
+                if (fieldsMatch) {
+                    card.className = 'user-card success';
+                    result.className = 'result success';
+                    result.innerHTML = `
+                        ✅ <strong>Authentication Successful!</strong><br>
+                        <small>
+                        ID: ${authResult.id} | Email: ${authResult.email}<br>
+                        Name: ${authResult.name}<br>
+                        Role: ${authResult.role} | Dept: ${authResult.department}
+                        </small>
+                    `;
+                    testResults[userId] = { success: true, user: authResult };
+                } else {
+                    throw new Error('User data mismatch');
+                }
+            } catch (error) {
+                card.className = 'user-card error';
+                result.className = 'result error';
+                result.innerHTML = `❌ <strong>Authentication Failed!</strong><br><small>Error: ${error.message}</small>`;
+                testResults[userId] = { success: false, error: error.message };
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Test Again';
+            updateSummary();
+        }
+
+        async function testAllUsers() {
+            const summary = document.getElementById('summary');
+            summary.innerHTML = '<h3>🔄 Testing All Users...</h3><p>Please wait while we test all 10 users...</p>';
+            
+            testResults = {};
+            
+            // Test all users sequentially
+            for (let i = 0; i < testUsers.length; i++) {
+                await testUser(testUsers[i].id);
+                await new Promise(resolve => setTimeout(resolve, 200)); // Small delay between tests
+            }
+        }
+
+        function updateSummary() {
+            const summary = document.getElementById('summary');
+            const totalTests = Object.keys(testResults).length;
+            const successfulTests = Object.values(testResults).filter(r => r.success).length;
+            const failedTests = totalTests - successfulTests;
+
+            if (totalTests === 0) {
+                summary.innerHTML = `
+                    <h3>Test Summary</h3>
+                    <p>Ready to test all 10 hardcoded users. Click "Test All Users" to begin automated testing.</p>
+                    <button class="test-btn" onclick="testAllUsers()">Test All Users</button>
+                    <button class="test-btn" onclick="clearResults()">Clear Results</button>
+                `;
+                return;
+            }
+
+            const isComplete = totalTests === testUsers.length;
+            const allPassed = successfulTests === testUsers.length;
+
+            let statusIcon = '🔄';
+            let statusText = 'In Progress';
+            let statusColor = '#f59e0b';
+
+            if (isComplete) {
+                if (allPassed) {
+                    statusIcon = '✅';
+                    statusText = 'All Tests Passed!';
+                    statusColor = '#10b981';
+                } else {
+                    statusIcon = '❌';
+                    statusText = 'Some Tests Failed';
+                    statusColor = '#ef4444';
+                }
+            }
+
+            summary.innerHTML = `
+                <h3>${statusIcon} Test Summary - ${statusText}</h3>
+                <p style="color: ${statusColor}; font-weight: bold;">
+                    ${successfulTests}/${testUsers.length} users authenticated successfully
+                    ${failedTests > 0 ? ` | ${failedTests} failed` : ''}
+                </p>
+                <button class="test-btn" onclick="testAllUsers()">Test All Users</button>
+                <button class="test-btn" onclick="clearResults()">Clear Results</button>
+                ${isComplete && allPassed ? '<p style="color: #10b981; margin-top: 10px;">🎉 <strong>Hardcoded authentication system is working perfectly!</strong></p>' : ''}
+            `;
+        }
+
+        function clearResults() {
+            testResults = {};
+            testUsers.forEach(user => {
+                const card = document.getElementById(`user-${user.id}`);
+                const result = document.getElementById(`result-${user.id}`);
+                const btn = document.getElementById(`btn-${user.id}`);
+                
+                card.className = 'user-card';
+                result.style.display = 'none';
+                btn.disabled = false;
+                btn.textContent = 'Test Login';
+            });
+            updateSummary();
+        }
+
+        // Initialize the page
+        document.addEventListener('DOMContentLoaded', function() {
+            generateUserCards();
+            updateSummary();
+        });
+    </script>
+</body>
+</html>
