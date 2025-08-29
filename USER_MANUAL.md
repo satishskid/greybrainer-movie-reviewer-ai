@@ -50,10 +50,7 @@ Welcome to Greybrainer AI! This manual will guide you through using the applicat
     *   [Token Usage Estimator](#token-usage-estimator)
         *   [Understanding the Dashboard](#understanding-the-dashboard)
         *   [Important Disclaimers](#important-disclaimers)
-6.  [API Quota Management](#api-quota-management)
-    *   [Understanding Quotas](#understanding-quotas)
-    *   [Monitoring Usage](#monitoring-usage)
-    *   [Managing Quota Limits](#managing-quota-limits)
+6.  [API Usage & Error Handling](#api-usage--error-handling)
 7.  [Troubleshooting & FAQ](#troubleshooting--faq)
 
 ---
@@ -302,82 +299,43 @@ Accessed via the "Estimator" button in the header.
 *   Actual token usage and costs are determined by Google. Always refer to your Google Cloud Console or AI Studio for accurate information.
 *   This tool is for general awareness and relative comparison of operations only.
 
-## 6. API Quota Management
+## 6. API Usage & Error Handling
 
-Greybrainer AI includes comprehensive quota monitoring to help you manage your API usage effectively.
+Greybrainer AI uses multiple AI services to provide comprehensive analysis. Here's what you need to know about API usage and error handling.
 
-### Understanding Quotas
+### API Services Used
 
-**Groq API Quotas**
+**Groq API**
 *   Pre-configured with generous limits
 *   Handles most core functionality
-*   Automatic rate limiting and retry logic
 *   Fast response times for quick analysis
+*   Automatic rate limiting and retry logic
 
-**Gemini API Quotas**
-*   Based on your Google AI Studio/Cloud account
-*   Varies by subscription tier (free, pay-as-you-go, etc.)
+**Gemini API**
+*   Requires your Google AI Studio API key
 *   Used for enhanced analysis and deep insights
-*   More comprehensive but with usage limits
+*   More comprehensive analysis capabilities
+*   Subject to your Google account's usage limits
 
-**Quota Types:**
-*   **Requests per minute (RPM):** Short-term rate limits
-*   **Requests per day (RPD):** Daily usage caps
-*   **Tokens per minute (TPM):** Content-based limits
-*   **Tokens per day (TPD):** Daily token allowances
+### Error Handling & Recovery
 
-### Monitoring Usage
+**When API Limits Are Reached:**
+*   Clear, informative error messages
+*   Suggested wait times (typically 24 hours for daily limits)
+*   Guidance on upgrading API plans
+*   Instructions for checking usage in Google AI Studio
 
-**Real-Time Quota Display**
-*   Live usage indicators in the interface
-*   Percentage of quota consumed
-*   Estimated remaining requests
-*   Time until quota reset
+**Automatic Recovery Features:**
+*   Graceful error handling without crashes
+*   Clear user notifications about temporary limitations
+*   Suggestions for alternative approaches
+*   Automatic retry capabilities where appropriate
 
-**Quota Status Indicators:**
-*   🟢 **Green (0-70%):** Normal usage, full functionality available
-*   🟡 **Yellow (71-90%):** Moderate usage, consider pacing requests
-*   🟠 **Orange (91-95%):** High usage, automatic optimization enabled
-*   🔴 **Red (96-100%):** Quota nearly exhausted, fallback modes active
-
-**Usage Tracking Features:**
-*   Historical usage patterns
-*   Peak usage times identification
-*   Request type breakdown (analysis vs. generation)
-*   Efficiency recommendations
-
-### Managing Quota Limits
-
-**Smart Quota Management:**
-*   Automatic fallback to Groq when Gemini quota is low
-*   Intelligent request batching
-*   Priority queuing for critical analyses
-*   Usage optimization suggestions
-
-**When Quotas Are Exceeded:**
-1.  **Automatic Fallbacks:** System switches to alternative AI engines
-2.  **Graceful Degradation:** Reduced functionality rather than complete failure
-3.  **Clear Messaging:** Informative error messages with suggested actions
-4.  **Retry Logic:** Automatic retries after quota reset
-
-**Quota Optimization Tips:**
-*   Use quick analysis for preliminary reviews
-*   Batch similar analyses together
-*   Monitor usage during peak hours
-*   Consider upgrading API plans for heavy usage
-*   Use Groq for speed, Gemini for depth
-
-**Quota Reset Information:**
-*   Daily quotas typically reset at midnight UTC
-*   Monthly quotas reset on the first day of each month
-*   Real-time countdown to next reset displayed
-*   Automatic notifications when quotas refresh
-
-**Managing Multiple Projects:**
-*   Consider separate API keys for different projects
-*   Monitor usage across all applications
-*   Set up alerts in Google Cloud Console
-*   Plan usage around quota limits
+**Best Practices:**
+*   Monitor your usage in Google AI Studio for official tracking
+*   Consider upgrading your API plan for heavy usage
+*   Use the application during off-peak hours if experiencing limits
+*   Keep your API keys secure and up-to-date
 
 ## 7. Troubleshooting & FAQ
 
@@ -387,7 +345,7 @@ Greybrainer AI includes comprehensive quota monitoring to help you manage your A
     *   A: No, Gemini API key is optional. Greybrainer AI works with Groq API for core functionality. Gemini provides enhanced analysis capabilities. You can skip Gemini setup and use Groq-only features.
 
 *   **Q: My Gemini API key shows as "invalid" or "expired."**
-    *   A: Verify your key format (should start with "AIza"), check it's active in Google AI Studio, and ensure you have sufficient quota. Keys are re-validated every 24 hours automatically.
+    *   A: Verify your key format (should start with "AIza") and check it's active in Google AI Studio. Keys are re-validated every 24 hours automatically.
 
 *   **Q: How do I update or change my API key?**
     *   A: Go to Settings/API Keys section, clear the existing key, and enter your new one. The system will validate and store the new key securely.
@@ -395,13 +353,10 @@ Greybrainer AI includes comprehensive quota monitoring to help you manage your A
 **Analysis and Performance Issues:**
 
 *   **Q: An analysis for a layer failed or shows an error.**
-    *   A: This can happen due to API issues, network problems, quota limits, or processing difficulties. The system automatically tries fallback options. Check your quota status and try again.
+    *   A: This can happen due to API issues, network problems, or processing difficulties. The system automatically tries fallback options and provides clear error messages with suggested actions.
 
-*   **Q: Analysis is slower than expected.**
-    *   A: This may indicate quota throttling or high API load. Check quota status indicators. Consider using quick analysis mode or trying during off-peak hours.
-
-*   **Q: I'm getting "quota exceeded" errors.**
-    *   A: Your API quota is exhausted. Check the quota management section for current usage. Wait for quota reset or consider upgrading your API plan. The system will automatically fall back to available services.
+*   **Q: I'm getting "API quota exceeded" errors.**
+    *   A: Your daily API usage limit has been reached. Wait for the quota to reset (typically 24 hours) or consider upgrading your API plan in Google AI Studio. The system will provide clear guidance on next steps.
 
 **Data and Storage Questions:**
 
@@ -414,18 +369,15 @@ Greybrainer AI includes comprehensive quota monitoring to help you manage your A
 *   **Q: What happens if I clear my browser data?**
     *   A: You'll lose stored API keys and analysis data. You'll need to re-enter your API keys and any custom analyses will be lost.
 
-**Quota and Billing Questions:**
+**Usage and Billing Questions:**
 
 *   **Q: How do I monitor my API usage and costs?**
-    *   A: Use the built-in quota monitoring features for estimates. For official usage and billing, check your Google AI Studio or Google Cloud Console. Greybrainer's estimates are for guidance only.
-
-*   **Q: Why do I see different quota limits than expected?**
-    *   A: Quota limits depend on your Google AI Studio/Cloud account tier, region, and current API policies. Check your Google account for official quota information.
+    *   A: For official usage and billing information, check your Google AI Studio or Google Cloud Console. These provide accurate, real-time usage data and billing details.
 
 **Feature-Specific Issues:**
 
 *   **Q: Some advanced features aren't working.**
-    *   A: Advanced features may require Gemini API access. Ensure you have a valid Gemini API key and sufficient quota. Some features automatically fall back to basic functionality when Gemini is unavailable.
+    *   A: Advanced features may require Gemini API access. Ensure you have a valid Gemini API key. Some features automatically fall back to basic functionality when Gemini is unavailable.
 
 *   **Q: Movie search isn't finding my title.**
     *   A: Try alternative spellings, include release year, or use the original language title. The search uses multiple databases and may have coverage limitations for very recent or obscure titles.

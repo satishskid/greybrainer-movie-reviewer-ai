@@ -186,12 +186,11 @@ Greybrainer AI features a sophisticated dual-engine architecture with a secure "
 *   Automatic key validation and expiration handling
 *   Easy key rotation and management
 
-**Quota Management:**
-*   Real-time quota monitoring and usage tracking
+**Error Handling & Recovery:**
+*   Graceful error handling with clear user messaging
 *   Intelligent fallback between engines based on availability
-*   Smart request optimization and batching
-*   Visual quota indicators and alerts
-*   Automatic retry logic and graceful degradation
+*   Automatic retry logic where appropriate
+*   Clear guidance on API usage limits and recovery
 
 ### Recommendations for Future Integration
 If you want to expand the AI capabilities, consider these top-tier alternatives:

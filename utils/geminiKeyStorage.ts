@@ -3,21 +3,7 @@
 const GEMINI_API_KEY_STORAGE_KEY = 'greybrainer_gemini_api_key';
 const GEMINI_KEY_VALIDATION_STORAGE_KEY = 'greybrainer_gemini_key_validated';
 
-// Import quota reset function to clear quota status when new key is stored
-let resetQuotaStatus: (() => void) | null = null;
-
-// Lazy import to avoid circular dependency
-const getResetQuotaFunction = async () => {
-  if (!resetQuotaStatus) {
-    try {
-      const geminiService = await import('../services/geminiService');
-      resetQuotaStatus = geminiService.resetQuotaStatus;
-    } catch (error) {
-      console.warn('Could not import resetQuotaStatus function:', error);
-    }
-  }
-  return resetQuotaStatus;
-};
+// Removed quota reset functionality as quota monitoring has been simplified
 
 export interface GeminiKeyInfo {
   apiKey: string;
@@ -37,12 +23,7 @@ export const storeGeminiApiKey = async (apiKey: string, isValidated: boolean = f
     };
     localStorage.setItem(GEMINI_API_KEY_STORAGE_KEY, JSON.stringify(keyInfo));
     
-    // Reset quota status when new API key is stored to clear any persisting quota exceeded status
-    const resetFn = await getResetQuotaFunction();
-    if (resetFn) {
-      resetFn();
-      console.log('Quota status reset for new API key');
-    }
+    // API key stored successfully
   } catch (error) {
     console.error('Failed to store Gemini API key:', error);
   }

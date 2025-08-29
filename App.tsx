@@ -23,7 +23,7 @@ import { MorphokineticsDisplay } from './components/MorphokineticsDisplay';
 import { MonthlyMagicScoreboard } from './components/MonthlyMagicScoreboard';
 import { LightBulbIcon } from './components/icons/LightBulbIcon';
 import { GreybrainerInsights } from './components/GreybrainerInsights';
-import QuotaCountdownTimer from './components/QuotaCountdownTimer';
+
 import { GoogleSearchKeyManager } from './components/GoogleSearchKeyManager';
 
 import { AuthWrapper } from './components/AuthWrapper';
@@ -327,7 +327,7 @@ const App: React.FC = () => {
             <TokenBudgetDashboard config={tokenBudgetConfig} setConfig={saveTokenBudgetConfig} usageLog={tokenUsageLog} clearLog={() => { setTokenUsageLog([]); localStorage.removeItem('tokenUsageLog'); }} onClose={() => setShowTokenDashboard(false)} />
           )}
 
-          <QuotaCountdownTimer className="mb-6" />
+
           <GoogleSearchKeyManager className="mb-6" />
           
           <MovieInputForm

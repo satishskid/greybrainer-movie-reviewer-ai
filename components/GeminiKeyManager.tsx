@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { KeyIcon } from './icons/KeyIcon';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
 import { getGeminiApiKey, storeGeminiApiKey, removeGeminiApiKey, isValidGeminiKeyFormat, updateGeminiKeyValidation } from '../utils/geminiKeyStorage';
-import { resetQuotaStatus, getDetailedQuotaInfo } from '../services/geminiService';
+
 
 interface GeminiKeyManagerProps {
   className?: string;
@@ -16,24 +16,11 @@ export const GeminiKeyManager: React.FC<GeminiKeyManagerProps> = ({ className = 
   const [isValidated, setIsValidated] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
-  const [quotaInfo, setQuotaInfo] = useState<any>(null);
+
 
   useEffect(() => {
     checkStoredKey();
-    updateQuotaInfo();
   }, []);
-
-  useEffect(() => {
-    if (isOpen) {
-      updateQuotaInfo();
-    }
-  }, [isOpen]);
-
-  const updateQuotaInfo = () => {
-    const info = getDetailedQuotaInfo();
-    console.log('Quota info:', info);
-    setQuotaInfo(info);
-  };
 
   const checkStoredKey = () => {
     const keyInfo = getGeminiApiKey();
@@ -64,11 +51,10 @@ export const GeminiKeyManager: React.FC<GeminiKeyManagerProps> = ({ className = 
       
       setMessage({ 
         type: 'success', 
-        text: isValidFormat ? 'API key saved and quota status reset!' : 'API key saved (format validation failed)'
+        text: isValidFormat ? 'API key saved successfully!' : 'API key saved (format validation failed)'
       });
       
       checkStoredKey();
-      updateQuotaInfo(); // Refresh quota info after saving new key
       
       // Auto-close after success
       setTimeout(() => {
@@ -95,17 +81,7 @@ export const GeminiKeyManager: React.FC<GeminiKeyManagerProps> = ({ className = 
     }
   };
 
-  const handleResetQuota = () => {
-    if (window.confirm('Are you sure you want to reset the quota status? This will clear the quota exceeded state.')) {
-      resetQuotaStatus();
-      updateQuotaInfo();
-      setMessage({ type: 'success', text: 'Quota status reset successfully' });
-      
-      setTimeout(() => {
-        setMessage(null);
-      }, 2000);
-    }
-  };
+
 
   const handleCancel = () => {
     setIsOpen(false);
@@ -205,48 +181,7 @@ export const GeminiKeyManager: React.FC<GeminiKeyManagerProps> = ({ className = 
                 </div>
               </div>
 
-              {/* Debug quota info */}
-              {quotaInfo && (
-                <div className="bg-slate-700/30 border border-slate-600 rounded-lg p-3 text-xs">
-                  <p className="text-slate-300 mb-1">Debug - Quota Status:</p>
-                  <p className="text-slate-400">isExceeded: {quotaInfo.isExceeded ? 'true' : 'false'}</p>
-                  {quotaInfo.resetTime && <p className="text-slate-400">Reset time: {quotaInfo.resetTime.toLocaleString()}</p>}
-                </div>
-              )}
 
-              {quotaInfo?.isExceeded && (
-                <div className="bg-red-900/30 border border-red-700 rounded-lg p-3">
-                  <div className="flex items-start justify-between">
-                    <div className="text-xs text-red-300">
-                      <p className="font-medium mb-1">⚠️ Quota Exceeded</p>
-                      <p>Reset time: {quotaInfo.resetTime?.toLocaleString()}</p>
-                      <p>Time remaining: {quotaInfo.timeRemaining?.hours}h {quotaInfo.timeRemaining?.minutes}m {quotaInfo.timeRemaining?.seconds}s</p>
-                    </div>
-                    <button
-                      onClick={handleResetQuota}
-                      className="text-xs bg-red-600 hover:bg-red-700 text-white px-2 py-1 rounded transition-colors duration-200"
-                    >
-                      Reset
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Manual reset button for testing */}
-              <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-3">
-                <div className="flex items-center justify-between">
-                  <div className="text-xs text-yellow-300">
-                    <p className="font-medium">Manual Quota Reset</p>
-                    <p>Force reset quota status if stuck</p>
-                  </div>
-                  <button
-                    onClick={handleResetQuota}
-                    className="text-xs bg-yellow-600 hover:bg-yellow-700 text-white px-2 py-1 rounded transition-colors duration-200"
-                  >
-                    Force Reset
-                  </button>
-                </div>
-              </div>
 
               {message && (
                 <div className={`rounded-lg p-3 ${

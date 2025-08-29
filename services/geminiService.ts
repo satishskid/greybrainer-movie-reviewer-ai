@@ -27,159 +27,17 @@ const getGeminiAI = (): GoogleGenerativeAI => {
 
 export type LogTokenUsageFn = (operation: string, inputChars: number, outputChars: number) => void;
 
-// Quota monitoring types and interfaces
-interface QuotaStatus {
-  isExceeded: boolean;
-  resetTime?: Date;
-  nextWindowAvailable?: string;
-  errorMessage?: string;
-}
-
-interface QuotaMonitor {
-  checkQuotaStatus(): QuotaStatus;
-  handleQuotaError(error: Error): QuotaStatus;
-  getNextResetWindow(): string;
-}
-
-// Gemini API quota monitoring implementation
-class GeminiQuotaMonitor implements QuotaMonitor {
-  private static instance: GeminiQuotaMonitor;
-  private quotaExceededUntil: Date | null = null;
-  private lastQuotaCheck: Date | null = null;
-
-  static getInstance(): GeminiQuotaMonitor {
-    if (!GeminiQuotaMonitor.instance) {
-      GeminiQuotaMonitor.instance = new GeminiQuotaMonitor();
-    }
-    return GeminiQuotaMonitor.instance;
-  }
-
-  checkQuotaStatus(): QuotaStatus {
-    const now = new Date();
-    
-    if (this.quotaExceededUntil && now < this.quotaExceededUntil) {
-      return {
-        isExceeded: true,
-        resetTime: this.quotaExceededUntil,
-        nextWindowAvailable: this.getNextResetWindow(),
-        errorMessage: `Gemini API quota exceeded. Next window available: ${this.getNextResetWindow()}`
-      };
-    }
-    
-    // Reset quota status if time has passed
-    if (this.quotaExceededUntil && now >= this.quotaExceededUntil) {
-      this.quotaExceededUntil = null;
-    }
-    
-    return { isExceeded: false };
-  }
-
-  handleQuotaError(error: Error): QuotaStatus {
-    const errorMessage = error.message.toLowerCase();
-    
-    if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
-      // Set quota exceeded for 24 hours (typical daily reset)
-      this.quotaExceededUntil = new Date(Date.now() + 24 * 60 * 60 * 1000);
-      
-      return {
-        isExceeded: true,
-        resetTime: this.quotaExceededUntil,
-        nextWindowAvailable: this.getNextResetWindow(),
-        errorMessage: `Gemini API quota exceeded. Next window available: ${this.getNextResetWindow()}`
-      };
-    }
-    
-    return { isExceeded: false, errorMessage: error.message };
-  }
-
-  getNextResetWindow(): string {
-    if (!this.quotaExceededUntil) {
-      return 'Available now';
-    }
-    
-    const now = new Date();
-    const timeDiff = this.quotaExceededUntil.getTime() - now.getTime();
-    
-    if (timeDiff <= 0) {
-      return 'Available now';
-    }
-    
-    const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
-    
-    if (hours > 0) {
-      return `${hours}h ${minutes}m ${seconds}s`;
-    } else if (minutes > 0) {
-      return `${minutes}m ${seconds}s`;
-    } else {
-      return `${seconds}s`;
-    }
-  }
-  
-  getResetTimestamp(): Date | null {
-    return this.quotaExceededUntil;
-  }
-  
-  getDetailedQuotaInfo(): {
-    isExceeded: boolean;
-    resetTime?: Date;
-    timeRemaining?: {
-      hours: number;
-      minutes: number;
-      seconds: number;
-      totalMs: number;
-    };
-    nextWindowFormatted?: string;
-  } {
-    if (!this.quotaExceededUntil) {
-      return { isExceeded: false };
-    }
-    
-    const now = new Date();
-    const timeDiff = this.quotaExceededUntil.getTime() - now.getTime();
-    
-    if (timeDiff <= 0) {
-      return { isExceeded: false };
-    }
-    
-    const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((timeDiff % (1000 * 60)) / 1000);
-    
-    return {
-      isExceeded: true,
-      resetTime: this.quotaExceededUntil,
-      timeRemaining: {
-        hours,
-        minutes,
-        seconds,
-        totalMs: timeDiff
-      },
-      nextWindowFormatted: this.getNextResetWindow()
-    };
-  }
-  
-  resetQuotaStatus(): void {
-    this.quotaExceededUntil = null;
-    console.log('Quota status has been manually reset');
-  }
-}
-
-// Global quota monitor instance
-const quotaMonitor = GeminiQuotaMonitor.getInstance();
-
-// Enhanced error handling with quota monitoring
+// Simple error handling without quota monitoring
 const handleGeminiError = (error: Error, operation: string): never => {
-  const quotaStatus = quotaMonitor.handleQuotaError(error);
+  const errorMessage = error.message.toLowerCase();
   
-  if (quotaStatus.isExceeded) {
-    // Show user-friendly quota exceeded message
+  // Handle quota/rate limit errors with graceful message
+  if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
     const alertMessage = `🚫 Gemini API Daily Quota Exceeded\n\n` +
       `The Gemini API has reached its daily usage limit.\n\n` +
-      `⏰ Next available window: ${quotaStatus.nextWindowAvailable}\n\n` +
+      `⏰ Please try again after 24 hours\n\n` +
       `💡 Tip: You can:\n` +
-      `• Wait for the quota to reset\n` +
+      `• Wait for the quota to reset (typically 24 hours)\n` +
       `• Upgrade your Gemini API plan\n` +
       `• Check your API usage in Google AI Studio`;
     
@@ -190,7 +48,7 @@ const handleGeminiError = (error: Error, operation: string): never => {
       console.error(alertMessage);
     }
     
-    throw new Error(quotaStatus.errorMessage || `Gemini API quota exceeded for operation: ${operation}`);
+    throw new Error(`Gemini API quota exceeded for operation: ${operation}. Please try again after 24 hours.`);
   }
   
   // Handle other API errors
@@ -199,15 +57,6 @@ const handleGeminiError = (error: Error, operation: string): never => {
   }
   
   throw new Error(`Gemini API error in ${operation}: ${error.message}`);
-};
-
-// Export quota monitoring functions for external use
-export const getQuotaStatus = (): QuotaStatus => quotaMonitor.checkQuotaStatus();
-export const getNextQuotaResetWindow = (): string => quotaMonitor.getNextResetWindow();
-export const getQuotaResetTimestamp = (): Date | null => quotaMonitor.getResetTimestamp();
-export const getDetailedQuotaInfo = () => quotaMonitor.getDetailedQuotaInfo();
-export const resetQuotaStatus = (): void => {
-  quotaMonitor.resetQuotaStatus();
 };
 
 // Add missing type definitions
@@ -1612,14 +1461,7 @@ Begin matching:
     return matches.length > 0 ? matches.slice(0, 12) : [userInput]; // Return original if no matches
   } catch (error) {
     console.error('Gemini API error finding movie matches:', error);
-    const quotaStatus = quotaMonitor.handleQuotaError(error as Error);
-    if (quotaStatus.isExceeded) {
-      // For movie matching, show alert but return fallback instead of throwing
-      const alertMessage = `🚫 Gemini API Daily Quota Exceeded\n\nMovie search will use basic matching until quota resets.\n\n⏰ Next available window: ${quotaStatus.nextWindowAvailable}`;
-      if (typeof window !== 'undefined' && window.alert) {
-        window.alert(alertMessage);
-      }
-    }
+    handleGeminiError(error as Error, 'finding movie matches');
     return [userInput]; // Return original input as fallback
   }
 };
