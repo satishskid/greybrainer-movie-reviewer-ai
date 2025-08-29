@@ -31,24 +31,9 @@ export type LogTokenUsageFn = (operation: string, inputChars: number, outputChar
 const handleGeminiError = (error: Error, operation: string): never => {
   const errorMessage = error.message.toLowerCase();
   
-  // Handle quota/rate limit errors with graceful message
+  // Handle quota/rate limit errors with simple informative message
   if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
-    const alertMessage = `🚫 Gemini API Daily Quota Exceeded\n\n` +
-      `The Gemini API has reached its daily usage limit.\n\n` +
-      `⏰ Please try again after 24 hours\n\n` +
-      `💡 Tip: You can:\n` +
-      `• Wait for the quota to reset (typically 24 hours)\n` +
-      `• Upgrade your Gemini API plan\n` +
-      `• Check your API usage in Google AI Studio`;
-    
-    // Show alert to user
-    if (typeof window !== 'undefined' && window.alert) {
-      window.alert(alertMessage);
-    } else {
-      console.error(alertMessage);
-    }
-    
-    throw new Error(`Gemini API quota exceeded for operation: ${operation}. Please try again after 24 hours.`);
+    throw new Error('Gemini API has daily usage limits. Please try again later.');
   }
   
   // Handle other API errors

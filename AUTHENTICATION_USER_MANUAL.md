@@ -162,11 +162,7 @@ These keys are managed through the application's key management system and are r
 
 ### API Error Handling
 
-**When API Limits Are Reached**: The application provides clear error messages when daily usage limits are exceeded, along with guidance on:
-
-- **Wait Times**: Typically 24 hours for daily quota resets
-- **Upgrade Options**: Information about upgrading your API plan in Google AI Studio
-- **Alternative Actions**: Suggestions for managing API usage
+**When API Limits Are Reached**: The application provides a simple informative message when daily usage limits are exceeded: "Gemini API has daily usage limits. Please try again later."
 
 **Key Management**: When you update your API key, the application will immediately attempt to use the new key for subsequent requests.
 

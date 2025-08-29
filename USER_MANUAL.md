@@ -320,10 +320,7 @@ Greybrainer AI uses multiple AI services to provide comprehensive analysis. Here
 ### Error Handling & Recovery
 
 **When API Limits Are Reached:**
-*   Clear, informative error messages
-*   Suggested wait times (typically 24 hours for daily limits)
-*   Guidance on upgrading API plans
-*   Instructions for checking usage in Google AI Studio
+*   Simple informative message: "Gemini API has daily usage limits. Please try again later."
 
 **Automatic Recovery Features:**
 *   Graceful error handling without crashes
@@ -333,9 +330,8 @@ Greybrainer AI uses multiple AI services to provide comprehensive analysis. Here
 
 **Best Practices:**
 *   Monitor your usage in Google AI Studio for official tracking
-*   Consider upgrading your API plan for heavy usage
-*   Use the application during off-peak hours if experiencing limits
 *   Keep your API keys secure and up-to-date
+*   Use the application during off-peak hours if experiencing limits
 
 ## 7. Troubleshooting & FAQ
 
@@ -356,7 +352,7 @@ Greybrainer AI uses multiple AI services to provide comprehensive analysis. Here
     *   A: This can happen due to API issues, network problems, or processing difficulties. The system automatically tries fallback options and provides clear error messages with suggested actions.
 
 *   **Q: I'm getting "API quota exceeded" errors.**
-    *   A: Your daily API usage limit has been reached. Wait for the quota to reset (typically 24 hours) or consider upgrading your API plan in Google AI Studio. The system will provide clear guidance on next steps.
+    *   A: Gemini API has daily usage limits. Please try again later.
 
 **Data and Storage Questions:**
 
