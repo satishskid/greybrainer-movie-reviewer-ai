@@ -28,6 +28,9 @@ service cloud.firestore {
                        request.resource.data.authorId == request.auth.uid &&
                        request.resource.data.status in ['draft', 'in_review'];
       
+      // Admins can create any reports (including during initialization)
+      allow create: if request.auth != null && isAdmin();
+      
       allow update: if request.auth != null && 
                        (resource.data.authorId == request.auth.uid || 
                         resource.data.authorEmail == request.auth.token.email) &&
@@ -48,6 +51,11 @@ service cloud.firestore {
     
     // Analytics collection - admin only
     match /analytics/{document} {
+      allow read, write: if request.auth != null && isAdmin();
+    }
+    
+    // System collection - admin only (for initialization)
+    match /system/{document} {
       allow read, write: if request.auth != null && isAdmin();
     }
     
