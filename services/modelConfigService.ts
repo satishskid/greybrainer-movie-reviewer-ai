@@ -86,9 +86,15 @@ class ModelConfigurationService {
   getSelectedModel(): string {
     const stored = localStorage.getItem('greybrainer_gemini_model');
     
-    // Priority: localStorage > environment variable > config file
+    // Check if stored model is still available in current configuration
     if (stored && this.isModelAvailable(stored)) {
       return stored;
+    }
+    
+    // If stored model is invalid, clear it and use preferred model
+    if (stored && !this.isModelAvailable(stored)) {
+      localStorage.removeItem('greybrainer_gemini_model');
+      this.logInfo(`Cleared invalid stored model: ${stored}`);
     }
     
     return this.config.preferredModel;

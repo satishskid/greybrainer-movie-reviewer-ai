@@ -8,10 +8,10 @@
 ```
 Preferred → Fallback → Stable → Legacy → Discovery
 ```
-- **Preferred**: `gemini-1.5-pro-latest` (best for film analysis)
-- **Fallback**: `gemini-1.5-flash-latest` (fast alternative)
-- **Stable**: `gemini-1.5-pro`, `gemini-1.5-flash`
-- **Legacy**: `gemini-pro`, `gemini-1.0-pro`
+- **Configuration-Driven**: Models defined in `config/gemini-models.json`
+- **Environment Overrides**: `VITE_GEMINI_PREFERRED_MODEL`, `VITE_GEMINI_FALLBACK_MODEL`
+- **Dynamic Discovery**: Automatic detection of new models via Google API
+- **Validation System**: Health checks and performance monitoring
 - **Discovery**: Auto-discover new models from Google API
 
 #### **2. Dynamic Model Discovery**

@@ -5,37 +5,37 @@
     "description": "Gemini AI model configuration for Greybrainer Film Analysis Platform"
   },
   "defaultModels": {
-    "preferred": "gemini-pro",
-    "fallback": "gemini-1.5-flash",
-    "legacy": "gemini-1.0-pro"
+    "preferred": "gemini-1.5-flash-latest",
+    "fallback": "gemini-pro",
+    "legacy": "gemini-1.0-pro-latest"
   },
   "availableModels": [
     {
-      "id": "gemini-pro",
-      "name": "Greybrainer Pro (Recommended)",
-      "description": "Best for detailed film analysis, character development, and narrative structure",
-      "category": "premium",
-      "isRecommended": true,
-      "isStable": true,
-      "maxTokens": 32768,
-      "costTier": "standard",
-      "lastVerified": "2024-11-03"
-    },
-    {
-      "id": "gemini-1.5-flash",
-      "name": "Greybrainer Fast",
-      "description": "Quick analysis for rapid reviews and initial assessments",
+      "id": "gemini-1.5-flash-latest",
+      "name": "Greybrainer Fast (Recommended)",
+      "description": "Latest fast model for quick analysis and rapid reviews",
       "category": "standard",
-      "isRecommended": false,
+      "isRecommended": true,
       "isStable": true,
       "maxTokens": 32768,
       "costTier": "economy",
       "lastVerified": "2024-11-03"
     },
     {
-      "id": "gemini-1.0-pro",
+      "id": "gemini-pro",
+      "name": "Greybrainer Pro",
+      "description": "Stable model for detailed film analysis and character development",
+      "category": "premium",
+      "isRecommended": false,
+      "isStable": true,
+      "maxTokens": 32768,
+      "costTier": "standard",
+      "lastVerified": "2024-11-03"
+    },
+    {
+      "id": "gemini-1.0-pro-latest",
       "name": "Greybrainer Classic",
-      "description": "Classic model for basic film evaluations",
+      "description": "Latest version of the classic model for basic evaluations",
       "category": "basic",
       "isRecommended": false,
       "isStable": true,
@@ -57,9 +57,9 @@
     }
   ],
   "modelPriority": [
-    "gemini-pro",
-    "gemini-1.5-flash", 
-    "gemini-1.0-pro",
+    "gemini-1.5-flash-latest",
+    "gemini-pro", 
+    "gemini-1.0-pro-latest",
     "text-bison-001"
   ],
   "discoveryPatterns": [

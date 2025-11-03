@@ -74,9 +74,10 @@
 - ✅ **Script Analyzer**: Magic quotient evaluation
 
 **AI Model System**: ✅ **OPTIMIZED FOR FILM ANALYSIS**
-- Default: `gemini-1.5-pro-latest` (best for detailed analysis)
-- Fallback: `gemini-1.5-flash-latest` (fast alternative)
-- User-friendly names: "Greybrainer Pro", "Greybrainer Fast"
+- Configuration-driven model selection (no hardcoded names)
+- Environment variable overrides supported
+- Automatic model discovery and validation
+- User-friendly names: "Greybrainer Pro", "Greybrainer Fast", "Greybrainer Classic"
 
 ---
 
