@@ -31,6 +31,9 @@
     X-XSS-Protection = "1; mode=block"
     Referrer-Policy = "strict-origin-when-cross-origin"
     
+    # Fix Cross-Origin-Opener-Policy for Firebase Auth
+    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
+    
     # Performance headers
     Cache-Control = "public, max-age=31536000, immutable"
 

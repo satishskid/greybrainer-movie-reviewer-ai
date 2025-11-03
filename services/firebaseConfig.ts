@@ -92,11 +92,18 @@ export class FirebaseAuthService {
   // Check if user is whitelisted
   async isUserWhitelisted(email: string): Promise<boolean> {
     try {
+      // Always allow admin emails (for initial setup)
+      if (ADMIN_EMAILS.includes(email) || EDITOR_EMAILS.includes(email)) {
+        return true;
+      }
+      
+      // Check database whitelist for other users
       const userDoc = await getDoc(doc(db, 'whitelist', email));
       return userDoc.exists() && userDoc.data()?.isActive === true;
     } catch (error) {
       console.error('Whitelist check error:', error);
-      return false;
+      // Fallback: allow admin emails even if database check fails
+      return ADMIN_EMAILS.includes(email) || EDITOR_EMAILS.includes(email);
     }
   }
   
