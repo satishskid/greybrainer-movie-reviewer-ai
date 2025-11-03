@@ -6,7 +6,7 @@ import { BookOpenIcon } from './components/icons/BookOpenIcon';
 import { CameraIcon } from './components/icons/CameraIcon';
 import { UsersIcon } from './components/icons/UsersIcon';
 
-export const GEMINI_MODEL_TEXT = 'gemini-2.5-flash';
+export const GEMINI_MODEL_TEXT = 'gemini-1.5-flash-latest';
 export const MAX_SCORE = 10; // Define a maximum score for layers
 
 export const LAYER_DEFINITIONS: Omit<LayerAnalysisData, 'aiGeneratedText' | 'editedText' | 'isLoading' | 'error' | 'userScore' | 'groundingSources' | 'aiSuggestedScore' | 'improvementSuggestions' | 'vonnegutShape'>[] = [

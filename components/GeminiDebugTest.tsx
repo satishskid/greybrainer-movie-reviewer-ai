@@ -31,7 +31,7 @@ const GeminiDebugTest: React.FC = () => {
       // Test simple API call
       result += 'Testing Gemini API call...\n';
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash' });
+      const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
       
       const response = await model.generateContent('Say "Hello, this is a test response from Gemini API" and nothing else.');
       

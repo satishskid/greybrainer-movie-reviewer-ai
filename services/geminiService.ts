@@ -598,7 +598,7 @@ export const enhanceCreativeSpark = async (
 
   try {
     // This getGeminiAI().models.generateContent call happens on your backend.
-    const model = getGeminiAI().getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = getGeminiAI().getGenerativeModel({ model: GEMINI_MODEL_TEXT });
     const response: GenerateContentResult = await model.generateContent(prompt);
     
     const responseText = response.response.text().trim();
@@ -669,7 +669,7 @@ export const analyzeIdeaMagicQuotient = async (
 
   try {
     // This ai.models.generateContent call happens on your backend.
-    const model = getGeminiAI().getGenerativeModel({ model: 'gemini-1.5-flash' });
+    const model = getGeminiAI().getGenerativeModel({ model: GEMINI_MODEL_TEXT });
     const response: GenerateContentResult = await model.generateContent(prompt);
 
     const responseText = response.response.text().trim();
@@ -743,7 +743,7 @@ export const getMovieTitleSuggestions = async (
 
   try {
     const model = getGeminiAI().getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL_TEXT,
       generationConfig: {
         responseMimeType: "application/json",
         temperature: 0.3,
@@ -799,7 +799,7 @@ export const fetchMovieFinancialsWithGemini = async (
   `;
   try {
     const model = getGeminiAI().getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL_TEXT,
       generationConfig: {
         temperature: 0.2
       },
@@ -879,7 +879,7 @@ export const generateQualitativeROIAnalysisWithGemini = async (
   `;
   try {
     const model = getGeminiAI().getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL_TEXT,
       generationConfig: {
         temperature: 0.6
       }
@@ -914,7 +914,7 @@ export const generateGreybrainerInsightWithGemini = async (
   `;
   try {
     const model = getGeminiAI().getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL_TEXT,
       generationConfig: {
         temperature: 0.75,
         topP: 0.9,
@@ -948,7 +948,7 @@ export const analyzeLayerWithGemini = async (
   
   try {
     const model = getGeminiAI().getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL_TEXT,
       generationConfig: {
         temperature: 0.7
       },
@@ -1064,7 +1064,7 @@ Begin your analysis:
   
   try {
     const model = getGeminiAI().getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL_TEXT,
       generationConfig: {
         temperature: 0.7
       }
@@ -1124,7 +1124,7 @@ Begin your analysis:
 
   try {
     const model = getGeminiAI().getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL_TEXT,
       generationConfig: {
         temperature: 0.7
       },
@@ -1199,7 +1199,7 @@ Begin generating professional-quality story concepts:
 
   try {
     const model = getGeminiAI().getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL_TEXT,
       generationConfig: {
         temperature: 0.8
       }
@@ -1318,7 +1318,7 @@ Begin your analysis:
 
   try {
     const model = getGeminiAI().getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL_TEXT,
       generationConfig: {
         temperature: 0.7
       },
@@ -1419,7 +1419,7 @@ Begin matching:
 
   try {
     const model = getGeminiAI().getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL_TEXT,
       generationConfig: {
         temperature: 0.3
       },
@@ -1505,7 +1505,7 @@ export const generateGreybrainerComparisonWithGemini = async (
 
   try {
     const model = getGeminiAI().getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL_TEXT,
       generationConfig: {
         temperature: 0.7,
         topP: 0.85,
@@ -1551,7 +1551,7 @@ export const generateDetailedReportFromInsightWithGemini = async (
   `;
   try {
     const model = getGeminiAI().getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
+      model: GEMINI_MODEL_TEXT,
       generationConfig: {
         temperature: 0.7,
         topP: 0.85,
