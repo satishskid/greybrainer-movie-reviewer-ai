@@ -919,7 +919,8 @@ export const generateGreybrainerInsightWithGemini = async (
         temperature: 0.75,
         topP: 0.9,
         topK: 50,
-      }
+      },
+      tools: [{ googleSearchRetrieval: {} }]
     });
     const response = await model.generateContent(prompt);
     const insightText = response.response.text().trim();
@@ -1448,6 +1449,78 @@ Begin matching:
     console.error('Gemini API error finding movie matches:', error);
     handleGeminiError(error as Error, 'finding movie matches');
     return [userInput]; // Return original input as fallback
+  }
+};
+
+
+
+// Greybrainer Comparison Analysis
+export const generateGreybrainerComparisonWithGemini = async (
+  item1: { title: string; type: string; description?: string },
+  item2: { title: string; type: string; description?: string },
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string> => {
+  const prompt = `
+    You are a film and media expert conducting a detailed comparative analysis using the "Greybrainer" methodology.
+    
+    Compare these two items:
+    
+    **Item 1:**
+    - Type: ${item1.type}
+    - Title/Name: "${item1.title}"
+    ${item1.description ? `- Additional Context: ${item1.description}` : ''}
+    
+    **Item 2:**
+    - Type: ${item2.type}
+    - Title/Name: "${item2.title}"
+    ${item2.description ? `- Additional Context: ${item2.description}` : ''}
+    
+    Provide a comprehensive comparative analysis (400-600 words) structured as follows:
+    
+    **Overview & Context**
+    Brief introduction to both items and the basis for comparison.
+    
+    **Key Similarities**
+    - Identify 3-4 significant commonalities (themes, style, approach, impact, etc.)
+    - Explain why these similarities matter
+    
+    **Notable Differences**
+    - Highlight 3-4 major distinctions (creative choices, execution, audience, cultural impact, etc.)
+    - Analyze how these differences affect their respective impacts
+    
+    **Creative Approaches**
+    Compare their unique creative methodologies, storytelling techniques, or artistic vision.
+    
+    **Cultural & Industry Impact**
+    Discuss their respective influences on audiences, industry trends, or cultural conversations.
+    
+    **Greybrainer Assessment**
+    Which demonstrates more innovative storytelling or creative risk-taking? Provide reasoning.
+    
+    **Conclusion**
+    Synthesize the comparison with insights about what each brings to the medium and their lasting significance.
+    
+    Use your search capabilities to gather accurate information about both items. Maintain an analytical, balanced tone while highlighting what makes each unique and valuable.
+  `;
+
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: 'gemini-1.5-flash',
+      generationConfig: {
+        temperature: 0.7,
+        topP: 0.85,
+        topK: 60,
+      },
+      tools: [{ googleSearchRetrieval: {} }]
+    });
+    const response = await model.generateContent(prompt);
+    const comparisonText = response.response.text().trim();
+    logTokenUsage?.(`Greybrainer Comparison (Gemini): ${item1.title} vs ${item2.title}`, prompt.length, comparisonText.length);
+    return comparisonText;
+  } catch (error) {
+    console.error('Gemini API error generating comparison:', error);
+    handleGeminiError(error as Error, 'Comparison Analysis');
+    throw new Error('Unexpected error in comparison generation');
   }
 };
 

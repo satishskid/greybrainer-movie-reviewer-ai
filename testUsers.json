@@ -49,6 +49,22 @@
       "department": "Administration"
     },
     {
+      "id": 11,
+      "email": "satish@skids.health",
+      "password": "Admin123!",
+      "role": "admin",
+      "name": "Satish Rath",
+      "department": "Administration"
+    },
+    {
+      "id": 12,
+      "email": "satish.rath@gmail.com",
+      "password": "Admin123!",
+      "role": "admin",
+      "name": "Satish Rath",
+      "department": "Administration"
+    },
+    {
       "id": 7,
       "email": "test7@greybrainer.ai",
       "password": "TestPass123!",

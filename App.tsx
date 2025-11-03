@@ -23,6 +23,10 @@ import { MorphokineticsDisplay } from './components/MorphokineticsDisplay';
 import { MonthlyMagicScoreboard } from './components/MonthlyMagicScoreboard';
 import { LightBulbIcon } from './components/icons/LightBulbIcon';
 import { GreybrainerInsights } from './components/GreybrainerInsights';
+import { GreybrainerComparison } from './components/GreybrainerComparison';
+import { AdminUserManagement } from './components/AdminUserManagement';
+import { PublicResearchPortal } from './components/PublicResearchPortal';
+import { FirebaseAdminDashboard } from './components/FirebaseAdminDashboard';
 
 import { GoogleSearchKeyManager } from './components/GoogleSearchKeyManager';
 
@@ -71,6 +75,8 @@ const App: React.FC = () => {
   const [morphokineticsError, setMorphokineticsError] = useState<string | null>(null);
 
   const [monthlyScoreboardData, setMonthlyScoreboardData] = useState<MonthlyScoreboardItem[]>([]);
+  const [showAdminPanel, setShowAdminPanel] = useState<boolean>(false);
+  const [currentUser, setCurrentUser] = useState<any>(null);
 
 
 
@@ -90,6 +96,16 @@ const App: React.FC = () => {
       .sort((a, b) => b.greybrainerScore - a.greybrainerScore)
       .map((item, index) => ({ ...item, ranking: index + 1 }));
     setMonthlyScoreboardData(sortedScoreboardData);
+
+    // Get current user from auth service
+    const user = localStorage.getItem('greybrainer_user');
+    if (user) {
+      try {
+        setCurrentUser(JSON.parse(user));
+      } catch (e) {
+        console.error("Failed to parse user data", e);
+      }
+    }
   }, []);
 
   const saveTokenBudgetConfig = useCallback((config: TokenBudgetConfig) => {
@@ -366,7 +382,29 @@ const App: React.FC = () => {
           {morphokineticsAnalysis && !isAnalyzingMorphokinetics && (<MorphokineticsDisplay analysis={morphokineticsAnalysis} />)}
           
           <GreybrainerInsights logTokenUsage={logTokenUsage} />
+          <GreybrainerComparison logTokenUsage={logTokenUsage} />
           <MonthlyMagicScoreboard scoreboardData={monthlyScoreboardData} />
+
+          {/* Firebase Admin Panel */}
+          {currentUser?.role === 'admin' && (
+            <div className="mt-12">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-semibold text-slate-100">Admin Dashboard</h2>
+                <button
+                  onClick={() => setShowAdminPanel(!showAdminPanel)}
+                  className="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
+                >
+                  {showAdminPanel ? 'Hide Dashboard' : 'Show Dashboard'}
+                </button>
+              </div>
+              
+              {showAdminPanel && (
+                <div className="bg-white rounded-xl p-6">
+                  <FirebaseAdminDashboard currentUser={currentUser} />
+                </div>
+              )}
+            </div>
+          )}
 
           <CreativeSparkGenerator genres={COMMON_GENRES} onGenerate={handleGenerateCreativeSpark} isLoading={isGeneratingCreativeSpark || isCurrentlyProcessing} error={creativeSparkError} results={creativeSparkResults} selectedIdea={selectedSparkForUI} onSelectIdea={handleSelectSparkIdea} onEnhanceIdea={handleEnhanceSparkIdea} isEnhancing={isEnhancingSpark || isCurrentlyProcessing} />
           

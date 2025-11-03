@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Greybrainer Research - AI-Powered Film Industry Insights</title>
+    <meta name="description" content="Discover the latest AI-powered insights and analysis on film industry trends, technology, and creative innovations from Greybrainer AI.">
+    <meta name="keywords" content="film analysis, movie insights, AI research, cinema trends, entertainment industry, Greybrainer">
+    
+    <!-- Open Graph / Facebook -->
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://greybrainer.ai/research">
+    <meta property="og:title" content="Greybrainer Research - AI-Powered Film Industry Insights">
+    <meta property="og:description" content="Discover the latest AI-powered insights and analysis on film industry trends, technology, and creative innovations.">
+    
+    <!-- Twitter -->
+    <meta property="twitter:card" content="summary_large_image">
+    <meta property="twitter:url" content="https://greybrainer.ai/research">
+    <meta property="twitter:title" content="Greybrainer Research - AI-Powered Film Industry Insights">
+    <meta property="twitter:description" content="Discover the latest AI-powered insights and analysis on film industry trends, technology, and creative innovations.">
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            800: '#1e293b',
+                            900: '#0f172a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .gradient-bg {
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 50%, #312e81 100%);
+        }
+        .card-hover {
+            transition: all 0.3s ease;
+        }
+        .card-hover:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+    </style>
+</head>
+<body class="gradient-bg min-h-screen text-white">
+    <!-- Header -->
+    <header class="bg-slate-800/90 border-b border-slate-700 sticky top-0 z-50 backdrop-blur-sm">
+        <div class="max-w-6xl mx-auto px-4 py-6">
+            <div class="text-center">
+                <h1 class="text-4xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent mb-2">
+                    Greybrainer Research
+                </h1>
+                <p class="text-slate-300 text-lg">
+                    AI-Powered Film Industry Insights & Analysis
+                </p>
+                <p class="text-slate-400 text-sm mt-2">
+                    Discover the latest trends, technologies, and creative insights shaping the future of cinema
+                </p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="max-w-6xl mx-auto px-4 py-8">
+        <!-- Search and Filters -->
+        <div class="bg-slate-800/70 rounded-xl p-6 border border-slate-700 mb-8">
+            <div class="flex flex-col md:flex-row gap-4">
+                <div class="flex-1">
+                    <input
+                        type="text"
+                        id="searchInput"
+                        placeholder="Search research by title, content, or tags..."
+                        class="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-400 focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none"
+                    />
+                </div>
+                <div class="flex flex-wrap gap-2" id="categoryFilters">
+                    <!-- Categories will be populated by JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Research Grid -->
+        <div id="researchGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <!-- Research items will be populated by JavaScript -->
+        </div>
+
+        <!-- Loading State -->
+        <div id="loadingState" class="text-center py-12">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-400 mx-auto mb-4"></div>
+            <p class="text-slate-400">Loading research...</p>
+        </div>
+
+        <!-- Empty State -->
+        <div id="emptyState" class="text-center py-12 hidden">
+            <div class="w-16 h-16 text-slate-600 mx-auto mb-4">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                </svg>
+            </div>
+            <p class="text-slate-400 text-lg">No research found</p>
+            <p class="text-slate-500 text-sm">Try adjusting your search or filters</p>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-slate-800/50 border-t border-slate-700 mt-16">
+        <div class="max-w-6xl mx-auto px-4 py-8 text-center">
+            <p class="text-slate-400 text-sm">
+                © 2024 Greybrainer AI. All research is AI-generated for educational and analytical purposes.
+            </p>
+            <p class="text-slate-500 text-xs mt-2">
+                Want to contribute or access our platform? Contact us for collaboration opportunities.
+            </p>
+            <div class="mt-4 flex justify-center space-x-4">
+                <a href="mailto:contact@greybrainer.ai" class="text-indigo-400 hover:text-indigo-300 text-sm">Contact</a>
+                <a href="#" class="text-indigo-400 hover:text-indigo-300 text-sm">About</a>
+                <a href="#" class="text-indigo-400 hover:text-indigo-300 text-sm">Privacy</a>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        // Sample research data (in production, this would come from an API)
+        const sampleResearch = [
+            {
+                id: 'sample-1',
+                title: 'The Rise of Regional OTT Content in Indian Cinema',
+                summary: 'Regional language content is experiencing unprecedented growth on OTT platforms, reshaping the Indian entertainment landscape.',
+                content: `The Indian OTT landscape has witnessed a remarkable transformation with regional content taking center stage. Platforms like Netflix, Amazon Prime Video, and Disney+ Hotstar are investing heavily in Tamil, Telugu, Malayalam, and other regional productions.
+
+This shift represents more than just content diversification—it's a fundamental change in how stories are told and consumed. Regional creators are bringing authentic narratives that resonate with local audiences while attracting global viewers through subtitles and dubbing.
+
+Key factors driving this trend include increased smartphone penetration in tier-2 and tier-3 cities, growing comfort with digital payments, success stories like "Arya" (Tamil) and "The Family Man" (Hindi with regional elements), and cost-effectiveness of regional productions compared to big-budget Hindi films.
+
+The implications are significant for the industry. Traditional Bollywood dominance is being challenged, and new talent pools are emerging. This democratization of content creation is likely to continue, with regional stories finding national and international audiences.`,
+                category: 'industry-trends',
+                tags: ['regional cinema', 'ott platforms', 'indian cinema', 'streaming', 'content diversity'],
+                publishedDate: '2024-12-01',
+                views: 245
+            },
+            {
+                id: 'sample-2',
+                title: 'AI-Driven Virtual Production: Democratizing High-Concept Visuals',
+                summary: 'Artificial intelligence and virtual production techniques are making sophisticated visual effects accessible to independent filmmakers.',
+                content: `The convergence of AI and virtual production is revolutionizing filmmaking, particularly for independent creators who previously couldn't afford high-end visual effects. Technologies like Unreal Engine's virtual sets, AI-powered motion capture, and automated compositing are breaking down traditional barriers.
+
+Independent filmmakers can now create sci-fi and fantasy content that rivals studio productions at a fraction of the cost. This democratization is leading to more diverse storytelling, as creators from different backgrounds can now visualize their ambitious concepts.
+
+Recent examples include "The Mandalorian" popularizing LED volume stages, AI tools like RunwayML enabling quick VFX iterations, real-time rendering reducing post-production timelines, and cloud-based rendering making powerful computing accessible.
+
+The impact extends beyond just cost savings. These tools are enabling new forms of storytelling, where the line between live-action and animation blurs. We're seeing experimental narratives that wouldn't have been possible with traditional filmmaking methods.
+
+This trend suggests a future where technical limitations no longer constrain creative vision, potentially leading to a renaissance of innovative, visually stunning independent cinema.`,
+                category: 'technology',
+                tags: ['ai', 'virtual production', 'independent film', 'vfx', 'technology', 'democratization'],
+                publishedDate: '2024-11-28',
+                views: 189
+            },
+            {
+                id: 'sample-3',
+                title: 'Interactive Narratives: The Future of Audience Engagement',
+                summary: 'Streaming platforms are experimenting with interactive storytelling, giving viewers agency in narrative outcomes.',
+                content: `Interactive narratives represent a paradigm shift in how audiences consume content. Netflix's "Black Mirror: Bandersnatch" and "You vs. Wild" demonstrated the potential, but we're now seeing more sophisticated implementations across platforms.
+
+This evolution reflects changing audience expectations. Modern viewers, particularly Gen Z and millennials, expect participation rather than passive consumption. They want to influence outcomes, explore alternative storylines, and feel agency in the narrative process.
+
+Technical innovations enabling this trend include branching narrative engines, real-time audience polling integration, AI-driven personalized story paths, and multi-device synchronization for group viewing.
+
+The implications for storytelling are profound. Writers must now think in terms of narrative trees rather than linear plots. This complexity requires new skills and tools, but also opens up unprecedented creative possibilities.
+
+Early data suggests interactive content has higher engagement rates and longer viewing sessions. However, production costs are significantly higher, and not all stories benefit from interactivity.
+
+As the technology matures, we expect to see hybrid approaches where traditional linear storytelling is enhanced with optional interactive elements, allowing viewers to choose their level of engagement.`,
+                category: 'audience-behavior',
+                tags: ['interactive media', 'audience engagement', 'streaming', 'narrative innovation', 'viewer agency'],
+                publishedDate: '2024-11-25',
+                views: 156
+            }
+        ];
+
+        const categories = [
+            { id: 'all', label: 'All Research' },
+            { id: 'industry-trends', label: 'Industry Trends' },
+            { id: 'technology', label: 'Technology & Innovation' },
+            { id: 'audience-behavior', label: 'Audience Behavior' },
+            { id: 'creative-analysis', label: 'Creative Analysis' },
+            { id: 'market-insights', label: 'Market Insights' }
+        ];
+
+        let currentCategory = 'all';
+        let currentSearch = '';
+
+        // Initialize the page
+        function init() {
+            renderCategories();
+            renderResearch();
+            setupEventListeners();
+            
+            // Hide loading state
+            document.getElementById('loadingState').style.display = 'none';
+        }
+
+        function renderCategories() {
+            const container = document.getElementById('categoryFilters');
+            container.innerHTML = categories.map(category => `
+                <button
+                    onclick="filterByCategory('${category.id}')"
+                    class="px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
+                        currentCategory === category.id
+                            ? 'bg-indigo-600 text-white'
+                            : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                    }"
+                >
+                    ${category.label}
+                </button>
+            `).join('');
+        }
+
+        function renderResearch() {
+            const filteredResearch = sampleResearch.filter(item => {
+                const matchesCategory = currentCategory === 'all' || item.category === currentCategory;
+                const matchesSearch = currentSearch === '' || 
+                    item.title.toLowerCase().includes(currentSearch.toLowerCase()) ||
+                    item.summary.toLowerCase().includes(currentSearch.toLowerCase()) ||
+                    item.tags.some(tag => tag.toLowerCase().includes(currentSearch.toLowerCase()));
+                return matchesCategory && matchesSearch;
+            });
+
+            const container = document.getElementById('researchGrid');
+            const emptyState = document.getElementById('emptyState');
+
+            if (filteredResearch.length === 0) {
+                container.innerHTML = '';
+                emptyState.classList.remove('hidden');
+                return;
+            }
+
+            emptyState.classList.add('hidden');
+            container.innerHTML = filteredResearch.map(item => `
+                <div class="bg-slate-800/70 rounded-xl border border-slate-700 overflow-hidden card-hover cursor-pointer" onclick="openResearch('${item.id}')">
+                    <div class="p-6">
+                        <div class="flex items-start justify-between mb-3">
+                            <span class="inline-block px-2 py-1 bg-indigo-900/50 text-indigo-300 text-xs font-medium rounded">
+                                ${getCategoryLabel(item.category)}
+                            </span>
+                            <div class="flex items-center text-slate-500 text-xs">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path>
+                                </svg>
+                                ${item.views}
+                            </div>
+                        </div>
+
+                        <h3 class="text-lg font-semibold text-slate-100 mb-2 hover:text-indigo-300 transition-colors">
+                            ${item.title}
+                        </h3>
+
+                        <p class="text-slate-400 text-sm mb-4">
+                            ${item.summary}
+                        </p>
+
+                        <div class="flex flex-wrap gap-1 mb-4">
+                            ${item.tags.slice(0, 3).map(tag => `
+                                <span class="px-2 py-1 bg-slate-700 text-slate-400 text-xs rounded">
+                                    #${tag}
+                                </span>
+                            `).join('')}
+                            ${item.tags.length > 3 ? `
+                                <span class="px-2 py-1 bg-slate-700 text-slate-400 text-xs rounded">
+                                    +${item.tags.length - 3} more
+                                </span>
+                            ` : ''}
+                        </div>
+
+                        <div class="flex items-center justify-between text-xs text-slate-500">
+                            <div class="flex items-center">
+                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                                ${formatDate(item.publishedDate)}
+                            </div>
+                            <button
+                                onclick="event.stopPropagation(); shareResearch('${item.id}')"
+                                class="p-1 text-slate-400 hover:text-indigo-400 transition-colors"
+                                title="Share research"
+                            >
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z"></path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function setupEventListeners() {
+            const searchInput = document.getElementById('searchInput');
+            searchInput.addEventListener('input', (e) => {
+                currentSearch = e.target.value;
+                renderResearch();
+            });
+        }
+
+        function filterByCategory(categoryId) {
+            currentCategory = categoryId;
+            renderCategories();
+            renderResearch();
+        }
+
+        function getCategoryLabel(categoryId) {
+            const category = categories.find(c => c.id === categoryId);
+            return category ? category.label : categoryId;
+        }
+
+        function formatDate(dateString) {
+            return new Date(dateString).toLocaleDateString('en-US', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+
+        function openResearch(researchId) {
+            const research = sampleResearch.find(r => r.id === researchId);
+            if (!research) return;
+
+            // Create modal
+            const modal = document.createElement('div');
+            modal.className = 'fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50';
+            modal.innerHTML = `
+                <div class="bg-slate-800 rounded-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+                    <div class="p-6">
+                        <div class="flex items-start justify-between mb-4">
+                            <div>
+                                <span class="inline-block px-2 py-1 bg-indigo-900/50 text-indigo-300 text-xs font-medium rounded mb-2">
+                                    ${getCategoryLabel(research.category)}
+                                </span>
+                                <h2 class="text-2xl font-bold text-slate-100">${research.title}</h2>
+                                <p class="text-slate-400 text-sm mt-2">${formatDate(research.publishedDate)} • ${research.views} views</p>
+                            </div>
+                            <button onclick="this.closest('.fixed').remove()" class="text-slate-400 hover:text-slate-200">
+                                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                </svg>
+                            </button>
+                        </div>
+                        
+                        <div class="prose prose-invert max-w-none">
+                            <p class="text-slate-300 text-lg mb-6">${research.summary}</p>
+                            <div class="text-slate-200 leading-relaxed whitespace-pre-line">${research.content}</div>
+                        </div>
+                        
+                        <div class="mt-6 pt-6 border-t border-slate-700">
+                            <div class="flex flex-wrap gap-2">
+                                ${research.tags.map(tag => `
+                                    <span class="px-2 py-1 bg-slate-700 text-slate-400 text-sm rounded">
+                                        #${tag}
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+            
+            // Increment view count (in production, this would be an API call)
+            research.views++;
+            renderResearch();
+        }
+
+        function shareResearch(researchId) {
+            const research = sampleResearch.find(r => r.id === researchId);
+            if (!research) return;
+
+            const url = `${window.location.href}#research-${researchId}`;
+            
+            if (navigator.share) {
+                navigator.share({
+                    title: research.title,
+                    text: research.summary,
+                    url: url
+                }).catch(console.error);
+            } else {
+                // Fallback: copy to clipboard
+                navigator.clipboard.writeText(url).then(() => {
+                    // Show temporary notification
+                    const notification = document.createElement('div');
+                    notification.className = 'fixed top-4 right-4 bg-green-600 text-white px-4 py-2 rounded-lg z-50';
+                    notification.textContent = 'Link copied to clipboard!';
+                    document.body.appendChild(notification);
+                    setTimeout(() => notification.remove(), 3000);
+                });
+            }
+        }
+
+        // Initialize when page loads
+        document.addEventListener('DOMContentLoaded', init);
+    </script>
+</body>
+</html>

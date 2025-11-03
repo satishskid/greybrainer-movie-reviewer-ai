@@ -1,10 +1,10 @@
 import React from 'react';
 
-interface TrashIconProps {
+interface PauseIconProps {
   className?: string;
 }
 
-export const TrashIcon: React.FC<TrashIconProps> = ({ className = "w-6 h-6" }) => {
+export const PauseIcon: React.FC<PauseIconProps> = ({ className = "w-6 h-6" }) => {
   return (
     <svg
       className={className}
@@ -17,7 +17,7 @@ export const TrashIcon: React.FC<TrashIconProps> = ({ className = "w-6 h-6" }) =
         strokeLinecap="round"
         strokeLinejoin="round"
         strokeWidth={2}
-        d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+        d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z"
       />
     </svg>
   );
