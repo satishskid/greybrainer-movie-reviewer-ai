@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { getGeminiApiKeyString, hasGeminiApiKey, isGeminiKeyValidated } from '../utils/geminiKeyStorage';
 import { GoogleGenerativeAI } from '@google/generative-ai';
-import { GEMINI_MODEL_TEXT } from '../constants';
+import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
 
 const GeminiDebugTest: React.FC = () => {
   const [testResult, setTestResult] = useState<string>('');
@@ -32,7 +32,7 @@ const GeminiDebugTest: React.FC = () => {
       // Test simple API call
       result += 'Testing Gemini API call...\n';
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: GEMINI_MODEL_TEXT });
+      const model = genAI.getGenerativeModel({ model: getSelectedGeminiModel() });
       
       const response = await model.generateContent('Say "Hello, this is a test response from Gemini API" and nothing else.');
       

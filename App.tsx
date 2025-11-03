@@ -29,6 +29,7 @@ import { PublicResearchPortal } from './components/PublicResearchPortal';
 import { FirebaseAdminDashboard } from './components/FirebaseAdminDashboard';
 
 import { GoogleSearchKeyManager } from './components/GoogleSearchKeyManager';
+import { GeminiModelSelector } from './components/GeminiModelSelector';
 
 import { AuthWrapper } from './components/AuthWrapper';
 
@@ -345,6 +346,8 @@ const App: React.FC = () => {
 
 
           <GoogleSearchKeyManager className="mb-6" />
+          
+          <GeminiModelSelector onModelChange={() => window.location.reload()} />
           
           <MovieInputForm
             movieInput={movieInput}
