@@ -335,14 +335,11 @@ const App: React.FC = () => {
           )}
 
 
-          <div className="flex items-center justify-between mb-6">
-            <div className="flex-1">
-              <GoogleSearchKeyManager />
-            </div>
+          <div className="flex justify-end mb-6">
             <button
               onClick={() => setShowSettings(true)}
-              className="ml-4 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2"
-              title="System Settings & AI Model Configuration"
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2"
+              title="Settings & Configuration"
             >
               ⚙️ Settings
             </button>

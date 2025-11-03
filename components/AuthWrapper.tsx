@@ -201,7 +201,6 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <GeminiKeyManager />
             <button
               onClick={handleLogout}
               className="text-slate-400 hover:text-slate-200 text-sm transition-colors duration-200"

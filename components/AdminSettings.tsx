@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { GeminiModelSelector } from './GeminiModelSelector';
 import GeminiDebugTest from './GeminiDebugTest';
 import { FirebaseAdminDashboard } from './FirebaseAdminDashboard';
+import { GeminiKeyManager } from './GeminiKeyManager';
+import { GoogleSearchKeyManager } from './GoogleSearchKeyManager';
 import { getSelectedGeminiModel, checkForNewerModels, getModelInfo } from '../utils/geminiModelStorage';
 import { getGeminiApiKeyString, hasGeminiApiKey } from '../utils/geminiKeyStorage';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -13,7 +15,7 @@ interface AdminSettingsProps {
 }
 
 export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'models' | 'admin' | 'debug' | 'health'>('models');
+  const [activeTab, setActiveTab] = useState<'keys' | 'models' | 'admin' | 'debug' | 'health'>('keys');
   const [systemHealth, setSystemHealth] = useState<any>(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
 
@@ -78,6 +80,16 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
         {/* Tabs */}
         <div className="flex border-b border-slate-700">
           <button
+            onClick={() => setActiveTab('keys')}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'keys'
+                ? 'text-indigo-400 border-b-2 border-indigo-400'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            🔑 API Keys
+          </button>
+          <button
             onClick={() => setActiveTab('models')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'models'
@@ -121,6 +133,28 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+          {activeTab === 'keys' && (
+            <div>
+              <h3 className="text-lg font-medium text-slate-100 mb-6">API Key Configuration</h3>
+              
+              <div className="space-y-6">
+                {/* Gemini API Key */}
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                  <h4 className="text-md font-medium text-slate-200 mb-3">🤖 Gemini AI API Key</h4>
+                  <p className="text-sm text-slate-400 mb-4">Required for film analysis and AI-powered insights</p>
+                  <GeminiKeyManager />
+                </div>
+
+                {/* Google Search API Key */}
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                  <h4 className="text-md font-medium text-slate-200 mb-3">🔍 Google Search API Key</h4>
+                  <p className="text-sm text-slate-400 mb-4">Optional: Enables movie data search and suggestions</p>
+                  <GoogleSearchKeyManager />
+                </div>
+              </div>
+            </div>
+          )}
+
           {activeTab === 'models' && (
             <div>
               <h3 className="text-lg font-medium text-slate-100 mb-4">AI Model Configuration</h3>

@@ -117,7 +117,7 @@ export class FirebaseAuthService {
     try {
       const role = ADMIN_EMAILS.includes(email) ? 'admin' : 'editor';
       const department = email.includes('greybrain') ? 'AI Research' : 
-                        email.includes('skids') ? 'Administration' : 'Editorial';
+                        email.includes('skids') ? 'Film Analysis' : 'Editorial';
       
       const userData = {
         email,
@@ -262,7 +262,7 @@ This technology enables filmmakers, critics, and audiences to gain deeper insigh
   
   // Get department for email
   private getDepartmentForEmail(email: string): string {
-    if (email.includes('skids.health')) return 'Healthcare Analytics';
+    if (email.includes('skids.health')) return 'Film Analysis';
     if (email.includes('greybrain.ai')) return 'AI Research';
     return 'Film Analysis';
   }
