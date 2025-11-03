@@ -7,7 +7,7 @@ import { XIcon } from './icons/XIcon';
 import { EyeIcon } from './icons/EyeIcon';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { LoadingSpinner } from './LoadingSpinner';
-import { AdminSettings } from './AdminSettings';
+
 
 interface DashboardStats {
   pendingApprovals: number;
@@ -43,7 +43,7 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState('analyst');
   const [isAddingUser, setIsAddingUser] = useState(false);
-  const [showAdminSettings, setShowAdminSettings] = useState(false);
+
 
   useEffect(() => {
     if (currentUser.role === 'admin') {
@@ -151,7 +151,7 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
     return (
       <div className="p-8 text-center">
         <LoadingSpinner />
-        <p className="text-slate-600 mt-4">Loading dashboard...</p>
+        <p className="text-slate-300 mt-4">Loading dashboard...</p>
       </div>
     );
   }
@@ -161,8 +161,8 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
-          <p className="text-slate-600">Manage content, users, and platform settings</p>
+          <h1 className="text-2xl font-bold text-slate-100">Admin Dashboard</h1>
+          <p className="text-slate-300">Manage content, users, and platform settings</p>
         </div>
         <div className="flex items-center gap-4">
           <button
@@ -179,40 +179,40 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
 
       {/* Stats Overview */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white rounded-lg p-6 border border-slate-200 shadow-sm">
+        <div className="bg-slate-700 rounded-lg p-6 border border-slate-600 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">Pending Approvals</p>
+              <p className="text-sm font-medium text-slate-300">Pending Approvals</p>
               <p className="text-2xl font-bold text-orange-600">{stats.pendingApprovals}</p>
             </div>
             <DocumentTextIcon className="w-8 h-8 text-orange-400" />
           </div>
         </div>
 
-        <div className="bg-white rounded-lg p-6 border border-slate-200 shadow-sm">
+        <div className="bg-slate-700 rounded-lg p-6 border border-slate-600 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">Published This Month</p>
+              <p className="text-sm font-medium text-slate-300">Published This Month</p>
               <p className="text-2xl font-bold text-green-600">{stats.publishedThisMonth}</p>
             </div>
             <CheckIcon className="w-8 h-8 text-green-400" />
           </div>
         </div>
 
-        <div className="bg-white rounded-lg p-6 border border-slate-200 shadow-sm">
+        <div className="bg-slate-700 rounded-lg p-6 border border-slate-600 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">Total Subscribers</p>
+              <p className="text-sm font-medium text-slate-300">Total Subscribers</p>
               <p className="text-2xl font-bold text-blue-600">{stats.totalSubscribers}</p>
             </div>
             <MailIcon className="w-8 h-8 text-blue-400" />
           </div>
         </div>
 
-        <div className="bg-white rounded-lg p-6 border border-slate-200 shadow-sm">
+        <div className="bg-slate-700 rounded-lg p-6 border border-slate-600 shadow-sm">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-slate-600">Total Views</p>
+              <p className="text-sm font-medium text-slate-300">Total Views</p>
               <p className="text-2xl font-bold text-purple-600">{stats.totalViews.toLocaleString()}</p>
             </div>
             <EyeIcon className="w-8 h-8 text-purple-400" />
@@ -221,7 +221,7 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
       </div>
 
       {/* Tab Navigation */}
-      <div className="border-b border-slate-200">
+      <div className="border-b border-slate-600">
         <nav className="-mb-px flex space-x-8">
           {[
             { id: 'overview', label: 'Overview', icon: '📊' },
@@ -248,14 +248,14 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
       {activeTab === 'overview' && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Recent Activity */}
-          <div className="bg-white rounded-lg border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Recent Activity</h3>
+          <div className="bg-slate-700 rounded-lg border border-slate-600 p-6">
+            <h3 className="text-lg font-semibold text-slate-100 mb-4">Recent Activity</h3>
             <div className="space-y-3">
               {pendingReports.slice(0, 5).map((report) => (
                 <div key={report.id} className="flex items-center justify-between py-2 border-b border-slate-100 last:border-0">
                   <div>
-                    <p className="font-medium text-slate-900">{report.title}</p>
-                    <p className="text-sm text-slate-600">by {report.editor}</p>
+                    <p className="font-medium text-slate-100">{report.title}</p>
+                    <p className="text-sm text-slate-300">by {report.editor}</p>
                   </div>
                   <span className="text-xs text-slate-500">
                     {new Date(report.submittedAt).toLocaleDateString()}
@@ -269,31 +269,31 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
           </div>
 
           {/* Quick Actions */}
-          <div className="bg-white rounded-lg border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Quick Actions</h3>
+          <div className="bg-slate-700 rounded-lg border border-slate-600 p-6">
+            <h3 className="text-lg font-semibold text-slate-100 mb-4">Quick Actions</h3>
             <div className="space-y-3">
               <button 
                 onClick={() => setActiveTab('editorial')}
-                className="w-full text-left p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+                className="w-full text-left p-3 rounded-lg border border-slate-600 hover:bg-slate-50 transition-colors"
               >
-                <div className="font-medium text-slate-900">Review Pending Content</div>
-                <div className="text-sm text-slate-600">{stats.pendingApprovals} items waiting for approval</div>
+                <div className="font-medium text-slate-100">Review Pending Content</div>
+                <div className="text-sm text-slate-300">{stats.pendingApprovals} items waiting for approval</div>
               </button>
               
               <button 
                 onClick={() => setActiveTab('users')}
-                className="w-full text-left p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+                className="w-full text-left p-3 rounded-lg border border-slate-600 hover:bg-slate-50 transition-colors"
               >
-                <div className="font-medium text-slate-900">Manage Users</div>
-                <div className="text-sm text-slate-600">{whitelistedUsers.length} users in whitelist</div>
+                <div className="font-medium text-slate-100">Manage Users</div>
+                <div className="text-sm text-slate-300">{whitelistedUsers.length} users in whitelist</div>
               </button>
               
               <button 
                 onClick={() => setActiveTab('subscribers')}
-                className="w-full text-left p-3 rounded-lg border border-slate-200 hover:bg-slate-50 transition-colors"
+                className="w-full text-left p-3 rounded-lg border border-slate-600 hover:bg-slate-50 transition-colors"
               >
-                <div className="font-medium text-slate-900">View Subscribers</div>
-                <div className="text-sm text-slate-600">{stats.totalSubscribers} active subscribers</div>
+                <div className="font-medium text-slate-100">View Subscribers</div>
+                <div className="text-sm text-slate-300">{stats.totalSubscribers} active subscribers</div>
               </button>
             </div>
           </div>
@@ -301,10 +301,10 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
       )}
 
       {activeTab === 'editorial' && (
-        <div className="bg-white rounded-lg border border-slate-200">
-          <div className="p-6 border-b border-slate-200">
-            <h3 className="text-lg font-semibold text-slate-900">Editorial Queue</h3>
-            <p className="text-slate-600">Review and approve content for publication</p>
+        <div className="bg-slate-700 rounded-lg border border-slate-600">
+          <div className="p-6 border-b border-slate-600">
+            <h3 className="text-lg font-semibold text-slate-100">Editorial Queue</h3>
+            <p className="text-slate-300">Review and approve content for publication</p>
           </div>
           
           <div className="divide-y divide-slate-200">
@@ -312,8 +312,8 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
               <div key={report.id} className="p-6">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <h4 className="font-semibold text-slate-900 mb-1">{report.title}</h4>
-                    <div className="flex items-center space-x-4 text-sm text-slate-600 mb-3">
+                    <h4 className="font-semibold text-slate-100 mb-1">{report.title}</h4>
+                    <div className="flex items-center space-x-4 text-sm text-slate-300 mb-3">
                       <span>Type: {report.type}</span>
                       <span>Editor: {report.editor}</span>
                       <span className="flex items-center">
@@ -356,8 +356,8 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
       {activeTab === 'users' && (
         <div className="space-y-6">
           {/* Add User Form */}
-          <div className="bg-white rounded-lg border border-slate-200 p-6">
-            <h3 className="text-lg font-semibold text-slate-900 mb-4">Add New User</h3>
+          <div className="bg-slate-700 rounded-lg border border-slate-600 p-6">
+            <h3 className="text-lg font-semibold text-slate-100 mb-4">Add New User</h3>
             <form onSubmit={handleAddUser} className="flex gap-4">
               <input
                 type="email"
@@ -387,9 +387,9 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
           </div>
 
           {/* Users List */}
-          <div className="bg-white rounded-lg border border-slate-200">
-            <div className="p-6 border-b border-slate-200">
-              <h3 className="text-lg font-semibold text-slate-900">Whitelisted Users</h3>
+          <div className="bg-slate-700 rounded-lg border border-slate-600">
+            <div className="p-6 border-b border-slate-600">
+              <h3 className="text-lg font-semibold text-slate-100">Whitelisted Users</h3>
             </div>
             
             <div className="overflow-x-auto">
@@ -406,7 +406,7 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
                 <tbody className="divide-y divide-slate-200">
                   {whitelistedUsers.map((user) => (
                     <tr key={user.email}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-900">{user.email}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-100">{user.email}</td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-indigo-100 text-indigo-800">
                           {user.role}
@@ -419,7 +419,7 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
                           {user.isActive ? 'Active' : 'Inactive'}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-600">{user.addedBy}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-300">{user.addedBy}</td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         <button
                           onClick={() => handleToggleUserStatus(user.email, user.isActive)}
@@ -442,21 +442,17 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
       )}
 
       {activeTab === 'subscribers' && (
-        <div className="bg-white rounded-lg border border-slate-200 p-6">
-          <h3 className="text-lg font-semibold text-slate-900 mb-4">Subscriber Management</h3>
+        <div className="bg-slate-700 rounded-lg border border-slate-600 p-6">
+          <h3 className="text-lg font-semibold text-slate-100 mb-4">Subscriber Management</h3>
           <div className="text-center py-8">
             <MailIcon className="w-16 h-16 text-slate-400 mx-auto mb-4" />
-            <p className="text-lg font-semibold text-slate-900 mb-2">{stats.totalSubscribers} Active Subscribers</p>
-            <p className="text-slate-600">Subscriber management features coming soon</p>
+            <p className="text-lg font-semibold text-slate-100 mb-2">{stats.totalSubscribers} Active Subscribers</p>
+            <p className="text-slate-300">Subscriber management features coming soon</p>
           </div>
         </div>
       )}
 
-      {/* Admin Settings Modal */}
-      <AdminSettings 
-        isOpen={showAdminSettings} 
-        onClose={() => setShowAdminSettings(false)} 
-      />
+
     </div>
   );
 };

@@ -165,18 +165,21 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
             </div>
           )}
 
-          {activeTab === 'admin' && currentUser?.role === 'admin' && (
+          {activeTab === 'admin' && (
             <div>
-              <h3 className="text-lg font-medium text-slate-100 mb-4">Firebase Admin Dashboard</h3>
-              <div className="bg-slate-800 rounded-lg p-1">
-                <FirebaseAdminDashboard currentUser={currentUser} />
-              </div>
-            </div>
-          )}
-
-          {activeTab === 'admin' && currentUser?.role !== 'admin' && (
-            <div className="text-center py-8">
-              <p className="text-slate-400">Admin privileges required to access this section.</p>
+              {currentUser?.role === 'admin' ? (
+                <div>
+                  <h3 className="text-lg font-medium text-slate-100 mb-4">Firebase Admin Dashboard</h3>
+                  <div className="bg-slate-800 rounded-lg p-1">
+                    <FirebaseAdminDashboard currentUser={currentUser} />
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-slate-400">Admin privileges required to access this section.</p>
+                  <p className="text-xs text-slate-500 mt-2">Current role: {currentUser?.role || 'undefined'}</p>
+                </div>
+              )}
             </div>
           )}
 
