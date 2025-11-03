@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { GeminiModelSelector } from './GeminiModelSelector';
 import GeminiDebugTest from './GeminiDebugTest';
+import { FirebaseAdminDashboard } from './FirebaseAdminDashboard';
 import { getSelectedGeminiModel, checkForNewerModels, getModelInfo } from '../utils/geminiModelStorage';
 import { getGeminiApiKeyString, hasGeminiApiKey } from '../utils/geminiKeyStorage';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -8,10 +9,11 @@ import { LoadingSpinner } from './LoadingSpinner';
 interface AdminSettingsProps {
   isOpen: boolean;
   onClose: () => void;
+  currentUser?: any;
 }
 
-export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose }) => {
-  const [activeTab, setActiveTab] = useState<'models' | 'debug' | 'health'>('models');
+export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, currentUser }) => {
+  const [activeTab, setActiveTab] = useState<'models' | 'admin' | 'debug' | 'health'>('models');
   const [systemHealth, setSystemHealth] = useState<any>(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
 
@@ -86,6 +88,16 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose })
             🎬 AI Models
           </button>
           <button
+            onClick={() => setActiveTab('admin')}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'admin'
+                ? 'text-indigo-400 border-b-2 border-indigo-400'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            👑 Admin Dashboard
+          </button>
+          <button
             onClick={() => setActiveTab('health')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'health'
@@ -116,6 +128,21 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose })
                 // Optional: Show success message or refresh
                 console.log('Model changed in admin settings');
               }} />
+            </div>
+          )}
+
+          {activeTab === 'admin' && currentUser?.role === 'admin' && (
+            <div>
+              <h3 className="text-lg font-medium text-slate-100 mb-4">Firebase Admin Dashboard</h3>
+              <div className="bg-slate-800 rounded-lg p-1">
+                <FirebaseAdminDashboard currentUser={currentUser} />
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'admin' && currentUser?.role !== 'admin' && (
+            <div className="text-center py-8">
+              <p className="text-slate-400">Admin privileges required to access this section.</p>
             </div>
           )}
 
