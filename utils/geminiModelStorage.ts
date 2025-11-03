@@ -12,13 +12,13 @@ export interface GeminiModelOption {
 // Available Gemini models optimized for film analysis
 export const AVAILABLE_GEMINI_MODELS: GeminiModelOption[] = [
   {
-    id: 'gemini-1.5-pro-latest',
+    id: 'gemini-1.5-pro',
     name: 'Greybrainer Pro (Recommended)',
     description: 'Best for detailed film analysis, character development, and narrative structure',
     isRecommended: true
   },
   {
-    id: 'gemini-1.5-flash-latest',
+    id: 'gemini-1.5-flash',
     name: 'Greybrainer Fast',
     description: 'Quick analysis for rapid reviews and initial assessments'
   },
@@ -47,8 +47,8 @@ export const AVAILABLE_GEMINI_MODELS: GeminiModelOption[] = [
 ];
 
 const GEMINI_MODEL_KEY = 'greybrainer_gemini_model';
-const GREYBRAINER_PREFERRED_MODEL = 'gemini-1.5-pro-latest'; // Best for film analysis
-const GREYBRAINER_FALLBACK_MODEL = 'gemini-1.5-flash-latest'; // Fast alternative
+const GREYBRAINER_PREFERRED_MODEL = 'gemini-1.5-pro'; // Best for film analysis
+const GREYBRAINER_FALLBACK_MODEL = 'gemini-1.5-flash'; // Fast alternative
 
 // Get selected Gemini model (smart default for film professionals)
 export const getSelectedGeminiModel = (): string => {
