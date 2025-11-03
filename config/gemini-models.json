@@ -5,41 +5,30 @@
     "description": "Gemini AI model configuration for Greybrainer Film Analysis Platform"
   },
   "defaultModels": {
-    "preferred": "gemini-1.5-flash-latest",
-    "fallback": "gemini-pro",
-    "legacy": "gemini-1.0-pro-latest"
+    "preferred": "gemini-pro",
+    "fallback": "gemini-1.5-flash",
+    "legacy": "text-bison-001"
   },
   "availableModels": [
     {
-      "id": "gemini-1.5-flash-latest",
-      "name": "Greybrainer Fast (Recommended)",
-      "description": "Latest fast model for quick analysis and rapid reviews",
-      "category": "standard",
-      "isRecommended": true,
-      "isStable": true,
-      "maxTokens": 32768,
-      "costTier": "economy",
-      "lastVerified": "2024-11-03"
-    },
-    {
       "id": "gemini-pro",
-      "name": "Greybrainer Pro",
-      "description": "Stable model for detailed film analysis and character development",
+      "name": "Greybrainer Pro (Recommended)",
+      "description": "Most stable model for detailed film analysis and character development",
       "category": "premium",
-      "isRecommended": false,
+      "isRecommended": true,
       "isStable": true,
       "maxTokens": 32768,
       "costTier": "standard",
       "lastVerified": "2024-11-03"
     },
     {
-      "id": "gemini-1.0-pro-latest",
-      "name": "Greybrainer Classic",
-      "description": "Latest version of the classic model for basic evaluations",
-      "category": "basic",
+      "id": "gemini-1.5-flash",
+      "name": "Greybrainer Fast",
+      "description": "Fast model for quick analysis and rapid reviews",
+      "category": "standard",
       "isRecommended": false,
       "isStable": true,
-      "maxTokens": 30720,
+      "maxTokens": 32768,
       "costTier": "economy",
       "lastVerified": "2024-11-03"
     },
@@ -52,14 +41,12 @@
       "isStable": false,
       "maxTokens": 8192,
       "costTier": "legacy",
-      "lastVerified": "2024-11-03",
-      "isDeprecated": true
+      "lastVerified": "2024-11-03"
     }
   ],
   "modelPriority": [
-    "gemini-1.5-flash-latest",
-    "gemini-pro", 
-    "gemini-1.0-pro-latest",
+    "gemini-pro",
+    "gemini-1.5-flash", 
     "text-bison-001"
   ],
   "discoveryPatterns": [
