@@ -4,7 +4,8 @@ import {
   getSelectedGeminiModel, 
   setSelectedGeminiModel, 
   testGeminiModel, 
-  autoSetupGreybrainerModel,
+  futureProofModelSetup,
+  checkForNewerModels,
   GeminiModelOption 
 } from '../utils/geminiModelStorage';
 import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
@@ -20,6 +21,7 @@ export const GeminiModelSelector: React.FC<GeminiModelSelectorProps> = ({ onMode
   const [testResults, setTestResults] = useState<Record<string, boolean | null>>({});
   const [isAutoDetecting, setIsAutoDetecting] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [newerModelsAvailable, setNewerModelsAvailable] = useState<string[]>([]);
 
   const handleModelChange = (modelId: string) => {
     try {
@@ -65,11 +67,19 @@ export const GeminiModelSelector: React.FC<GeminiModelSelectorProps> = ({ onMode
 
     setIsAutoDetecting(true);
     try {
-      const workingModel = await autoSetupGreybrainerModel(apiKey);
+      // Use future-proof setup that adapts to new models
+      const workingModel = await futureProofModelSetup(apiKey);
       if (workingModel) {
         handleModelChange(workingModel);
-        const modelName = AVAILABLE_GEMINI_MODELS.find(m => m.id === workingModel)?.name;
+        const modelName = AVAILABLE_GEMINI_MODELS.find(m => m.id === workingModel)?.name || workingModel;
         alert(`🎬 Greybrainer configured with: ${modelName}\n\nThis model is optimized for film analysis!`);
+        
+        // Check for newer models in background
+        checkForNewerModels(apiKey).then(({newModels}) => {
+          if (newModels.length > 0) {
+            setNewerModelsAvailable(newModels);
+          }
+        });
       } else {
         alert('❌ No compatible models found. Please check your API key and try again.');
       }
@@ -170,6 +180,19 @@ export const GeminiModelSelector: React.FC<GeminiModelSelectorProps> = ({ onMode
           <div>⚠️ Deprecated (may stop working)</div>
         </div>
       </div>
+
+      {newerModelsAvailable.length > 0 && (
+        <div className="mt-4 p-3 bg-green-900/20 border border-green-700/50 rounded-lg">
+          <p className="text-sm text-green-200">
+            <strong>🆕 New Models Available:</strong> Google has released newer AI models! 
+            Click "Auto-Setup" again to upgrade to the latest models for better film analysis.
+          </p>
+          <p className="text-xs text-green-300 mt-1">
+            New models: {newerModelsAvailable.slice(0, 3).join(', ')}
+            {newerModelsAvailable.length > 3 && ` and ${newerModelsAvailable.length - 3} more`}
+          </p>
+        </div>
+      )}
 
       <div className="mt-4 p-3 bg-indigo-900/20 border border-indigo-700/50 rounded-lg">
         <p className="text-sm text-indigo-200">

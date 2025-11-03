@@ -120,19 +120,19 @@ export const autoSetupGreybrainerModel = async (apiKey: string): Promise<string 
     GREYBRAINER_FALLBACK_MODEL,   // Fast alternative
     'gemini-1.5-pro',             // Stable pro
     'gemini-1.5-flash',           // Stable fast
-    'gemini-pro'                  // Legacy fallback
+    'gemini-pro',                 // Legacy fallback
+    'gemini-1.0-pro'              // Last resort
   ];
   
   console.log('🎬 Setting up optimal model for film analysis...');
   
   for (const modelId of greybrainerOrder) {
     const model = AVAILABLE_GEMINI_MODELS.find(m => m.id === modelId);
-    if (!model) continue;
+    console.log(`Testing: ${model?.name || modelId}`);
     
-    console.log(`Testing: ${model.name}`);
     const works = await testGeminiModel(apiKey, modelId);
     if (works) {
-      console.log(`✅ Greybrainer configured with: ${model.name}`);
+      console.log(`✅ Greybrainer configured with: ${model?.name || modelId}`);
       setSelectedGeminiModel(modelId);
       return modelId;
     }
@@ -142,5 +142,108 @@ export const autoSetupGreybrainerModel = async (apiKey: string): Promise<string 
   return null;
 };
 
+// Dynamic model discovery - fetch available models from Google API
+export const discoverAvailableModels = async (apiKey: string): Promise<string[]> => {
+  try {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    const data = await response.json();
+    
+    if (response.ok && data.models) {
+      const modelIds = data.models
+        .filter((model: any) => model.supportedGenerationMethods?.includes('generateContent'))
+        .map((model: any) => model.name.replace('models/', ''));
+      
+      console.log('🔍 Discovered models:', modelIds);
+      return modelIds;
+    }
+  } catch (error) {
+    console.warn('Could not discover models:', error);
+  }
+  return [];
+};
+
+// Future-proof auto-setup that adapts to new models
+export const futureProofModelSetup = async (apiKey: string): Promise<string | null> => {
+  console.log('🚀 Future-proof model setup starting...');
+  
+  // First try our known good models
+  const knownGoodModel = await autoSetupGreybrainerModel(apiKey);
+  if (knownGoodModel) {
+    return knownGoodModel;
+  }
+  
+  // If none work, discover what's actually available
+  console.log('🔍 Discovering available models...');
+  const availableModels = await discoverAvailableModels(apiKey);
+  
+  if (availableModels.length === 0) {
+    console.warn('❌ No models discovered');
+    return null;
+  }
+  
+  // Test discovered models, prioritizing newer/better ones
+  const priorityPatterns = [
+    /gemini.*pro.*latest/i,     // Latest pro models
+    /gemini.*flash.*latest/i,   // Latest flash models
+    /gemini.*1\.5.*pro/i,       // 1.5 pro models
+    /gemini.*1\.5.*flash/i,     // 1.5 flash models
+    /gemini.*pro/i,             // Any pro model
+    /gemini.*flash/i,           // Any flash model
+    /gemini/i                   // Any gemini model
+  ];
+  
+  for (const pattern of priorityPatterns) {
+    const matchingModels = availableModels.filter(model => pattern.test(model));
+    
+    for (const modelId of matchingModels) {
+      console.log(`🧪 Testing discovered model: ${modelId}`);
+      const works = await testGeminiModel(apiKey, modelId);
+      if (works) {
+        console.log(`✅ Found working model: ${modelId}`);
+        setSelectedGeminiModel(modelId);
+        return modelId;
+      }
+    }
+  }
+  
+  console.warn('❌ No working models found even after discovery');
+  return null;
+};
+
 // Legacy function for manual detection
 export const autoDetectWorkingModel = autoSetupGreybrainerModel;
+
+// Check if there are newer models available than what we know about
+export const checkForNewerModels = async (apiKey: string): Promise<{hasNewer: boolean, newModels: string[]}> => {
+  try {
+    const availableModels = await discoverAvailableModels(apiKey);
+    const knownModelIds = AVAILABLE_GEMINI_MODELS.map(m => m.id);
+    const newModels = availableModels.filter(model => !knownModelIds.includes(model));
+    
+    return {
+      hasNewer: newModels.length > 0,
+      newModels
+    };
+  } catch (error) {
+    console.warn('Could not check for newer models:', error);
+    return { hasNewer: false, newModels: [] };
+  }
+};
+
+// Get model update recommendations
+export const getModelUpdateRecommendations = async (apiKey: string): Promise<string[]> => {
+  const { newModels } = await checkForNewerModels(apiKey);
+  
+  // Filter for models that look like upgrades
+  const recommendations = newModels.filter(model => {
+    const modelLower = model.toLowerCase();
+    return (
+      modelLower.includes('latest') ||
+      modelLower.includes('2.0') ||
+      modelLower.includes('1.6') ||
+      (modelLower.includes('pro') && modelLower.includes('1.5'))
+    );
+  });
+  
+  return recommendations;
+};
