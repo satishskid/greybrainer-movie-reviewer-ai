@@ -75,8 +75,6 @@ const App: React.FC = () => {
   const [morphokineticsError, setMorphokineticsError] = useState<string | null>(null);
 
   const [monthlyScoreboardData, setMonthlyScoreboardData] = useState<MonthlyScoreboardItem[]>([]);
-  // Admin panel moved to AdminSettings modal
-  const [currentUser, setCurrentUser] = useState<any>(null);
 
 
 
@@ -97,15 +95,7 @@ const App: React.FC = () => {
       .map((item, index) => ({ ...item, ranking: index + 1 }));
     setMonthlyScoreboardData(sortedScoreboardData);
 
-    // Get current user from auth service
-    const user = localStorage.getItem('greybrainer_user');
-    if (user) {
-      try {
-        setCurrentUser(JSON.parse(user));
-      } catch (e) {
-        console.error("Failed to parse user data", e);
-      }
-    }
+    // User data now comes from AuthWrapper
   }, []);
 
   const saveTokenBudgetConfig = useCallback((config: TokenBudgetConfig) => {
@@ -333,6 +323,7 @@ const App: React.FC = () => {
 
   return (
     <AuthWrapper>
+      {(authUser) => (
       <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-slate-100">
         <Header
           onToggleTokenDashboard={() => setShowTokenDashboard(prev => !prev)}
@@ -409,9 +400,10 @@ const App: React.FC = () => {
         <AdminSettings 
           isOpen={showSettings} 
           onClose={() => setShowSettings(false)}
-          currentUser={currentUser}
+          currentUser={authUser}
         />
       </div>
+      )}
     </AuthWrapper>
   );
 };

@@ -51,8 +51,8 @@ const GeminiDebugTest: React.FC = () => {
   };
 
   return (
-    <div className="p-4 border border-gray-300 rounded-lg bg-gray-50">
-      <h3 className="text-lg font-semibold mb-3">Gemini API Debug Test</h3>
+    <div className="p-4 border border-slate-600 rounded-lg bg-slate-800">
+      <h3 className="text-lg font-semibold mb-3 text-slate-100">Gemini API Debug Test</h3>
       <button
         onClick={runDebugTest}
         disabled={isLoading}
@@ -62,8 +62,8 @@ const GeminiDebugTest: React.FC = () => {
       </button>
       
       {testResult && (
-        <div className="mt-4 p-3 bg-white border rounded">
-          <pre className="whitespace-pre-wrap text-sm">{testResult}</pre>
+        <div className="mt-4 p-3 bg-slate-900 border border-slate-600 rounded">
+          <pre className="whitespace-pre-wrap text-sm text-slate-100 font-mono">{testResult}</pre>
         </div>
       )}
     </div>

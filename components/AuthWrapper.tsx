@@ -11,7 +11,7 @@ import { hasGoogleSearchApiKey } from '../utils/googleSearchKeyStorage';
 import { GoogleSearchKeyPrompt } from './GoogleSearchKeyPrompt';
 
 interface AuthWrapperProps {
-  children: React.ReactNode;
+  children: (user: GreybrainerUser | null) => React.ReactNode;
 }
 
 export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
@@ -220,7 +220,7 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
       )}
 
       {/* Main App Content */}
-      {children}
+      {children(user)}
     </div>
   );
   };
