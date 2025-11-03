@@ -1,0 +1,113 @@
+{
+  "modelConfiguration": {
+    "version": "1.0.0",
+    "lastUpdated": "2024-11-03",
+    "description": "Gemini AI model configuration for Greybrainer Film Analysis Platform"
+  },
+  "defaultModels": {
+    "preferred": "gemini-pro",
+    "fallback": "gemini-1.5-flash",
+    "legacy": "gemini-1.0-pro"
+  },
+  "availableModels": [
+    {
+      "id": "gemini-pro",
+      "name": "Greybrainer Pro (Recommended)",
+      "description": "Best for detailed film analysis, character development, and narrative structure",
+      "category": "premium",
+      "isRecommended": true,
+      "isStable": true,
+      "maxTokens": 32768,
+      "costTier": "standard",
+      "lastVerified": "2024-11-03"
+    },
+    {
+      "id": "gemini-1.5-flash",
+      "name": "Greybrainer Fast",
+      "description": "Quick analysis for rapid reviews and initial assessments",
+      "category": "standard",
+      "isRecommended": false,
+      "isStable": true,
+      "maxTokens": 32768,
+      "costTier": "economy",
+      "lastVerified": "2024-11-03"
+    },
+    {
+      "id": "gemini-1.0-pro",
+      "name": "Greybrainer Classic",
+      "description": "Classic model for basic film evaluations",
+      "category": "basic",
+      "isRecommended": false,
+      "isStable": true,
+      "maxTokens": 30720,
+      "costTier": "economy",
+      "lastVerified": "2024-11-03"
+    },
+    {
+      "id": "text-bison-001",
+      "name": "Legacy Text Model",
+      "description": "Legacy model for emergency fallback only",
+      "category": "legacy",
+      "isRecommended": false,
+      "isStable": false,
+      "maxTokens": 8192,
+      "costTier": "legacy",
+      "lastVerified": "2024-11-03",
+      "isDeprecated": true
+    }
+  ],
+  "modelPriority": [
+    "gemini-pro",
+    "gemini-1.5-flash", 
+    "gemini-1.0-pro",
+    "text-bison-001"
+  ],
+  "discoveryPatterns": [
+    {
+      "pattern": "gemini.*pro.*latest",
+      "priority": 1,
+      "description": "Latest pro models"
+    },
+    {
+      "pattern": "gemini.*flash.*latest", 
+      "priority": 2,
+      "description": "Latest flash models"
+    },
+    {
+      "pattern": "gemini.*2\\.\\d+.*pro",
+      "priority": 3,
+      "description": "Version 2.x pro models"
+    },
+    {
+      "pattern": "gemini.*1\\.\\d+.*pro",
+      "priority": 4,
+      "description": "Version 1.x pro models"
+    },
+    {
+      "pattern": "gemini.*pro",
+      "priority": 5,
+      "description": "Any pro model"
+    },
+    {
+      "pattern": "gemini.*flash",
+      "priority": 6,
+      "description": "Any flash model"
+    },
+    {
+      "pattern": "gemini",
+      "priority": 7,
+      "description": "Any gemini model"
+    }
+  ],
+  "errorHandling": {
+    "retryAttempts": 3,
+    "retryDelay": 1000,
+    "fallbackOnError": true,
+    "logErrors": true
+  },
+  "validation": {
+    "testPrompt": "Say 'test' and nothing else.",
+    "expectedResponse": "test",
+    "timeout": 30000
+  }
+}

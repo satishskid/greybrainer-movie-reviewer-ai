@@ -4,6 +4,7 @@ import GeminiDebugTest from './GeminiDebugTest';
 import { FirebaseAdminDashboard } from './FirebaseAdminDashboard';
 import { GeminiKeyManager } from './GeminiKeyManager';
 import { GoogleSearchKeyManager } from './GoogleSearchKeyManager';
+import { ModelHealthMonitor } from './ModelHealthMonitor';
 import { getSelectedGeminiModel, checkForNewerModels, getModelInfo } from '../utils/geminiModelStorage';
 import { getGeminiApiKeyString, hasGeminiApiKey } from '../utils/geminiKeyStorage';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -157,11 +158,20 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
 
           {activeTab === 'models' && (
             <div>
-              <h3 className="text-lg font-medium text-slate-100 mb-4">AI Model Configuration</h3>
-              <GeminiModelSelector onModelChange={() => {
-                // Optional: Show success message or refresh
-                console.log('Model changed in admin settings');
-              }} />
+              <h3 className="text-lg font-medium text-slate-100 mb-6">AI Model Configuration</h3>
+              
+              <div className="space-y-6">
+                {/* Model Selection */}
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-600">
+                  <h4 className="text-md font-medium text-slate-200 mb-3">🎬 Model Selection</h4>
+                  <GeminiModelSelector onModelChange={() => {
+                    console.log('Model changed in admin settings');
+                  }} />
+                </div>
+
+                {/* Model Health Monitor */}
+                <ModelHealthMonitor />
+              </div>
             </div>
           )}
 
