@@ -7,6 +7,7 @@ import { XIcon } from './icons/XIcon';
 import { EyeIcon } from './icons/EyeIcon';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { LoadingSpinner } from './LoadingSpinner';
+import { AdminSettings } from './AdminSettings';
 
 interface DashboardStats {
   pendingApprovals: number;
@@ -42,6 +43,7 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
   const [newUserEmail, setNewUserEmail] = useState('');
   const [newUserRole, setNewUserRole] = useState('analyst');
   const [isAddingUser, setIsAddingUser] = useState(false);
+  const [showAdminSettings, setShowAdminSettings] = useState(false);
 
   useEffect(() => {
     if (currentUser.role === 'admin') {
@@ -162,8 +164,16 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
           <h1 className="text-2xl font-bold text-slate-900">Admin Dashboard</h1>
           <p className="text-slate-600">Manage content, users, and platform settings</p>
         </div>
-        <div className="text-sm text-slate-500">
-          Welcome back, {currentUser.displayName}
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setShowAdminSettings(true)}
+            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
+          >
+            ⚙️ System Settings
+          </button>
+          <div className="text-sm text-slate-500">
+            Welcome back, {currentUser.displayName}
+          </div>
         </div>
       </div>
 
@@ -441,6 +451,12 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
           </div>
         </div>
       )}
+
+      {/* Admin Settings Modal */}
+      <AdminSettings 
+        isOpen={showAdminSettings} 
+        onClose={() => setShowAdminSettings(false)} 
+      />
     </div>
   );
 };

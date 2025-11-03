@@ -29,7 +29,7 @@ import { PublicResearchPortal } from './components/PublicResearchPortal';
 import { FirebaseAdminDashboard } from './components/FirebaseAdminDashboard';
 
 import { GoogleSearchKeyManager } from './components/GoogleSearchKeyManager';
-import { GeminiModelSelector } from './components/GeminiModelSelector';
+import { AdminSettings } from './components/AdminSettings';
 
 import { AuthWrapper } from './components/AuthWrapper';
 
@@ -70,6 +70,7 @@ const App: React.FC = () => {
   const [tokenUsageLog, setTokenUsageLog] = useState<TokenUsageEntry[]>([]);
   const [tokenBudgetConfig, setTokenBudgetConfig] = useState<TokenBudgetConfig>(INITIAL_TOKEN_BUDGET_CONFIG);
   const [showTokenDashboard, setShowTokenDashboard] = useState<boolean>(false);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
 
   const [morphokineticsAnalysis, setMorphokineticsAnalysis] = useState<MorphokineticsAnalysis | null>(null);
   const [isAnalyzingMorphokinetics, setIsAnalyzingMorphokinetics] = useState<boolean>(false);
@@ -345,9 +346,18 @@ const App: React.FC = () => {
           )}
 
 
-          <GoogleSearchKeyManager className="mb-6" />
-          
-          <GeminiModelSelector onModelChange={() => window.location.reload()} />
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex-1">
+              <GoogleSearchKeyManager />
+            </div>
+            <button
+              onClick={() => setShowSettings(true)}
+              className="ml-4 px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2"
+              title="System Settings & AI Model Configuration"
+            >
+              ⚙️ Settings
+            </button>
+          </div>
           
           <MovieInputForm
             movieInput={movieInput}
@@ -415,6 +425,12 @@ const App: React.FC = () => {
         </>
         </main>
         <Footer />
+        
+        {/* Admin Settings Modal */}
+        <AdminSettings 
+          isOpen={showSettings} 
+          onClose={() => setShowSettings(false)} 
+        />
       </div>
     </AuthWrapper>
   );
