@@ -12,6 +12,7 @@ import { SparklesIcon } from './components/icons/SparklesIcon';
 import { ReviewStage, LayerAnalysisData, ReviewLayer, PersonnelData, SummaryReportData, MagicFactorAnalysis, CreativeSparkResult, TokenUsageEntry, TokenBudgetConfig, ActualPerformanceData, ScriptIdeaInput, MagicQuotientAnalysis, MovieAnalysisInput, MorphokineticsAnalysis, MonthlyScoreboardItem, FinancialAnalysisData } from './types';
 import { initialLayerAnalyses, LAYER_DEFINITIONS, REVIEW_STAGES_OPTIONS, MAX_SCORE, COMMON_GENRES, INITIAL_TOKEN_BUDGET_CONFIG, CHARS_PER_TOKEN_ESTIMATE, MAX_TOKEN_LOG_ENTRIES, MOCK_MONTHLY_SCOREBOARD_DATA } from './constants';
 import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, findMovieMatches, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini } from './services/geminiService';
+import { AdminService } from './services/adminService';
 import { googleSearchService } from './services/googleSearchService';
 import { PersonnelDisplay } from './components/PersonnelDisplay';
 import { CreativeSparkGenerator } from './components/CreativeSparkGenerator';
@@ -403,7 +404,7 @@ const App: React.FC = () => {
           <MonthlyMagicScoreboard 
             scoreboardData={monthlyScoreboardData} 
             currentUser={authUser}
-            isAdmin={authUser?.email === 'admin@greybrainer.com'} // Simple admin check
+            isAdmin={AdminService.isAdminSync(authUser)} // Firebase-based admin check
             logTokenUsage={logTokenUsage}
             onScoreboardGenerated={() => {
               // Refresh scoreboard data when new one is generated

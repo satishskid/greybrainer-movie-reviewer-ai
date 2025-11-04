@@ -327,6 +327,13 @@ export const MonthlyMagicScoreboard: React.FC<MonthlyMagicScoreboardProps> = ({
             )}
           </div>
           
+          {/* Debug Info */}
+          {currentUser && (
+            <div className="text-xs text-slate-500 mb-1">
+              User: {currentUser.email} | Admin: {isAdmin ? 'Yes' : 'No'}
+            </div>
+          )}
+          
           {/* Admin Generate Button */}
           {isAdmin && (
             <div className="flex flex-col items-center space-y-1">
