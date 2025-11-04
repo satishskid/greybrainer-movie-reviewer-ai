@@ -229,11 +229,22 @@ const parseMainCast = (text: string): string[] | undefined => {
 };
 
 const parseAISuggestedScore = (text: string): number | undefined => {
-  const scoreRegex = new RegExp(`Suggested Score:\\s*(\\d*\\.?\\d+)\\s*/\\s*${MAX_SCORE}`, "i");
-  const match = text.match(scoreRegex);
-  if (match && match[1]) {
-    const score = parseFloat(match[1]);
-    return isNaN(score) ? undefined : Math.max(0, Math.min(score, MAX_SCORE));
+  // Try multiple patterns to catch different AI score formats
+  const patterns = [
+    new RegExp(`Suggested Score:\\s*\\*?\\*?\\s*(\\d*\\.?\\d+)\\s*/\\s*${MAX_SCORE}`, "i"),
+    new RegExp(`\\*\\*Suggested Score:\\*\\*\\s*(\\d*\\.?\\d+)\\s*/\\s*${MAX_SCORE}`, "i"),
+    new RegExp(`Score:\\s*(\\d*\\.?\\d+)\\s*/\\s*${MAX_SCORE}`, "i"),
+    new RegExp(`(\\d*\\.?\\d+)\\s*/\\s*${MAX_SCORE}`, "g") // Last resort - any number/10 pattern
+  ];
+  
+  for (const regex of patterns) {
+    const match = text.match(regex);
+    if (match && match[1]) {
+      const score = parseFloat(match[1]);
+      if (!isNaN(score) && score >= 0 && score <= MAX_SCORE) {
+        return Math.max(0, Math.min(score, MAX_SCORE));
+      }
+    }
   }
   return undefined;
 };

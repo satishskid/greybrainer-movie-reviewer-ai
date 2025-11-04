@@ -22,8 +22,8 @@ export const MonthlyMagicScoreboard: React.FC<MonthlyMagicScoreboardProps> = ({ 
   const currentYear = new Date().getFullYear();
   const currentMonthIndex = new Date().getMonth(); // 0-11
 
-  const [selectedYear, setSelectedYear] = useState<number | string>(currentYear);
-  const [selectedMonth, setSelectedMonth] = useState<string>(MONTH_NAMES[currentMonthIndex]);
+  const [selectedYear, setSelectedYear] = useState<number | string>(2024); // Default to 2024 where data exists
+  const [selectedMonth, setSelectedMonth] = useState<string>(ALL_FILTER_VALUE); // Show all months by default
   const [selectedCountry, setSelectedCountry] = useState<string>("India"); // Default to India
   const [selectedRegion, setSelectedRegion] = useState<string>(ALL_FILTER_VALUE);
   const [selectedLanguage, setSelectedLanguage] = useState<string>(ALL_FILTER_VALUE);
