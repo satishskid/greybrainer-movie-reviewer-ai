@@ -400,7 +400,17 @@ const App: React.FC = () => {
           
           <GreybrainerInsights logTokenUsage={logTokenUsage} />
           <GreybrainerComparison logTokenUsage={logTokenUsage} />
-          <MonthlyMagicScoreboard scoreboardData={monthlyScoreboardData} />
+          <MonthlyMagicScoreboard 
+            scoreboardData={monthlyScoreboardData} 
+            currentUser={authUser}
+            isAdmin={authUser?.email === 'admin@greybrainer.com'} // Simple admin check
+            logTokenUsage={logTokenUsage}
+            onScoreboardGenerated={() => {
+              // Refresh scoreboard data when new one is generated
+              // For now, this could trigger a page refresh or data reload
+              console.log('New scoreboard generated - consider refreshing data');
+            }}
+          />
 
           {/* Admin Dashboard moved to Settings modal */}
 

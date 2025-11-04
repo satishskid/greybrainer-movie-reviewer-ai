@@ -6,6 +6,7 @@ import { GoogleSearchKeyManager } from './GoogleSearchKeyManager';
 import { getSelectedGeminiModel, getModelInfo } from '../utils/geminiModelStorage';
 import { getGeminiApiKeyString, hasGeminiApiKey } from '../utils/geminiKeyStorage';
 import { LoadingSpinner } from './LoadingSpinner';
+import { MonthlyScoreboardAdmin } from './MonthlyScoreboardAdmin';
 
 interface AdminSettingsProps {
   isOpen: boolean;
@@ -14,7 +15,7 @@ interface AdminSettingsProps {
 }
 
 export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'keys' | 'admin' | 'debug' | 'health'>('keys');
+  const [activeTab, setActiveTab] = useState<'keys' | 'admin' | 'debug' | 'health' | 'scoreboard'>('keys');
   const [systemHealth, setSystemHealth] = useState<any>(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
 
@@ -106,6 +107,16 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
             }`}
           >
             🔧 Debug Tools
+          </button>
+          <button
+            onClick={() => setActiveTab('scoreboard')}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'scoreboard'
+                ? 'text-indigo-400 border-b-2 border-indigo-400'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            🏆 Scoreboard
           </button>
         </div>
 

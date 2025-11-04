@@ -8,7 +8,10 @@ import { FilterIcon } from './icons/FilterIcon';
 import { GlobeAltIcon } from './icons/GlobeAltIcon';
 import { LocationMarkerIcon } from './icons/LocationMarkerIcon';
 import { LanguageIcon } from './icons/LanguageIcon';
-import { CalendarIcon } from './icons/CalendarIcon'; 
+import { CalendarIcon } from './icons/CalendarIcon';
+import { MonthlyScoreboardService } from '../services/monthlyScoreboardService';
+import { LoadingSpinner } from './LoadingSpinner';
+import { SparklesIcon } from './icons/SparklesIcon'; 
 
 const ALL_FILTER_VALUE = "All";
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -16,14 +19,73 @@ const TARGET_INDIAN_LANGUAGES = ["Hindi", "Malayalam", "Tamil", "Telugu", "Marat
 
 interface MonthlyMagicScoreboardProps {
   scoreboardData: MonthlyScoreboardItem[];
+  currentUser?: any; // Firebase user object
+  isAdmin?: boolean; // Whether current user is admin
+  logTokenUsage?: (operation: string, inputChars: number, outputChars: number) => void;
+  onScoreboardGenerated?: () => void; // Callback when new scoreboard is generated
 }
 
-export const MonthlyMagicScoreboard: React.FC<MonthlyMagicScoreboardProps> = ({ scoreboardData }) => {
+export const MonthlyMagicScoreboard: React.FC<MonthlyMagicScoreboardProps> = ({ 
+  scoreboardData, 
+  currentUser, 
+  isAdmin = false, 
+  logTokenUsage,
+  onScoreboardGenerated 
+}) => {
   const currentYear = new Date().getFullYear();
   const currentMonthIndex = new Date().getMonth(); // 0-11
 
-  const [selectedYear, setSelectedYear] = useState<number | string>(2024); // Default to 2024 where data exists
-  const [selectedMonth, setSelectedMonth] = useState<string>(ALL_FILTER_VALUE); // Show all months by default
+  // Smart defaults: Find the most recent month with data, or fall back to current/previous month
+  const getSmartDefaults = () => {
+    const currentDate = new Date();
+    const currentYear = currentDate.getFullYear();
+    const currentMonthIndex = currentDate.getMonth();
+    
+    // Check if current month has data
+    const currentMonthName = MONTH_NAMES[currentMonthIndex];
+    const hasCurrentMonthData = scoreboardData.some(item => 
+      item.releaseMonth.includes(currentMonthName) && item.releaseMonth.includes(currentYear.toString())
+    );
+    
+    if (hasCurrentMonthData) {
+      return { year: currentYear, month: currentMonthName };
+    }
+    
+    // Check previous month
+    const prevMonthIndex = currentMonthIndex === 0 ? 11 : currentMonthIndex - 1;
+    const prevYear = currentMonthIndex === 0 ? currentYear - 1 : currentYear;
+    const prevMonthName = MONTH_NAMES[prevMonthIndex];
+    const hasPrevMonthData = scoreboardData.some(item => 
+      item.releaseMonth.includes(prevMonthName) && item.releaseMonth.includes(prevYear.toString())
+    );
+    
+    if (hasPrevMonthData) {
+      return { year: prevYear, month: prevMonthName };
+    }
+    
+    // Fallback: Find the most recent month with any data
+    const monthsWithData = scoreboardData
+      .map(item => {
+        const parts = item.releaseMonth.split(' ');
+        return { month: parts[0], year: parseInt(parts[1]) };
+      })
+      .sort((a, b) => b.year - a.year || MONTH_NAMES.indexOf(b.month) - MONTH_NAMES.indexOf(a.month));
+    
+    if (monthsWithData.length > 0) {
+      return { year: monthsWithData[0].year, month: monthsWithData[0].month };
+    }
+    
+    // Ultimate fallback
+    return { year: 2024, month: 'November' };
+  };
+
+  const smartDefaults = getSmartDefaults();
+  const [selectedYear, setSelectedYear] = useState<number | string>(smartDefaults.year);
+  const [selectedMonth, setSelectedMonth] = useState<string>(smartDefaults.month);
+  
+  // Admin generation state
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generationStatus, setGenerationStatus] = useState<string>('');
   const [selectedCountry, setSelectedCountry] = useState<string>("India"); // Default to India
   const [selectedRegion, setSelectedRegion] = useState<string>(ALL_FILTER_VALUE);
   const [selectedLanguage, setSelectedLanguage] = useState<string>(ALL_FILTER_VALUE);
@@ -92,6 +154,47 @@ export const MonthlyMagicScoreboard: React.FC<MonthlyMagicScoreboardProps> = ({ 
         setSelectedLanguage(ALL_FILTER_VALUE);
     }
   }, [selectedCountry, selectedRegion, languages, selectedLanguage]);
+
+  // Admin: Generate new scoreboard
+  const handleGenerateScoreboard = async () => {
+    if (!isAdmin || !currentUser || isGenerating) return;
+
+    setIsGenerating(true);
+    setGenerationStatus('Searching for releases...');
+
+    try {
+      const year = typeof selectedYear === 'number' ? selectedYear : parseInt(selectedYear.toString());
+      
+      const result = await MonthlyScoreboardService.generateMonthlyScoreboard(
+        year,
+        selectedMonth,
+        currentUser.uid,
+        logTokenUsage
+      );
+
+      setGenerationStatus(`✅ Generated ${result.totalItems} entries!`);
+      
+      // Notify parent component to refresh data
+      if (onScoreboardGenerated) {
+        onScoreboardGenerated();
+      }
+      
+      // Clear status after 5 seconds
+      setTimeout(() => {
+        setGenerationStatus('');
+      }, 5000);
+
+    } catch (error) {
+      console.error('Generation failed:', error);
+      setGenerationStatus(`❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      
+      setTimeout(() => {
+        setGenerationStatus('');
+      }, 8000);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
 
 
   const filteredAndRankedData = useMemo(() => {
@@ -180,9 +283,46 @@ export const MonthlyMagicScoreboard: React.FC<MonthlyMagicScoreboardProps> = ({ 
                 Monthly Magic Scoreboard
             </h2>
         </div>
-         <p className="text-slate-300 text-sm text-center md:text-right">
+        <div className="flex flex-col items-center md:items-end space-y-2">
+          <p className="text-slate-300 text-sm text-center md:text-right">
             Top-rated releases, filtered by you.
-        </p>
+          </p>
+          
+          {/* Admin Generate Button */}
+          {isAdmin && (
+            <div className="flex flex-col items-center space-y-1">
+              <button
+                onClick={handleGenerateScoreboard}
+                disabled={isGenerating}
+                className="px-4 py-2 bg-amber-600 hover:bg-amber-700 disabled:bg-slate-600 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors flex items-center space-x-2"
+              >
+                {isGenerating ? (
+                  <>
+                    <LoadingSpinner />
+                    <span>Generating...</span>
+                  </>
+                ) : (
+                  <>
+                    <SparklesIcon className="w-4 h-4" />
+                    <span>Generate {selectedMonth} {selectedYear}</span>
+                  </>
+                )}
+              </button>
+              
+              {generationStatus && (
+                <div className={`text-xs px-2 py-1 rounded ${
+                  generationStatus.includes('❌') 
+                    ? 'bg-red-900/50 text-red-300' 
+                    : generationStatus.includes('✅')
+                    ? 'bg-green-900/50 text-green-300'
+                    : 'bg-blue-900/50 text-blue-300'
+                }`}>
+                  {generationStatus}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Filters Section */}
