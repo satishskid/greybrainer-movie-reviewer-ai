@@ -152,34 +152,36 @@ export const LayerAnalysisCard: React.FC<LayerAnalysisCardProps> = ({ layerData,
               <span className="text-sm font-medium text-amber-300">Scoring</span>
             </div>
             
-            {/* AI Suggested Score */}
-            {layerData.aiSuggestedScore !== undefined && (
-              <div className="flex items-center justify-between p-2 bg-slate-600/50 rounded border border-slate-500/50">
-                <span className="text-sm text-slate-300">🤖 AI Suggested Score:</span>
-                <span className="text-lg font-semibold text-blue-400">{layerData.aiSuggestedScore}/{maxScore}</span>
+            {/* Side-by-side Score Display */}
+            <div className="grid grid-cols-2 gap-3">
+              {/* AI Score */}
+              <div className="flex flex-col items-center p-3 bg-blue-900/30 border border-blue-700/50 rounded-md">
+                <span className="text-xs text-blue-300 mb-1">🤖 AI Suggested</span>
+                <span className="text-2xl font-bold text-blue-400">
+                  {layerData.aiSuggestedScore !== undefined ? layerData.aiSuggestedScore : '—'}
+                </span>
+                <span className="text-xs text-blue-300">/ {maxScore}</span>
               </div>
-            )}
-            
-            {/* User Score Input */}
-            <div className="flex items-center justify-between">
-              <label htmlFor={`score-${layerData.id}`} className="text-sm font-medium text-amber-300">
-                👤 Your Score:
-              </label>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="number"
-                  id={`score-${layerData.id}`}
-                  value={layerData.userScore !== undefined ? layerData.userScore : (layerData.aiSuggestedScore !== undefined ? layerData.aiSuggestedScore : '')}
-                  onChange={handleScoreInputChange}
-                  min="0"
-                  max={maxScore}
-                  step="0.5"
-                  className="w-20 px-2 py-1 bg-slate-600 border border-slate-500 rounded-md focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none text-slate-100 text-sm text-center"
-                  placeholder={`0-${maxScore}`}
-                  disabled={!canInteract}
-                  aria-label={`Score for ${layerData.title} (0-${maxScore})`}
-                />
-                <span className="text-sm text-slate-400">/ {maxScore}</span>
+              
+              {/* User Score */}
+              <div className="flex flex-col items-center p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-md">
+                <span className="text-xs text-yellow-300 mb-1">👤 Your Score</span>
+                <div className="flex flex-col items-center">
+                  <input
+                    type="number"
+                    id={`score-${layerData.id}`}
+                    value={layerData.userScore !== undefined ? layerData.userScore : (layerData.aiSuggestedScore !== undefined ? layerData.aiSuggestedScore : '')}
+                    onChange={handleScoreInputChange}
+                    min="0"
+                    max={maxScore}
+                    step="0.5"
+                    className="w-16 px-1 py-1 bg-yellow-800/50 border border-yellow-600 rounded text-yellow-100 text-2xl font-bold text-center focus:ring-1 focus:ring-yellow-500 focus:border-yellow-500 outline-none"
+                    placeholder="0"
+                    disabled={!canInteract}
+                    aria-label={`Score for ${layerData.title} (0-${maxScore})`}
+                  />
+                  <span className="text-xs text-yellow-300 mt-1">/ {maxScore}</span>
+                </div>
               </div>
             </div>
             
