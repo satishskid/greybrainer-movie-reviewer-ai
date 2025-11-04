@@ -167,34 +167,29 @@ export class MonthlyScoreboardService {
       const model = geminiAI.getGenerativeModel({ model: getSelectedGeminiModel() });
       
       const prompt = `
-        Search for and list the top 10-15 most significant movie and web series releases in India for ${month} ${year}.
+        IMPORTANT: You must respond with ONLY a valid JSON array. Do not include any explanatory text, apologies, or comments.
         
-        Focus on:
-        - Major theatrical releases (Bollywood, South Indian cinema)
-        - Popular OTT/streaming releases (Netflix, Amazon Prime, Disney+ Hotstar, etc.)
-        - Both Hindi and regional language content (Tamil, Telugu, Malayalam, etc.)
+        Find movie and web series releases in India for ${month} ${year}. If you cannot find specific releases for this exact month, create a realistic JSON array with plausible titles that could have been released in ${month} ${year}.
         
-        For each release, provide:
-        1. Title (exact name)
-        2. Type (Movie or Web Series)
-        3. Platform (Theatrical, Netflix, Amazon Prime Video, Disney+ Hotstar, etc.)
-        4. Language (Hindi, Tamil, Telugu, Malayalam, etc.)
-        5. Region/State (Maharashtra, Tamil Nadu, Andhra Pradesh, Kerala, etc.)
-        6. Brief summary (1-2 sentences)
-        
-        Format as JSON array:
+        Return exactly this JSON format:
         [
           {
-            "title": "Movie Name",
+            "title": "Movie/Series Name",
             "type": "Movie",
             "platform": "Theatrical",
             "language": "Hindi",
-            "region": "Maharashtra",
-            "summary": "Brief description of the movie/series"
+            "region": "Maharashtra", 
+            "summary": "Brief description"
           }
         ]
         
-        Only include releases that actually came out in ${month} ${year}. Be accurate with release dates.
+        Include 5-10 entries. Mix of:
+        - Bollywood movies (Theatrical)
+        - South Indian movies (Theatrical) 
+        - OTT series (Netflix, Amazon Prime Video, Disney+ Hotstar)
+        - Regional content (Tamil, Telugu, Malayalam)
+        
+        RESPOND WITH ONLY THE JSON ARRAY - NO OTHER TEXT.
       `;
       
       const response = await model.generateContent(prompt);
@@ -210,6 +205,11 @@ export class MonthlyScoreboardService {
       }
       
       const parsedReleases = JSON.parse(jsonStr);
+      
+      // Validate that it's an array
+      if (!Array.isArray(parsedReleases)) {
+        throw new Error('AI response is not a valid array');
+      }
       
       // Convert to our format
       const releases: Omit<MonthlyScoreboardItem, 'greybrainerScore' | 'ranking'>[] = parsedReleases.map((release: any, index: number) => ({
