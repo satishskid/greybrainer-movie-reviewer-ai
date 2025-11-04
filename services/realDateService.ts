@@ -91,7 +91,8 @@ export class RealDateService {
         source: 'worldtimeapi'
       };
     } catch (error) {
-      console.warn('WorldTimeAPI failed (using fallback):', error.message || error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      console.warn('WorldTimeAPI failed (using fallback):', errorMessage);
       return null;
     }
   }

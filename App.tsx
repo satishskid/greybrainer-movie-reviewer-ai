@@ -401,7 +401,8 @@ const App: React.FC = () => {
           
           <GreybrainerInsights logTokenUsage={logTokenUsage} />
           <GreybrainerComparison logTokenUsage={logTokenUsage} />
-          <MonthlyMagicScoreboard 
+          {/* Monthly Scoreboard temporarily disabled due to network issues */}
+          {/* <MonthlyMagicScoreboard 
             scoreboardData={monthlyScoreboardData} 
             currentUser={authUser}
             isAdmin={AdminService.isAdminSync(authUser)} // Firebase-based admin check
@@ -411,7 +412,7 @@ const App: React.FC = () => {
               // For now, this could trigger a page refresh or data reload
               console.log('New scoreboard generated - consider refreshing data');
             }}
-          />
+          /> */}
 
           {/* Admin Dashboard moved to Settings modal */}
 
