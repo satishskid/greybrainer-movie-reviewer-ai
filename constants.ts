@@ -5,6 +5,7 @@ import { ReviewLayer, LayerAnalysisData, ReviewStage, TokenBudgetConfig, Monthly
 import { BookOpenIcon } from './components/icons/BookOpenIcon';
 import { CameraIcon } from './components/icons/CameraIcon';
 import { UsersIcon } from './components/icons/UsersIcon';
+import { PosterUtils } from './utils/posterUtils';
 
 // Gemini model is now user-configurable via GeminiModelSelector component
 export const MAX_SCORE = 10; // Define a maximum score for layers
@@ -105,7 +106,7 @@ export const MOCK_MONTHLY_SCOREBOARD_DATA: MonthlyScoreboardItem[] = [
     platform: 'Theatrical',
     releaseMonth: 'December 2024',
     greybrainerScore: 9.6,
-    posterUrl: 'https://via.placeholder.com/150x220/8B4513/FFFFFF?text=Pushpa+2',
+    posterUrl: PosterUtils.createMoviePoster('Pushpa 2: The Rule', 'Movie'),
     summary: 'Allu Arjun returns as Pushpa Raj in this highly anticipated sequel that breaks box office records.',
     country: 'India',
     region: 'Andhra Pradesh',
@@ -144,7 +145,7 @@ export const MOCK_MONTHLY_SCOREBOARD_DATA: MonthlyScoreboardItem[] = [
     platform: 'Amazon Prime Video',
     releaseMonth: 'July 2024',
     greybrainerScore: 9.2,
-    posterUrl: 'https://via.placeholder.com/150x220/8B0000/FFFFFF?text=Mirzapur+S3',
+    posterUrl: PosterUtils.createMoviePoster('Mirzapur: Season 3', 'Web Series'),
     summary: 'The brutal saga of power and crime continues in the lawless heartland of Uttar Pradesh.',
     country: 'India',
     region: 'Uttar Pradesh',

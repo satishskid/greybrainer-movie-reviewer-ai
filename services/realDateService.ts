@@ -64,8 +64,20 @@ export class RealDateService {
    */
   private static async getDateFromWorldTimeAPI(): Promise<RealDateInfo | null> {
     try {
-      const response = await fetch('https://worldtimeapi.org/api/timezone/Asia/Kolkata');
-      if (!response.ok) throw new Error('WorldTimeAPI request failed');
+      // Add timeout and better error handling
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+      
+      const response = await fetch('https://worldtimeapi.org/api/timezone/Asia/Kolkata', {
+        signal: controller.signal,
+        headers: {
+          'Accept': 'application/json',
+        }
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) throw new Error(`WorldTimeAPI HTTP ${response.status}`);
       
       const data = await response.json();
       const date = new Date(data.datetime);
@@ -79,7 +91,7 @@ export class RealDateService {
         source: 'worldtimeapi'
       };
     } catch (error) {
-      console.error('WorldTimeAPI error:', error);
+      console.warn('WorldTimeAPI failed (using fallback):', error.message || error);
       return null;
     }
   }

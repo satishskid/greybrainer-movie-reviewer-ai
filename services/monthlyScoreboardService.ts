@@ -6,6 +6,7 @@ import { ReviewStage, ReviewLayer } from '../types';
 import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { PosterUtils } from '../utils/posterUtils';
 
 export interface MonthlyScoreboardCache {
   id: string;
@@ -218,7 +219,7 @@ export class MonthlyScoreboardService {
         type: release.type === 'Web Series' ? 'Web Series' : 'Movie',
         platform: release.platform,
         releaseMonth: `${month} ${year}`,
-        posterUrl: `https://via.placeholder.com/150x220/4A90E2/FFFFFF?text=${encodeURIComponent(release.title.substring(0, 20))}`,
+        posterUrl: PosterUtils.createMoviePoster(release.title, release.type),
         summary: release.summary,
         country: 'India',
         region: release.region || 'India',
@@ -238,7 +239,7 @@ export class MonthlyScoreboardService {
           type: 'Movie',
           platform: 'Theatrical',
           releaseMonth: `${month} ${year}`,
-          posterUrl: 'https://via.placeholder.com/150x220/FF6B6B/FFFFFF?text=Fallback',
+          posterUrl: PosterUtils.createMoviePoster('Fallback Movie', 'Movie'),
           summary: 'Fallback entry when search fails',
           country: 'India',
           region: 'Maharashtra',
