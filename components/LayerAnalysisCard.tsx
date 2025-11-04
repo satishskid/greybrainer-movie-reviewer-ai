@@ -153,7 +153,7 @@ export const LayerAnalysisCard: React.FC<LayerAnalysisCardProps> = ({ layerData,
             </div>
             
             {/* AI Suggested Score */}
-            {layerData.aiSuggestedScore && (
+            {layerData.aiSuggestedScore !== undefined && (
               <div className="flex items-center justify-between p-2 bg-slate-600/50 rounded border border-slate-500/50">
                 <span className="text-sm text-slate-300">🤖 AI Suggested Score:</span>
                 <span className="text-lg font-semibold text-blue-400">{layerData.aiSuggestedScore}/{maxScore}</span>
@@ -169,7 +169,7 @@ export const LayerAnalysisCard: React.FC<LayerAnalysisCardProps> = ({ layerData,
                 <input
                   type="number"
                   id={`score-${layerData.id}`}
-                  value={layerData.userScore !== undefined ? layerData.userScore : (layerData.aiSuggestedScore || '')}
+                  value={layerData.userScore !== undefined ? layerData.userScore : (layerData.aiSuggestedScore !== undefined ? layerData.aiSuggestedScore : '')}
                   onChange={handleScoreInputChange}
                   min="0"
                   max={maxScore}
@@ -183,7 +183,7 @@ export const LayerAnalysisCard: React.FC<LayerAnalysisCardProps> = ({ layerData,
               </div>
             </div>
             
-            {layerData.aiSuggestedScore && !layerData.userScore && (
+            {layerData.aiSuggestedScore !== undefined && layerData.userScore === undefined && (
               <p className="text-xs text-slate-400 italic">💡 Tip: AI suggested {layerData.aiSuggestedScore}/{maxScore}. You can use this or enter your own score.</p>
             )}
           </div>

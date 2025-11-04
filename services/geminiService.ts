@@ -193,6 +193,9 @@ const generatePromptForLayer = (
 
   return `
     You are an expert film and television critic using the "Greybrainer" methodology.
+    
+    IMPORTANT: Analyze ONLY the content provided for "${movieTitle}" (${reviewStage}). Do NOT make assumptions about whether this movie/series exists, has been released, or is announced. Focus ONLY on analyzing the creative content as presented to you.
+    
     Analyze "${movieTitle}" (${reviewStage}) focusing on "${layerTitle}" (${layerDescription}).
     ${context}
     ${searchInstructions} 
