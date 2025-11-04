@@ -11,7 +11,8 @@ import { LanguageIcon } from './icons/LanguageIcon';
 import { CalendarIcon } from './icons/CalendarIcon';
 import { MonthlyScoreboardService } from '../services/monthlyScoreboardService';
 import { LoadingSpinner } from './LoadingSpinner';
-import { SparklesIcon } from './icons/SparklesIcon'; 
+import { SparklesIcon } from './icons/SparklesIcon';
+import { RealDateService, RealDateInfo } from '../services/realDateService'; 
 
 const ALL_FILTER_VALUE = "All";
 const MONTH_NAMES = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
@@ -35,53 +36,64 @@ export const MonthlyMagicScoreboard: React.FC<MonthlyMagicScoreboardProps> = ({
   const currentYear = new Date().getFullYear();
   const currentMonthIndex = new Date().getMonth(); // 0-11
 
-  // Smart defaults: Find the most recent month with data, or fall back to current/previous month
-  const getSmartDefaults = () => {
-    const currentDate = new Date();
-    const currentYear = currentDate.getFullYear();
-    const currentMonthIndex = currentDate.getMonth();
-    
+  // State for real date
+  const [realDate, setRealDate] = useState<RealDateInfo | null>(null);
+  const [isLoadingDate, setIsLoadingDate] = useState(true);
+
+  // Load real current date on component mount
+  useEffect(() => {
+    const loadRealDate = async () => {
+      try {
+        const currentRealDate = await RealDateService.getCurrentDate();
+        setRealDate(currentRealDate);
+        
+        // Set smart defaults based on real date
+        const smartDefaults = getSmartDefaults(currentRealDate);
+        setSelectedYear(smartDefaults.year);
+        setSelectedMonth(smartDefaults.month);
+      } catch (error) {
+        console.error('Failed to load real date:', error);
+        // Fallback to system date
+        const fallbackDate = new Date();
+        setSelectedYear(fallbackDate.getFullYear());
+        setSelectedMonth(MONTH_NAMES[fallbackDate.getMonth()]);
+      } finally {
+        setIsLoadingDate(false);
+      }
+    };
+
+    loadRealDate();
+  }, []);
+
+  // Smart defaults based on real date
+  const getSmartDefaults = (currentRealDate: RealDateInfo) => {
     // Check if current month has data
-    const currentMonthName = MONTH_NAMES[currentMonthIndex];
     const hasCurrentMonthData = scoreboardData.some(item => 
-      item.releaseMonth.includes(currentMonthName) && item.releaseMonth.includes(currentYear.toString())
+      item.releaseMonth.includes(currentRealDate.month) && 
+      item.releaseMonth.includes(currentRealDate.year.toString())
     );
     
     if (hasCurrentMonthData) {
-      return { year: currentYear, month: currentMonthName };
+      return { year: currentRealDate.year, month: currentRealDate.month };
     }
     
     // Check previous month
-    const prevMonthIndex = currentMonthIndex === 0 ? 11 : currentMonthIndex - 1;
-    const prevYear = currentMonthIndex === 0 ? currentYear - 1 : currentYear;
-    const prevMonthName = MONTH_NAMES[prevMonthIndex];
+    const prevMonth = RealDateService.getPreviousMonth(currentRealDate);
     const hasPrevMonthData = scoreboardData.some(item => 
-      item.releaseMonth.includes(prevMonthName) && item.releaseMonth.includes(prevYear.toString())
+      item.releaseMonth.includes(prevMonth.month) && 
+      item.releaseMonth.includes(prevMonth.year.toString())
     );
     
     if (hasPrevMonthData) {
-      return { year: prevYear, month: prevMonthName };
+      return { year: prevMonth.year, month: prevMonth.month };
     }
     
-    // Fallback: Find the most recent month with any data
-    const monthsWithData = scoreboardData
-      .map(item => {
-        const parts = item.releaseMonth.split(' ');
-        return { month: parts[0], year: parseInt(parts[1]) };
-      })
-      .sort((a, b) => b.year - a.year || MONTH_NAMES.indexOf(b.month) - MONTH_NAMES.indexOf(a.month));
-    
-    if (monthsWithData.length > 0) {
-      return { year: monthsWithData[0].year, month: monthsWithData[0].month };
-    }
-    
-    // Ultimate fallback
-    return { year: 2024, month: 'November' };
+    // Default to current month (admin can generate if needed)
+    return { year: currentRealDate.year, month: currentRealDate.month };
   };
 
-  const smartDefaults = getSmartDefaults();
-  const [selectedYear, setSelectedYear] = useState<number | string>(smartDefaults.year);
-  const [selectedMonth, setSelectedMonth] = useState<string>(smartDefaults.month);
+  const [selectedYear, setSelectedYear] = useState<number | string>(2025); // Temporary default
+  const [selectedMonth, setSelectedMonth] = useState<string>('November'); // Temporary default
   
   // Admin generation state
   const [isGenerating, setIsGenerating] = useState(false);
@@ -95,7 +107,12 @@ export const MonthlyMagicScoreboard: React.FC<MonthlyMagicScoreboardProps> = ({
       const yearPart = item.releaseMonth.split(' ')[1];
       return yearPart ? parseInt(yearPart) : null;
     }).filter(year => year !== null) as number[]);
-    yearsFromData.add(currentYear); // Ensure current year is always an option
+    
+    // Add current real year and nearby years
+    const currentRealYear = realDate?.year || 2025;
+    yearsFromData.add(currentRealYear);
+    yearsFromData.add(currentRealYear - 1); // Previous year
+    yearsFromData.add(currentRealYear + 1); // Next year (for future planning)
     return Array.from(yearsFromData).sort((a, b) => b - a); // Sort descending
   }, [scoreboardData, currentYear]);
 
@@ -274,6 +291,18 @@ export const MonthlyMagicScoreboard: React.FC<MonthlyMagicScoreboardProps> = ({
     </div>
   );
 
+  // Show loading while fetching real date
+  if (isLoadingDate) {
+    return (
+      <div className="mt-12 p-6 bg-slate-800/70 rounded-xl shadow-2xl border border-slate-700">
+        <div className="flex items-center justify-center py-8">
+          <LoadingSpinner />
+          <span className="ml-3 text-slate-300">Loading current date information...</span>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="mt-12 p-6 bg-slate-800/70 rounded-xl shadow-2xl border border-slate-700">
       <div className="flex flex-col md:flex-row items-center justify-between mb-4">
@@ -284,9 +313,19 @@ export const MonthlyMagicScoreboard: React.FC<MonthlyMagicScoreboardProps> = ({
             </h2>
         </div>
         <div className="flex flex-col items-center md:items-end space-y-2">
-          <p className="text-slate-300 text-sm text-center md:text-right">
-            Top-rated releases, filtered by you.
-          </p>
+          <div className="text-center md:text-right">
+            <p className="text-slate-300 text-sm">
+              Top-rated releases, filtered by you.
+            </p>
+            {realDate && (
+              <p className="text-slate-400 text-xs mt-1">
+                📅 Current: {realDate.month} {realDate.year} 
+                {realDate.source !== 'system_fallback' && (
+                  <span className="ml-1 text-green-400">✓</span>
+                )}
+              </p>
+            )}
+          </div>
           
           {/* Admin Generate Button */}
           {isAdmin && (
