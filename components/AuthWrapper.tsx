@@ -188,12 +188,12 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
           <div className="flex items-center space-x-3">
             <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
               <span className="text-white text-sm font-medium">
-                {user.name?.charAt(0).toUpperCase()}
+                {(user.displayName || user.email)?.charAt(0).toUpperCase()}
               </span>
             </div>
             <div className="flex flex-col">
               <span className="text-slate-300 text-sm font-medium">
-                {user.name}
+                {user.displayName || user.email?.split('@')[0]}
               </span>
               <span className="text-slate-400 text-xs">
                 {user.role} • {user.department}

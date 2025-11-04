@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Firebase Users List - Greybrainer</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: #e2e8f0;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            color: #60a5fa;
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5rem;
+        }
+        h2 {
+            color: #34d399;
+            border-bottom: 2px solid #34d399;
+            padding-bottom: 10px;
+            margin-top: 40px;
+        }
+        .user-card {
+            background: rgba(51, 65, 85, 0.6);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 15px 0;
+            border-left: 4px solid #60a5fa;
+        }
+        .user-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .user-email {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: #60a5fa;
+        }
+        .user-role {
+            background: #059669;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            text-transform: uppercase;
+        }
+        .user-role.admin {
+            background: #dc2626;
+        }
+        .user-role.editor {
+            background: #d97706;
+        }
+        .user-role.analyst {
+            background: #059669;
+        }
+        .user-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 15px;
+        }
+        .detail-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #94a3b8;
+            min-width: 100px;
+        }
+        .detail-value {
+            color: #e2e8f0;
+        }
+        .status-active {
+            color: #34d399;
+            font-weight: bold;
+        }
+        .status-inactive {
+            color: #f87171;
+            font-weight: bold;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            font-size: 1.2rem;
+            color: #60a5fa;
+        }
+        .error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            color: #fecaca;
+        }
+        .summary {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid #22c55e;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            text-align: center;
+        }
+        .refresh-btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 20px auto;
+            display: block;
+            transition: background 0.3s;
+        }
+        .refresh-btn:hover {
+            background: #2563eb;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: #94a3b8;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Firebase Users Dashboard</h1>
+        
+        <button class="refresh-btn" onclick="loadAllUsers()">🔄 Refresh Data</button>
+        
+        <div id="loading" class="loading">
+            Loading Firebase data...
+        </div>
+        
+        <div id="error" class="error" style="display: none;"></div>
+        
+        <div id="summary" class="summary" style="display: none;"></div>
+        
+        <div id="users-section" style="display: none;">
+            <h2>👥 Registered Users</h2>
+            <div id="users-list"></div>
+        </div>
+        
+        <div id="whitelist-section" style="display: none;">
+            <h2>📋 Whitelisted Users</h2>
+            <div id="whitelist-list"></div>
+        </div>
+        
+        <div id="subscribers-section" style="display: none;">
+            <h2>📧 Subscribers</h2>
+            <div id="subscribers-list"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDdWuwH2BAz9nSWVLXyC2uE8qoxl5QU3lY",
+            authDomain: "greybrainer.firebaseapp.com",
+            projectId: "greybrainer",
+            storageBucket: "greybrainer.firebasestorage.app",
+            messagingSenderId: "334602682761",
+            appId: "1:334602682761:web:a8cc82bd81a753a3392158",
+            measurementId: "G-BQ36BCQTTX"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Global function to load all users
+        window.loadAllUsers = async function() {
+            const loading = document.getElementById('loading');
+            const error = document.getElementById('error');
+            const summary = document.getElementById('summary');
+            
+            loading.style.display = 'block';
+            error.style.display = 'none';
+            summary.style.display = 'none';
+            
+            try {
+                let totalUsers = 0;
+                let totalWhitelisted = 0;
+                let totalSubscribers = 0;
+                
+                // Load users
+                const users = await loadUsers();
+                totalUsers = users.length;
+                
+                // Load whitelist
+                const whitelist = await loadWhitelist();
+                totalWhitelisted = whitelist.length;
+                
+                // Load subscribers
+                const subscribers = await loadSubscribers();
+                totalSubscribers = subscribers.length;
+                
+                // Show summary
+                summary.innerHTML = `
+                    <h3>📊 Summary</h3>
+                    <p><strong>Registered Users:</strong> ${totalUsers}</p>
+                    <p><strong>Whitelisted Users:</strong> ${totalWhitelisted}</p>
+                    <p><strong>Subscribers:</strong> ${totalSubscribers}</p>
+                    <p><strong>Last Updated:</strong> ${new Date().toLocaleString()}</p>
+                `;
+                summary.style.display = 'block';
+                
+            } catch (err) {
+                console.error('Error loading data:', err);
+                error.textContent = `Error loading data: ${err.message}`;
+                error.style.display = 'block';
+            } finally {
+                loading.style.display = 'none';
+            }
+        };
+
+        async function loadUsers() {
+            try {
+                const usersCollection = collection(db, 'users');
+                const usersSnapshot = await getDocs(usersCollection);
+                
+                const usersList = document.getElementById('users-list');
+                const usersSection = document.getElementById('users-section');
+                
+                if (usersSnapshot.empty) {
+                    usersList.innerHTML = '<div class="empty-state">No registered users found</div>';
+                } else {
+                    const users = [];
+                    usersSnapshot.forEach((doc) => {
+                        users.push({ id: doc.id, ...doc.data() });
+                    });
+                    
+                    usersList.innerHTML = users.map(user => createUserCard(user, 'user')).join('');
+                    usersSection.style.display = 'block';
+                    return users;
+                }
+                
+                usersSection.style.display = 'block';
+                return [];
+            } catch (err) {
+                console.error('Error loading users:', err);
+                throw err;
+            }
+        }
+
+        async function loadWhitelist() {
+            try {
+                const whitelistCollection = collection(db, 'whitelist');
+                const whitelistSnapshot = await getDocs(whitelistCollection);
+                
+                const whitelistList = document.getElementById('whitelist-list');
+                const whitelistSection = document.getElementById('whitelist-section');
+                
+                if (whitelistSnapshot.empty) {
+                    whitelistList.innerHTML = '<div class="empty-state">No whitelisted users found</div>';
+                } else {
+                    const whitelist = [];
+                    whitelistSnapshot.forEach((doc) => {
+                        whitelist.push({ id: doc.id, ...doc.data() });
+                    });
+                    
+                    whitelistList.innerHTML = whitelist.map(user => createUserCard(user, 'whitelist')).join('');
+                    whitelistSection.style.display = 'block';
+                    return whitelist;
+                }
+                
+                whitelistSection.style.display = 'block';
+                return [];
+            } catch (err) {
+                console.error('Error loading whitelist:', err);
+                throw err;
+            }
+        }
+
+        async function loadSubscribers() {
+            try {
+                const subscribersCollection = collection(db, 'subscribers');
+                const subscribersSnapshot = await getDocs(subscribersCollection);
+                
+                const subscribersList = document.getElementById('subscribers-list');
+                const subscribersSection = document.getElementById('subscribers-section');
+                
+                if (subscribersSnapshot.empty) {
+                    subscribersList.innerHTML = '<div class="empty-state">No subscribers found</div>';
+                } else {
+                    const subscribers = [];
+                    subscribersSnapshot.forEach((doc) => {
+                        subscribers.push({ id: doc.id, ...doc.data() });
+                    });
+                    
+                    subscribersList.innerHTML = subscribers.map(user => createUserCard(user, 'subscriber')).join('');
+                    subscribersSection.style.display = 'block';
+                    return subscribers;
+                }
+                
+                subscribersSection.style.display = 'block';
+                return [];
+            } catch (err) {
+                console.error('Error loading subscribers:', err);
+                throw err;
+            }
+        }
+
+        function createUserCard(user, type) {
+            const formatDate = (timestamp) => {
+                if (!timestamp) return 'N/A';
+                if (timestamp.seconds) {
+                    return new Date(timestamp.seconds * 1000).toLocaleString();
+                }
+                if (timestamp.toDate) {
+                    return timestamp.toDate().toLocaleString();
+                }
+                return new Date(timestamp).toLocaleString();
+            };
+
+            const email = user.email || user.id;
+            const role = user.role || 'N/A';
+            const isActive = user.isActive !== false;
+            
+            let details = '';
+            
+            if (type === 'user') {
+                details = `
+                    <div class="detail-item">
+                        <span class="detail-label">👤 Name:</span>
+                        <span class="detail-value">${user.displayName || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">🏢 Department:</span>
+                        <span class="detail-value">${user.department || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">📅 Created:</span>
+                        <span class="detail-value">${formatDate(user.createdAt)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">🕐 Last Login:</span>
+                        <span class="detail-value">${formatDate(user.lastLogin)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">🔑 Permissions:</span>
+                        <span class="detail-value">${user.permissions ? user.permissions.join(', ') : 'N/A'}</span>
+                    </div>
+                `;
+            } else if (type === 'whitelist') {
+                details = `
+                    <div class="detail-item">
+                        <span class="detail-label">👤 Name:</span>
+                        <span class="detail-value">${user.name || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">🏢 Department:</span>
+                        <span class="detail-value">${user.department || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">👨‍💼 Added By:</span>
+                        <span class="detail-value">${user.addedBy || 'N/A'}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">📅 Added At:</span>
+                        <span class="detail-value">${formatDate(user.addedAt)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">📊 Status:</span>
+                        <span class="detail-value">${user.status || 'N/A'}</span>
+                    </div>
+                `;
+            } else if (type === 'subscriber') {
+                details = `
+                    <div class="detail-item">
+                        <span class="detail-label">📧 Verified:</span>
+                        <span class="detail-value ${user.emailVerified ? 'status-active' : 'status-inactive'}">
+                            ${user.emailVerified ? 'Yes' : 'No'}
+                        </span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">📅 Subscribed:</span>
+                        <span class="detail-value">${formatDate(user.subscribedAt)}</span>
+                    </div>
+                    <div class="detail-item">
+                        <span class="detail-label">🎯 Preferences:</span>
+                        <span class="detail-value">${user.preferences ? user.preferences.join(', ') : 'N/A'}</span>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="user-card">
+                    <div class="user-header">
+                        <div class="user-email">${email}</div>
+                        <div class="user-role ${role.toLowerCase()}">${role}</div>
+                    </div>
+                    <div class="user-details">
+                        <div class="detail-item">
+                            <span class="detail-label">✅ Active:</span>
+                            <span class="detail-value ${isActive ? 'status-active' : 'status-inactive'}">
+                                ${isActive ? 'Yes' : 'No'}
+                            </span>
+                        </div>
+                        ${details}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Load data on page load
+        window.addEventListener('load', loadAllUsers);
+    </script>
+</body>
+</html>

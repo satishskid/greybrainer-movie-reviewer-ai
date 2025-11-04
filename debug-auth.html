@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Auth Debug - Greybrainer</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: #e2e8f0;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            color: #60a5fa;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .debug-section {
+            background: rgba(51, 65, 85, 0.6);
+            border-radius: 8px;
+            padding: 20px;
+            margin: 20px 0;
+            border-left: 4px solid #60a5fa;
+        }
+        .debug-title {
+            color: #34d399;
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+        .debug-content {
+            font-family: 'Courier New', monospace;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            overflow-x: auto;
+        }
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 10px 5px;
+            transition: background 0.3s;
+        }
+        .btn:hover {
+            background: #2563eb;
+        }
+        .btn.danger {
+            background: #dc2626;
+        }
+        .btn.danger:hover {
+            background: #b91c1c;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 6px;
+            margin: 10px 0;
+        }
+        .status.success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid #22c55e;
+            color: #86efac;
+        }
+        .status.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+        }
+        .status.warning {
+            background: rgba(245, 158, 11, 0.2);
+            border: 1px solid #f59e0b;
+            color: #fcd34d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Authentication Debug Tool</h1>
+        
+        <div class="debug-section">
+            <div class="debug-title">🔐 Authentication Status</div>
+            <div id="auth-status" class="status warning">Checking authentication...</div>
+            <button class="btn" onclick="signInWithGoogle()">🔑 Sign In with Google</button>
+            <button class="btn danger" onclick="signOut()">🚪 Sign Out</button>
+        </div>
+        
+        <div class="debug-section">
+            <div class="debug-title">👤 Current User Info</div>
+            <div id="user-info" class="debug-content">No user data available</div>
+        </div>
+        
+        <div class="debug-section">
+            <div class="debug-title">📋 Whitelist Check</div>
+            <div id="whitelist-status" class="debug-content">Not checked</div>
+            <button class="btn" onclick="checkWhitelist()">🔍 Check Whitelist Status</button>
+        </div>
+        
+        <div class="debug-section">
+            <div class="debug-title">🔧 Debug Actions</div>
+            <button class="btn" onclick="initializeUser()">🚀 Initialize User in Database</button>
+            <button class="btn" onclick="checkFirestoreRules()">📜 Test Firestore Access</button>
+            <button class="btn" onclick="refreshData()">🔄 Refresh All Data</button>
+        </div>
+        
+        <div class="debug-section">
+            <div class="debug-title">📊 Debug Log</div>
+            <div id="debug-log" class="debug-content">Debug log will appear here...</div>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut as firebaseSignOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+        import { getFirestore, doc, getDoc, setDoc, collection, getDocs } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDdWuwH2BAz9nSWVLXyC2uE8qoxl5QU3lY",
+            authDomain: "greybrainer.firebaseapp.com",
+            projectId: "greybrainer",
+            storageBucket: "greybrainer.firebasestorage.app",
+            messagingSenderId: "334602682761",
+            appId: "1:334602682761:web:a8cc82bd81a753a3392158",
+            measurementId: "G-BQ36BCQTTX"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const googleProvider = new GoogleAuthProvider();
+
+        // Admin and Editor emails
+        const ADMIN_EMAILS = [
+            'satish@skids.health',
+            'satish.rath@gmail.com',
+            'dr.satish@greybrain.ai'
+        ];
+
+        const EDITOR_EMAILS = [
+            'drpratichi@skids.health',
+            'saminamisra@gmail.com'
+        ];
+
+        let currentUser = null;
+
+        // Debug logging
+        function debugLog(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.getElementById('debug-log');
+            const colorMap = {
+                info: '#60a5fa',
+                success: '#34d399',
+                error: '#f87171',
+                warning: '#fbbf24'
+            };
+            
+            logElement.innerHTML += `<span style="color: ${colorMap[type]}">[${timestamp}] ${message}</span>\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        // Update auth status display
+        function updateAuthStatus(user) {
+            const statusElement = document.getElementById('auth-status');
+            const userInfoElement = document.getElementById('user-info');
+            
+            if (user) {
+                statusElement.className = 'status success';
+                statusElement.textContent = `✅ Authenticated as ${user.email}`;
+                
+                userInfoElement.textContent = JSON.stringify({
+                    uid: user.uid,
+                    email: user.email,
+                    displayName: user.displayName,
+                    emailVerified: user.emailVerified,
+                    photoURL: user.photoURL
+                }, null, 2);
+                
+                debugLog(`User authenticated: ${user.email}`, 'success');
+            } else {
+                statusElement.className = 'status error';
+                statusElement.textContent = '❌ Not authenticated';
+                userInfoElement.textContent = 'No user data available';
+                debugLog('User signed out', 'warning');
+            }
+        }
+
+        // Sign in with Google
+        window.signInWithGoogle = async function() {
+            try {
+                debugLog('Attempting Google sign-in...', 'info');
+                const result = await signInWithPopup(auth, googleProvider);
+                const user = result.user;
+                
+                debugLog(`Google sign-in successful: ${user.email}`, 'success');
+                
+                // Check whitelist immediately after sign-in
+                const isWhitelisted = await checkUserWhitelist(user.email);
+                if (!isWhitelisted) {
+                    debugLog(`User ${user.email} is not whitelisted - signing out`, 'error');
+                    await firebaseSignOut(auth);
+                    throw new Error('Access denied. Please contact administrator for access.');
+                }
+                
+                debugLog(`User ${user.email} is whitelisted - access granted`, 'success');
+                
+            } catch (error) {
+                debugLog(`Sign-in error: ${error.message}`, 'error');
+                alert(`Sign-in failed: ${error.message}`);
+            }
+        };
+
+        // Sign out
+        window.signOut = async function() {
+            try {
+                await firebaseSignOut(auth);
+                debugLog('Sign-out successful', 'success');
+            } catch (error) {
+                debugLog(`Sign-out error: ${error.message}`, 'error');
+            }
+        };
+
+        // Check whitelist status
+        async function checkUserWhitelist(email) {
+            try {
+                debugLog(`Checking whitelist for: ${email}`, 'info');
+                
+                // Check database whitelist first
+                const userDoc = await getDoc(doc(db, 'whitelist', email));
+                
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    debugLog(`Found in whitelist database: ${JSON.stringify(userData)}`, 'info');
+                    
+                    if (userData.isActive === true) {
+                        debugLog(`User ${email} is active in whitelist`, 'success');
+                        return true;
+                    } else {
+                        debugLog(`User ${email} is in whitelist but not active`, 'warning');
+                        return false;
+                    }
+                } else {
+                    debugLog(`User ${email} not found in whitelist database`, 'warning');
+                }
+                
+                // Check if user is admin/editor and should be auto-initialized
+                if (ADMIN_EMAILS.includes(email) || EDITOR_EMAILS.includes(email)) {
+                    debugLog(`User ${email} is admin/editor - initializing...`, 'info');
+                    await initializeAdminUser(email);
+                    return true;
+                }
+                
+                debugLog(`User ${email} is not whitelisted`, 'error');
+                return false;
+                
+            } catch (error) {
+                debugLog(`Whitelist check error: ${error.message}`, 'error');
+                return false;
+            }
+        }
+
+        // Initialize admin user
+        async function initializeAdminUser(email) {
+            try {
+                const role = ADMIN_EMAILS.includes(email) ? 'admin' : 'editor';
+                const department = email.includes('greybrain') ? 'AI Research' : 
+                                 email.includes('skids') ? 'Film Analysis' : 'Editorial';
+                
+                const userData = {
+                    email,
+                    role,
+                    isActive: true,
+                    addedBy: 'system',
+                    addedAt: new Date(),
+                    department,
+                    name: email.split('@')[0],
+                    status: 'active'
+                };
+                
+                await setDoc(doc(db, 'whitelist', email), userData);
+                debugLog(`Initialized ${role} user: ${email}`, 'success');
+                
+            } catch (error) {
+                debugLog(`Failed to initialize admin user: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        // Check whitelist button handler
+        window.checkWhitelist = async function() {
+            if (!currentUser) {
+                alert('Please sign in first');
+                return;
+            }
+            
+            const whitelistElement = document.getElementById('whitelist-status');
+            whitelistElement.textContent = 'Checking...';
+            
+            try {
+                const isWhitelisted = await checkUserWhitelist(currentUser.email);
+                whitelistElement.textContent = `Whitelist Status: ${isWhitelisted ? '✅ ALLOWED' : '❌ DENIED'}`;
+            } catch (error) {
+                whitelistElement.textContent = `Error: ${error.message}`;
+            }
+        };
+
+        // Initialize user button handler
+        window.initializeUser = async function() {
+            if (!currentUser) {
+                alert('Please sign in first');
+                return;
+            }
+            
+            try {
+                await initializeAdminUser(currentUser.email);
+                alert('User initialized successfully!');
+                await checkWhitelist();
+            } catch (error) {
+                alert(`Initialization failed: ${error.message}`);
+            }
+        };
+
+        // Test Firestore access
+        window.checkFirestoreRules = async function() {
+            if (!currentUser) {
+                alert('Please sign in first');
+                return;
+            }
+            
+            try {
+                debugLog('Testing Firestore access...', 'info');
+                
+                // Test whitelist read
+                const whitelistDoc = await getDoc(doc(db, 'whitelist', currentUser.email));
+                debugLog(`Whitelist read: ${whitelistDoc.exists() ? 'SUCCESS' : 'NOT FOUND'}`, 
+                        whitelistDoc.exists() ? 'success' : 'warning');
+                
+                // Test users collection read
+                const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
+                debugLog(`Users read: ${userDoc.exists() ? 'SUCCESS' : 'NOT FOUND'}`, 
+                        userDoc.exists() ? 'success' : 'warning');
+                
+                debugLog('Firestore access test completed', 'success');
+                
+            } catch (error) {
+                debugLog(`Firestore access error: ${error.message}`, 'error');
+            }
+        };
+
+        // Refresh all data
+        window.refreshData = function() {
+            location.reload();
+        };
+
+        // Listen to auth state changes
+        onAuthStateChanged(auth, (user) => {
+            currentUser = user;
+            updateAuthStatus(user);
+            
+            if (user) {
+                checkWhitelist();
+            } else {
+                document.getElementById('whitelist-status').textContent = 'Not checked - please sign in';
+            }
+        });
+
+        // Initialize debug log
+        debugLog('Auth Debug Tool initialized', 'success');
+        debugLog('Ready to test authentication flow', 'info');
+    </script>
+</body>
+</html>

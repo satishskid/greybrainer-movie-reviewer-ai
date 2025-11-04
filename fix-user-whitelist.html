@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix User Whitelist - Greybrainer</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+            color: #e2e8f0;
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: rgba(30, 41, 59, 0.8);
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            color: #60a5fa;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .btn {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 1rem;
+            margin: 10px 5px;
+            transition: background 0.3s;
+            width: 100%;
+        }
+        .btn:hover {
+            background: #2563eb;
+        }
+        .btn.success {
+            background: #059669;
+        }
+        .btn.success:hover {
+            background: #047857;
+        }
+        .status {
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+            text-align: center;
+        }
+        .status.success {
+            background: rgba(34, 197, 94, 0.2);
+            border: 1px solid #22c55e;
+            color: #86efac;
+        }
+        .status.error {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+        }
+        .status.info {
+            background: rgba(59, 130, 246, 0.2);
+            border: 1px solid #3b82f6;
+            color: #93c5fd;
+        }
+        .log {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            max-height: 300px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Fix User Whitelist</h1>
+        
+        <div class="status info">
+            <strong>This tool will:</strong><br>
+            1. Initialize all admin and editor users in the whitelist<br>
+            2. Ensure proper permissions are set<br>
+            3. Fix any authentication issues
+        </div>
+        
+        <button class="btn" onclick="fixWhitelist()">🚀 Fix Whitelist & Initialize Users</button>
+        
+        <div id="status" style="display: none;"></div>
+        <div id="log" class="log" style="display: none;"></div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getFirestore, doc, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js';
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyDdWuwH2BAz9nSWVLXyC2uE8qoxl5QU3lY",
+            authDomain: "greybrainer.firebaseapp.com",
+            projectId: "greybrainer",
+            storageBucket: "greybrainer.firebasestorage.app",
+            messagingSenderId: "334602682761",
+            appId: "1:334602682761:web:a8cc82bd81a753a3392158",
+            measurementId: "G-BQ36BCQTTX"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Admin and Editor emails
+        const ADMIN_EMAILS = [
+            'satish@skids.health',
+            'satish.rath@gmail.com',
+            'dr.satish@greybrain.ai'
+        ];
+
+        const EDITOR_EMAILS = [
+            'drpratichi@skids.health',
+            'saminamisra@gmail.com'
+        ];
+
+        function log(message, type = 'info') {
+            const logElement = document.getElementById('log');
+            logElement.style.display = 'block';
+            
+            const timestamp = new Date().toLocaleTimeString();
+            const colors = {
+                info: '#60a5fa',
+                success: '#34d399',
+                error: '#f87171',
+                warning: '#fbbf24'
+            };
+            
+            logElement.innerHTML += `<span style="color: ${colors[type]}">[${timestamp}] ${message}</span>\n`;
+            logElement.scrollTop = logElement.scrollHeight;
+        }
+
+        function showStatus(message, type) {
+            const statusElement = document.getElementById('status');
+            statusElement.style.display = 'block';
+            statusElement.className = `status ${type}`;
+            statusElement.innerHTML = message;
+        }
+
+        window.fixWhitelist = async function() {
+            try {
+                showStatus('🔄 Fixing whitelist...', 'info');
+                log('Starting whitelist fix process', 'info');
+                
+                // Initialize all admin users
+                for (const email of ADMIN_EMAILS) {
+                    await initializeUser(email, 'admin');
+                }
+                
+                // Initialize all editor users
+                for (const email of EDITOR_EMAILS) {
+                    await initializeUser(email, 'editor');
+                }
+                
+                // Mark system as initialized
+                await setDoc(doc(db, 'system', 'initialized'), {
+                    initializedAt: new Date(),
+                    version: '1.0.0',
+                    initializedBy: 'whitelist-fix-tool'
+                });
+                
+                log('System marked as initialized', 'success');
+                
+                showStatus('✅ Whitelist fix completed successfully!<br>All users should now be able to log in.', 'success');
+                
+            } catch (error) {
+                log(`Error: ${error.message}`, 'error');
+                showStatus(`❌ Fix failed: ${error.message}`, 'error');
+            }
+        };
+
+        async function initializeUser(email, role) {
+            try {
+                log(`Initializing ${role}: ${email}`, 'info');
+                
+                // Check if user already exists
+                const existingDoc = await getDoc(doc(db, 'whitelist', email));
+                if (existingDoc.exists() && existingDoc.data().isActive) {
+                    log(`User ${email} already exists and is active`, 'warning');
+                    return;
+                }
+                
+                const department = email.includes('greybrain') ? 'AI Research' : 
+                                 email.includes('skids') ? 'Film Analysis' : 'Editorial';
+                
+                const userData = {
+                    email,
+                    role,
+                    isActive: true,
+                    addedBy: 'system',
+                    addedAt: new Date(),
+                    department,
+                    name: email.split('@')[0],
+                    status: 'active'
+                };
+                
+                await setDoc(doc(db, 'whitelist', email), userData);
+                log(`✅ Successfully initialized ${role}: ${email}`, 'success');
+                
+            } catch (error) {
+                log(`❌ Failed to initialize ${email}: ${error.message}`, 'error');
+                throw error;
+            }
+        }
+
+        log('Whitelist fix tool ready', 'success');
+    </script>
+</body>
+</html>
