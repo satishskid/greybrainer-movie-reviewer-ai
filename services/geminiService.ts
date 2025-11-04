@@ -981,7 +981,8 @@ export const analyzeLayerWithGemini = async (
     const scoreRegex = new RegExp(`Suggested Score:\\s*\\d*\\.?\\d+\\s*/\\s*${MAX_SCORE}`, "i");
     cleanedAnalysisText = cleanedAnalysisText.replace(scoreRegex, '').trim();
     
-    cleanedAnalysisText = cleanedAnalysisText.replace(/Potential Enhancements:[\s\S]*/i, '').trim();
+    // More precise removal of Potential Enhancements section
+    cleanedAnalysisText = cleanedAnalysisText.replace(/Potential Enhancements:[\s\S]*?(?=\n\n|\n---|\n\*\*|$)/i, '').trim();
     cleanedAnalysisText = cleanedAnalysisText.replace(/\n\s*\n/g, '\n').trim();
 
     return {

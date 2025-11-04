@@ -152,21 +152,20 @@ export const LayerAnalysisCard: React.FC<LayerAnalysisCardProps> = ({ layerData,
               <span className="text-sm font-medium text-amber-300">Scoring</span>
             </div>
             
-            {/* Side-by-side Score Display */}
-            <div className="grid grid-cols-2 gap-3">
+            {/* Simple Side-by-side Scoring */}
+            <div className="flex items-center justify-between">
               {/* AI Score */}
-              <div className="flex flex-col items-center p-3 bg-blue-900/30 border border-blue-700/50 rounded-md">
-                <span className="text-xs text-blue-300 mb-1">🤖 AI Suggested</span>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-slate-300">🤖 AI Suggested:</span>
                 <span className="text-2xl font-bold text-blue-400">
-                  {layerData.aiSuggestedScore !== undefined ? layerData.aiSuggestedScore : '—'}
+                  {layerData.aiSuggestedScore !== undefined ? `${layerData.aiSuggestedScore}/${maxScore}` : '—'}
                 </span>
-                <span className="text-xs text-blue-300">/ {maxScore}</span>
               </div>
               
               {/* User Score */}
-              <div className="flex flex-col items-center p-3 bg-yellow-900/30 border border-yellow-700/50 rounded-md">
-                <span className="text-xs text-yellow-300 mb-1">👤 Your Score</span>
-                <div className="flex flex-col items-center">
+              <div className="flex items-center space-x-2">
+                <span className="text-sm text-slate-300">👤 Your Score:</span>
+                <div className="flex items-center space-x-1">
                   <input
                     type="number"
                     id={`score-${layerData.id}`}
@@ -175,12 +174,12 @@ export const LayerAnalysisCard: React.FC<LayerAnalysisCardProps> = ({ layerData,
                     min="0"
                     max={maxScore}
                     step="0.5"
-                    className="w-16 px-1 py-1 bg-yellow-800/50 border border-yellow-600 rounded text-yellow-100 text-2xl font-bold text-center focus:ring-1 focus:ring-yellow-500 focus:border-yellow-500 outline-none"
+                    className="w-16 px-2 py-1 bg-slate-600 border border-slate-500 rounded text-yellow-400 text-xl font-bold text-center focus:ring-1 focus:ring-yellow-500 focus:border-yellow-500 outline-none"
                     placeholder="0"
                     disabled={!canInteract}
                     aria-label={`Score for ${layerData.title} (0-${maxScore})`}
                   />
-                  <span className="text-xs text-yellow-300 mt-1">/ {maxScore}</span>
+                  <span className="text-xl font-bold text-slate-300">/ {maxScore}</span>
                 </div>
               </div>
             </div>
