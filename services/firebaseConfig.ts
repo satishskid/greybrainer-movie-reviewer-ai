@@ -50,7 +50,8 @@ const ADMIN_EMAILS = [
 
 // Editor emails
 const EDITOR_EMAILS = [
-  'drpratichi@skids.health'
+  'drpratichi@skids.health',
+  'saminamisra@gmail.com'
 ];
 
 // Authentication Service

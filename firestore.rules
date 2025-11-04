@@ -82,7 +82,8 @@ service cloud.firestore {
     
     function isEditor() {
       return request.auth.token.email in [
-        'drpratichi@skids.health'
+        'drpratichi@skids.health',
+        'saminamisra@gmail.com'
       ] || isAdmin();
     }
     

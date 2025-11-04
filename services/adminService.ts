@@ -85,4 +85,18 @@ export class AdminService {
     
     return ADMIN_EMAILS.includes(user.email);
   }
+  
+  /**
+   * Synchronous editor check for immediate UI updates (uses email-based check)
+   */
+  static isEditorSync(user: User | null): boolean {
+    if (!user?.email) return false;
+    
+    const EDITOR_EMAILS = [
+      'drpratichi@skids.health',
+      'saminamisra@gmail.com'
+    ];
+    
+    return EDITOR_EMAILS.includes(user.email) || this.isAdminSync(user);
+  }
 }
