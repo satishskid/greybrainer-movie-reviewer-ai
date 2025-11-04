@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Final Gemini Configuration</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        .container { max-width: 1000px; margin: 0 auto; }
+        input { background: #333; color: #fff; padding: 10px; width: 400px; border: 1px solid #555; border-radius: 5px; }
+        button { background: #4CAF50; color: white; padding: 10px 20px; margin: 10px; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #1a4d1a; border: 1px solid #2d7d2d; }
+        .error { background: #4d1a1a; border: 1px solid #7d2d2d; }
+        .warning { background: #4d4d1a; border: 1px solid #7d7d2d; }
+        .info { background: #1a1a4d; border: 1px solid #2d2d7d; }
+        .deprecated { background: #4d1a4d; border: 1px solid #7d2d7d; }
+        .model-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 15px; margin: 20px 0; }
+        .model-card { background: #2a2a2a; padding: 15px; border-radius: 8px; border-left: 4px solid #4CAF50; }
+        .model-card.deprecated { border-left-color: #f44336; }
+        .model-card.recommended { border-left-color: #2196F3; }
+        pre { background: #1a1a1a; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Final Gemini Configuration Test</h1>
+        <p>This tool tests the updated configuration with current recommended models and deprecation warnings.</p>
+        
+        <div>
+            <input type="password" id="apiKey" placeholder="Enter your Gemini API key" />
+            <button onclick="testCurrentModels()">Test Current Models</button>
+            <button onclick="testDeprecatedModels()">Test Deprecated Models</button>
+            <button onclick="showConfiguration()">Show Configuration</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        const CURRENT_MODELS = [
+            { name: 'gemini-2.5-flash', description: 'Current recommended for basic text tasks', recommended: true },
+            { name: 'gemini-2.5-pro', description: 'Current recommended for complex tasks', recommended: true }
+        ];
+        
+        const DEPRECATED_MODELS = [
+            { name: 'gemini-1.5-flash', description: 'DEPRECATED - will be turned down', deprecated: true },
+            { name: 'gemini-1.5-pro', description: 'DEPRECATED - will be turned down', deprecated: true },
+            { name: 'gemini-pro', description: 'DEPRECATED - already turned down', deprecated: true }
+        ];
+
+        async function testModel(apiKey, modelName) {
+            try {
+                const { GoogleGenerativeAI } = await import('https://esm.sh/@google/generative-ai@0.21.0');
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ model: modelName });
+                
+                const result = await model.generateContent('Say "working" and nothing else.');
+                const response = await result.response;
+                const text = response.text();
+                
+                return { success: true, response: text.trim() };
+            } catch (error) {
+                return { success: false, error: error.message };
+            }
+        }
+
+        window.testCurrentModels = async function() {
+            const apiKey = document.getElementById('apiKey').value;
+            const resultsDiv = document.getElementById('results');
+            
+            if (!apiKey) {
+                resultsDiv.innerHTML = '<div class="result error">Please enter your API key</div>';
+                return;
+            }
+            
+            resultsDiv.innerHTML = '<div class="result info"><h2>🧪 Testing Current Recommended Models</h2></div>';
+            
+            const workingModels = [];
+            const failedModels = [];
+            
+            for (const model of CURRENT_MODELS) {
+                resultsDiv.innerHTML += `<div class="result info">Testing ${model.name}...</div>`;
+                
+                const result = await testModel(apiKey, model.name);
+                
+                if (result.success) {
+                    workingModels.push({ ...model, response: result.response });
+                    resultsDiv.innerHTML += `
+                        <div class="result success">
+                            ✅ <strong>${model.name}</strong>: WORKS!<br>
+                            Response: "${result.response}"<br>
+                            Use Case: ${model.description}
+                        </div>
+                    `;
+                } else {
+                    failedModels.push({ ...model, error: result.error });
+                    resultsDiv.innerHTML += `
+                        <div class="result error">
+                            ❌ <strong>${model.name}</strong>: FAILED<br>
+                            Error: ${result.error}
+                        </div>
+                    `;
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            // Summary
+            resultsDiv.innerHTML += `
+                <div class="result ${workingModels.length > 0 ? 'success' : 'error'}">
+                    <h3>📊 Current Models Summary</h3>
+                    <p><strong>Working:</strong> ${workingModels.length}/${CURRENT_MODELS.length}</p>
+                    ${workingModels.length > 0 ? 
+                        `<p>✅ Your app should work with: <strong>${workingModels[0].name}</strong></p>` :
+                        `<p>🚨 No current models are working. Check your API key or contact support.</p>`
+                    }
+                </div>
+            `;
+        };
+
+        window.testDeprecatedModels = async function() {
+            const apiKey = document.getElementById('apiKey').value;
+            const resultsDiv = document.getElementById('results');
+            
+            if (!apiKey) {
+                resultsDiv.innerHTML = '<div class="result error">Please enter your API key</div>';
+                return;
+            }
+            
+            resultsDiv.innerHTML = '<div class="result warning"><h2>⚠️ Testing Deprecated Models (Expected to Fail)</h2></div>';
+            
+            for (const model of DEPRECATED_MODELS) {
+                resultsDiv.innerHTML += `<div class="result info">Testing deprecated ${model.name}...</div>`;
+                
+                const result = await testModel(apiKey, model.name);
+                
+                if (result.success) {
+                    resultsDiv.innerHTML += `
+                        <div class="result warning">
+                            ⚠️ <strong>${model.name}</strong>: Still works (but deprecated)<br>
+                            Response: "${result.response}"<br>
+                            Warning: ${model.description}
+                        </div>
+                    `;
+                } else {
+                    resultsDiv.innerHTML += `
+                        <div class="result deprecated">
+                            ❌ <strong>${model.name}</strong>: FAILED (Expected)<br>
+                            Error: ${result.error}<br>
+                            Status: ${model.description}
+                        </div>
+                    `;
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        };
+
+        window.showConfiguration = function() {
+            const resultsDiv = document.getElementById('results');
+            
+            resultsDiv.innerHTML = `
+                <div class="result info">
+                    <h2>🔧 Current Configuration</h2>
+                    
+                    <h3>✅ Recommended Models (Use These)</h3>
+                    <div class="model-grid">
+                        ${CURRENT_MODELS.map(model => `
+                            <div class="model-card recommended">
+                                <h4>${model.name}</h4>
+                                <p>${model.description}</p>
+                                <small>Status: Current & Recommended</small>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <h3>❌ Deprecated Models (Avoid These)</h3>
+                    <div class="model-grid">
+                        ${DEPRECATED_MODELS.map(model => `
+                            <div class="model-card deprecated">
+                                <h4>${model.name}</h4>
+                                <p>${model.description}</p>
+                                <small>Status: Deprecated - Will be turned down</small>
+                            </div>
+                        `).join('')}
+                    </div>
+                    
+                    <h3>📋 Configuration Summary</h3>
+                    <pre>{
+  "defaultModels": {
+    "preferred": "gemini-2.5-flash",
+    "fallback": "gemini-2.5-pro",
+    "legacy": "gemini-2.5-flash"
+  },
+  "status": "Updated for Gemini 2.5 series",
+  "deprecatedModels": ["gemini-1.5-flash", "gemini-1.5-pro", "gemini-pro"]
+}</pre>
+                    
+                    <h3>🚀 Next Steps</h3>
+                    <ol>
+                        <li>Test current models to verify they work</li>
+                        <li>Clear browser cache to remove old model selections</li>
+                        <li>Restart your Greybrainer application</li>
+                        <li>Verify film analysis features work with gemini-2.5-flash</li>
+                    </ol>
+                </div>
+            `;
+        };
+    </script>
+</body>
+</html>

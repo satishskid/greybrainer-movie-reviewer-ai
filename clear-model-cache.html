@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Clear Model Cache</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        .container { max-width: 600px; margin: 0 auto; }
+        button { padding: 10px 20px; margin: 10px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        button:hover { background: #45a049; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; background: #2a2a2a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧹 Clear Gemini Model Cache</h1>
+        <p>This tool will clear any cached model selections that might be causing issues.</p>
+        
+        <button onclick="clearCache()">Clear Model Cache</button>
+        <button onclick="showCurrentCache()">Show Current Cache</button>
+        
+        <div id="results"></div>
+    </div>
+
+    <script>
+        function clearCache() {
+            const resultsDiv = document.getElementById('results');
+            
+            try {
+                // Clear all Greybrainer-related localStorage items
+                const keysToRemove = [];
+                for (let i = 0; i < localStorage.length; i++) {
+                    const key = localStorage.key(i);
+                    if (key && (key.includes('greybrainer') || key.includes('gemini'))) {
+                        keysToRemove.push(key);
+                    }
+                }
+                
+                keysToRemove.forEach(key => {
+                    localStorage.removeItem(key);
+                });
+                
+                resultsDiv.innerHTML = `
+                    <div class="result">
+                        ✅ <strong>Cache Cleared Successfully!</strong><br>
+                        Removed ${keysToRemove.length} cached items:<br>
+                        ${keysToRemove.map(key => `• ${key}`).join('<br>')}
+                        <br><br>
+                        <strong>Next steps:</strong><br>
+                        1. Refresh your Greybrainer application<br>
+                        2. The app will now use the updated model configuration<br>
+                        3. Default model should be: gemini-1.5-flash
+                    </div>
+                `;
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="result" style="border-left: 4px solid #f44336;">
+                        ❌ <strong>Error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        }
+        
+        function showCurrentCache() {
+            const resultsDiv = document.getElementById('results');
+            
+            const cacheItems = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (key.includes('greybrainer') || key.includes('gemini'))) {
+                    const value = localStorage.getItem(key);
+                    cacheItems.push({ key, value });
+                }
+            }
+            
+            if (cacheItems.length === 0) {
+                resultsDiv.innerHTML = `
+                    <div class="result">
+                        ℹ️ <strong>No cached model data found.</strong><br>
+                        This is good - the app will use the default configuration.
+                    </div>
+                `;
+            } else {
+                resultsDiv.innerHTML = `
+                    <div class="result">
+                        📋 <strong>Current Cache Contents:</strong><br>
+                        ${cacheItems.map(item => `• <strong>${item.key}:</strong> ${item.value}`).join('<br>')}
+                    </div>
+                `;
+            }
+        }
+    </script>
+</body>
+</html>

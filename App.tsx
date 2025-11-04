@@ -196,7 +196,7 @@ const App: React.FC = () => {
   const handleLayerScoreChange = (layerId: ReviewLayer, score?: number) => setLayerAnalyses(prev => prev.map(l => l.id === layerId ? { ...l, userScore: score } : l));
 
   const handleGenerateReport = useCallback(async () => {
-    setOverallError(null); setIsGeneratingReport(true); setSummaryReport(null);
+    setOverallError(null); setIsGeneratingReport(true);
     let currentFinancialData = { ...financialAnalysisData, userProvidedBudget: movieInput.productionBudget };
     let budgetForROI = movieInput.productionBudget;
 
@@ -230,6 +230,18 @@ const App: React.FC = () => {
         }
       }
     }
+    // Generate morphokinetics analysis if not already available (for complete report)
+    let morphoAnalysis = morphokineticsAnalysis;
+    if (!morphoAnalysis && !morphokineticsError) {
+      try {
+        morphoAnalysis = await analyzeMovieMorphokinetics(movieInput.movieTitle, logTokenUsage);
+        setMorphokineticsAnalysis(morphoAnalysis);
+      } catch (error) {
+        console.error('Error generating morphokinetics for complete report:', error);
+        // Continue without morphokinetics if it fails - don't block report generation
+      }
+    }
+
     try {
       const reportData = await generateFinalReportWithGemini(movieInput.movieTitle, movieInput.reviewStage, layerAnalyses, personnelData, currentFinancialData, logTokenUsage);
       setSummaryReport(reportData);
@@ -366,17 +378,23 @@ const App: React.FC = () => {
           {canGenerateReport && !isCurrentlyProcessing && (
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
               <button onClick={handleGenerateReport} disabled={isGeneratingReport || isCurrentlyProcessing} className="w-full sm:w-auto px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" title={`Generate Greybrainer Report${movieInput.enableROIAnalysis ? ' with ROI Analysis' : ''}`}>
-                {isGeneratingReport || financialAnalysisData?.isLoadingROI ? (<> <LoadingSpinner size="sm" /> {financialAnalysisData?.isLoadingROI ? 'Analyzing ROI...':'Generating Report...'}</>) : (<> <SparklesIcon className="w-5 h-5 mr-2" /> Generate Report{movieInput.enableROIAnalysis ? ' + ROI' : ''}</>)}
+                {isGeneratingReport || financialAnalysisData?.isLoadingROI ? (<> <LoadingSpinner size="sm" /> {financialAnalysisData?.isLoadingROI ? 'Analyzing ROI...':'Generating Complete Report...'}</>) : (<> <SparklesIcon className="w-5 h-5 mr-2" /> Generate Complete Report{movieInput.enableROIAnalysis ? ' + ROI' : ''}</>)}
               </button>
               
-              <button onClick={handleAnalyzeMorphokinetics} disabled={isAnalyzingMorphokinetics || !movieInput.movieTitle || isCurrentlyProcessing} className="w-full sm:w-auto px-8 py-3 bg-teal-600 hover:bg-teal-500 text-white font-semibold rounded-lg shadow-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" title="Analyze Movie Motion & Dynamics">
-                {isAnalyzingMorphokinetics ? (<> <LoadingSpinner size="sm" /> Analyzing Motion...</>) : (<> <MotionIcon className="w-5 h-5 mr-2" /> Analyze Movie Motion</>)}
-              </button>
+
             </div>
           )}
           
           {morphokineticsError && (<div className={`mt-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}><strong>Morphokinetics Error:</strong> {morphokineticsError}</div>)}
-          {summaryReport && !isGeneratingReport && (<ReportDisplay summaryReportData={summaryReport} title={movieInput.movieTitle} layerAnalyses={layerAnalyses} personnelData={personnelData} maxScore={MAX_SCORE} initialActualPerformance={actualPerformance} onActualPerformanceChange={handleUpdateActualPerformance} financialAnalysisData={financialAnalysisData} />)}
+          {isGeneratingReport && (
+            <div className="mt-8 p-8 bg-slate-800/50 rounded-xl border border-slate-700 text-center">
+              <LoadingSpinner size="lg" />
+              <p className="mt-4 text-lg text-slate-300">Generating complete report...</p>
+              <p className="text-sm text-slate-400">Including summary, morphokinetics, and all visualizations</p>
+            </div>
+          )}
+          
+          {summaryReport && !isGeneratingReport && (<ReportDisplay summaryReportData={summaryReport} title={movieInput.movieTitle} layerAnalyses={layerAnalyses} personnelData={personnelData} maxScore={MAX_SCORE} initialActualPerformance={actualPerformance} onActualPerformanceChange={handleUpdateActualPerformance} financialAnalysisData={financialAnalysisData} morphokineticsAnalysis={morphokineticsAnalysis} />)}
           
           {morphokineticsAnalysis && !isAnalyzingMorphokinetics && (<MorphokineticsDisplay analysis={morphokineticsAnalysis} />)}
           

@@ -803,8 +803,7 @@ export const fetchMovieFinancialsWithGemini = async (
       model: getSelectedGeminiModel(),
       generationConfig: {
         temperature: 0.2
-      },
-      tools: [{ googleSearchRetrieval: {} }]
+      }
     });
     const response = await model.generateContent(prompt);
     const responseText = response.response.text().trim();
@@ -920,8 +919,7 @@ export const generateGreybrainerInsightWithGemini = async (
         temperature: 0.75,
         topP: 0.9,
         topK: 50,
-      },
-      tools: [{ googleSearchRetrieval: {} }]
+      }
     });
     const response = await model.generateContent(prompt);
     const insightText = response.response.text().trim();
@@ -952,8 +950,7 @@ export const analyzeLayerWithGemini = async (
       model: getSelectedGeminiModel(),
       generationConfig: {
         temperature: 0.7
-      },
-      tools: [{ googleSearchRetrieval: {} }]
+      }
     });
     const response = await model.generateContent(prompt);
     const rawAnalysisText = response.response.text().trim();
@@ -978,8 +975,8 @@ export const analyzeLayerWithGemini = async (
     if (director) cleanedAnalysisText = cleanedAnalysisText.replace(/Director:\s*(.*)/i, '').trim();
     if (mainCast && mainCast.length > 0) cleanedAnalysisText = cleanedAnalysisText.replace(/Main Cast:\s*([\w\s,]+)/i, '').trim();
     
-    const scoreRegex = new RegExp(`Suggested Score:\\s*(\\d*\\.?\\d+)\\s*/\\s*${MAX_SCORE}[\\s\\S]*?(Potential Enhancements:|$)`, "i");
-    cleanedAnalysisText = cleanedAnalysisText.replace(scoreRegex, '$1').trim();
+    const scoreRegex = new RegExp(`Suggested Score:\\s*\\d*\\.?\\d+\\s*/\\s*${MAX_SCORE}`, "i");
+    cleanedAnalysisText = cleanedAnalysisText.replace(scoreRegex, '').trim();
     
     cleanedAnalysisText = cleanedAnalysisText.replace(/Potential Enhancements:[\s\S]*/i, '').trim();
     cleanedAnalysisText = cleanedAnalysisText.replace(/\n\s*\n/g, '\n').trim();
@@ -1128,8 +1125,7 @@ Begin your analysis:
       model: getSelectedGeminiModel(),
       generationConfig: {
         temperature: 0.7
-      },
-      tools: [{ googleSearchRetrieval: {} }]
+      }
     });
     const response = await model.generateContent(prompt);
     const analysisText = response.response.text().trim();
@@ -1322,8 +1318,7 @@ Begin your analysis:
       model: getSelectedGeminiModel(),
       generationConfig: {
         temperature: 0.7
-      },
-      tools: [{ googleSearchRetrieval: {} }]
+      }
     });
     const response = await model.generateContent(prompt);
     const responseText = response.response.text().trim();
@@ -1423,8 +1418,7 @@ Begin matching:
       model: getSelectedGeminiModel(),
       generationConfig: {
         temperature: 0.3
-      },
-      tools: [{ googleSearchRetrieval: {} }]
+      }
     });
     const response = await model.generateContent(prompt);
     const responseText = response.response.text().trim();
@@ -1511,8 +1505,7 @@ export const generateGreybrainerComparisonWithGemini = async (
         temperature: 0.7,
         topP: 0.85,
         topK: 60,
-      },
-      tools: [{ googleSearchRetrieval: {} }]
+      }
     });
     const response = await model.generateContent(prompt);
     const comparisonText = response.response.text().trim();
@@ -1557,8 +1550,7 @@ export const generateDetailedReportFromInsightWithGemini = async (
         temperature: 0.7,
         topP: 0.85,
         topK: 60,
-      },
-      tools: [{ googleSearchRetrieval: {} }]
+      }
     });
     const response = await model.generateContent(prompt);
     const reportText = response.response.text().trim();

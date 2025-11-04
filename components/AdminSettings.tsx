@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { GeminiModelSelector } from './GeminiModelSelector';
 import GeminiDebugTest from './GeminiDebugTest';
 import { FirebaseAdminDashboard } from './FirebaseAdminDashboard';
 import { GeminiKeyManager } from './GeminiKeyManager';
 import { GoogleSearchKeyManager } from './GoogleSearchKeyManager';
-import { ModelHealthMonitor } from './ModelHealthMonitor';
-import { getSelectedGeminiModel, checkForNewerModels, getModelInfo } from '../utils/geminiModelStorage';
+import { getSelectedGeminiModel, getModelInfo } from '../utils/geminiModelStorage';
 import { getGeminiApiKeyString, hasGeminiApiKey } from '../utils/geminiKeyStorage';
 import { LoadingSpinner } from './LoadingSpinner';
 
@@ -16,14 +14,13 @@ interface AdminSettingsProps {
 }
 
 export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'keys' | 'models' | 'admin' | 'debug' | 'health'>('keys');
+  const [activeTab, setActiveTab] = useState<'keys' | 'admin' | 'debug' | 'health'>('keys');
   const [systemHealth, setSystemHealth] = useState<any>(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
 
   const checkSystemHealth = async () => {
     setIsCheckingHealth(true);
     try {
-      const apiKey = getGeminiApiKeyString();
       const currentModel = getSelectedGeminiModel();
       const modelInfo = getModelInfo(currentModel);
       
@@ -35,21 +32,11 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
         systemStatus: 'operational'
       };
 
-      if (apiKey) {
-        try {
-          const { hasNewer, newModels } = await checkForNewerModels(apiKey);
-          health.newerModelsAvailable = hasNewer;
-          health.availableUpdates = newModels;
-        } catch (error) {
-          health.modelCheckError = error.message;
-        }
-      }
-
       setSystemHealth(health);
     } catch (error) {
       setSystemHealth({
         timestamp: new Date().toISOString(),
-        error: error.message,
+        error: (error as Error).message,
         systemStatus: 'error'
       });
     } finally {
@@ -89,16 +76,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
             }`}
           >
             🔑 API Keys
-          </button>
-          <button
-            onClick={() => setActiveTab('models')}
-            className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'models'
-                ? 'text-indigo-400 border-b-2 border-indigo-400'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            🎬 AI Models
           </button>
           <button
             onClick={() => setActiveTab('admin')}
@@ -156,24 +133,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
             </div>
           )}
 
-          {activeTab === 'models' && (
-            <div>
-              <h3 className="text-lg font-medium text-slate-100 mb-6">AI Model Configuration</h3>
-              
-              <div className="space-y-6">
-                {/* Model Selection */}
-                <div className="bg-slate-800 rounded-lg p-4 border border-slate-600">
-                  <h4 className="text-md font-medium text-slate-200 mb-3">🎬 Model Selection</h4>
-                  <GeminiModelSelector onModelChange={() => {
-                    console.log('Model changed in admin settings');
-                  }} />
-                </div>
 
-                {/* Model Health Monitor */}
-                <ModelHealthMonitor />
-              </div>
-            </div>
-          )}
 
           {activeTab === 'admin' && (
             <div>

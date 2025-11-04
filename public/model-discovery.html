@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Gemini Model Discovery</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #1a1a1a; color: #fff; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .result { margin: 10px 0; padding: 10px; border-radius: 5px; }
+        .success { background: #1a4d1a; border: 1px solid #2d7d2d; }
+        .error { background: #4d1a1a; border: 1px solid #7d2d2d; }
+        .testing { background: #1a1a4d; border: 1px solid #2d2d7d; }
+        input, button { padding: 10px; margin: 5px; border-radius: 5px; border: 1px solid #555; }
+        input { background: #333; color: #fff; width: 400px; }
+        button { background: #4CAF50; color: white; cursor: pointer; }
+        button:hover { background: #45a049; }
+        #results { margin-top: 20px; }
+        .model-list { background: #2a2a2a; padding: 15px; border-radius: 5px; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Gemini Model Discovery Tool</h1>
+        <p>This tool will test different Gemini model names to find which ones actually work with your API key.</p>
+        
+        <div>
+            <input type="password" id="apiKey" placeholder="Enter your Gemini API key here" />
+            <button onclick="discoverModels()">🚀 Discover Working Models</button>
+        </div>
+        
+        <div id="results"></div>
+    </div>
+
+    <script type="module">
+        const MODELS_TO_TEST = [
+            'gemini-pro',
+            'gemini-1.5-pro',
+            'gemini-1.5-flash',
+            'gemini-1.0-pro',
+            'text-bison-001',
+            'gemini-1.5-pro-latest',
+            'gemini-1.5-flash-latest',
+            'gemini-1.0-pro-latest',
+            'gemini-pro-vision',
+            'gemini-1.5-pro-vision-latest',
+            'models/gemini-pro',
+            'models/gemini-1.5-pro',
+            'models/gemini-1.5-flash'
+        ];
+
+        async function testModel(apiKey, modelName) {
+            const resultsDiv = document.getElementById('results');
+            
+            // Add testing indicator
+            const testingDiv = document.createElement('div');
+            testingDiv.className = 'result testing';
+            testingDiv.innerHTML = `🧪 Testing: ${modelName}...`;
+            resultsDiv.appendChild(testingDiv);
+            
+            try {
+                const { GoogleGenerativeAI } = await import('https://esm.sh/@google/generative-ai@0.21.0');
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ model: modelName });
+                
+                const result = await model.generateContent('Say "test" and nothing else.');
+                const response = await result.response;
+                const text = response.text();
+                
+                // Remove testing indicator
+                resultsDiv.removeChild(testingDiv);
+                
+                // Add success result
+                const successDiv = document.createElement('div');
+                successDiv.className = 'result success';
+                successDiv.innerHTML = `✅ <strong>${modelName}</strong>: WORKS! Response: "${text.trim()}"`;
+                resultsDiv.appendChild(successDiv);
+                
+                return { model: modelName, success: true, response: text.trim() };
+            } catch (error) {
+                // Remove testing indicator
+                resultsDiv.removeChild(testingDiv);
+                
+                // Add error result
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'result error';
+                errorDiv.innerHTML = `❌ <strong>${modelName}</strong>: ${error.message}`;
+                resultsDiv.appendChild(errorDiv);
+                
+                return { model: modelName, success: false, error: error.message };
+            }
+        }
+
+        window.discoverModels = async function() {
+            const apiKey = document.getElementById('apiKey').value;
+            if (!apiKey) {
+                alert('Please enter your Gemini API key');
+                return;
+            }
+            
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h2>🔍 Testing Models...</h2>';
+            
+            const results = [];
+            
+            for (const modelName of MODELS_TO_TEST) {
+                const result = await testModel(apiKey, modelName);
+                results.push(result);
+                
+                // Small delay to avoid rate limiting
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
+            // Summary
+            const working = results.filter(r => r.success);
+            const broken = results.filter(r => !r.success);
+            
+            const summaryDiv = document.createElement('div');
+            summaryDiv.className = 'model-list';
+            summaryDiv.innerHTML = `
+                <h2>📊 SUMMARY</h2>
+                <h3>✅ Working Models (${working.length}):</h3>
+                ${working.map(r => `<div>• <strong>${r.model}</strong></div>`).join('')}
+                
+                <h3>❌ Broken Models (${broken.length}):</h3>
+                ${broken.map(r => `<div>• ${r.model}: ${r.error}</div>`).join('')}
+                
+                <h3>🔧 Configuration Update:</h3>
+                <p>Use these working models in your config/gemini-models.json:</p>
+                <pre style="background: #1a1a1a; padding: 10px; border-radius: 5px; overflow-x: auto;">
+"defaultModels": {
+  "preferred": "${working[0]?.model || 'NONE_FOUND'}",
+  "fallback": "${working[1]?.model || 'NONE_FOUND'}",
+  "legacy": "${working[2]?.model || 'NONE_FOUND'}"
+}</pre>
+            `;
+            resultsDiv.appendChild(summaryDiv);
+        };
+    </script>
+</body>
+</html>

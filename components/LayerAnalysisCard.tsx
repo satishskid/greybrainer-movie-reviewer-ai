@@ -145,26 +145,47 @@ export const LayerAnalysisCard: React.FC<LayerAnalysisCardProps> = ({ layerData,
             </CollapsibleSection>
           )}
           
-          {/* Score Input Section */}
-          <div className="flex items-center space-x-3 p-3 bg-slate-700/50 rounded-md mt-4">
-            <StarIcon className="w-6 h-6 text-amber-400 flex-shrink-0" />
-            <label htmlFor={`score-${layerData.id}`} className="text-sm font-medium text-amber-300">
-              Your Score:
-            </label>
-            <input
-              type="number"
-              id={`score-${layerData.id}`}
-              value={layerData.userScore === undefined ? '' : layerData.userScore}
-              onChange={handleScoreInputChange}
-              min="0"
-              max={maxScore}
-              step="0.5"
-              className="w-24 px-2 py-1 bg-slate-600 border border-slate-500 rounded-md focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none text-slate-100 text-sm"
-              placeholder={`0-${maxScore}`}
-              disabled={!canInteract}
-              aria-label={`Score for ${layerData.title} (0-${maxScore})`}
-            />
-            <span className="text-sm text-slate-400">/ {maxScore}</span>
+          {/* Score Section - AI Score + User Score */}
+          <div className="p-4 bg-slate-700/50 rounded-md mt-4 space-y-3">
+            <div className="flex items-center space-x-2">
+              <StarIcon className="w-5 h-5 text-amber-400 flex-shrink-0" />
+              <span className="text-sm font-medium text-amber-300">Scoring</span>
+            </div>
+            
+            {/* AI Suggested Score */}
+            {layerData.aiSuggestedScore && (
+              <div className="flex items-center justify-between p-2 bg-slate-600/50 rounded border border-slate-500/50">
+                <span className="text-sm text-slate-300">🤖 AI Suggested Score:</span>
+                <span className="text-lg font-semibold text-blue-400">{layerData.aiSuggestedScore}/{maxScore}</span>
+              </div>
+            )}
+            
+            {/* User Score Input */}
+            <div className="flex items-center justify-between">
+              <label htmlFor={`score-${layerData.id}`} className="text-sm font-medium text-amber-300">
+                👤 Your Score:
+              </label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="number"
+                  id={`score-${layerData.id}`}
+                  value={layerData.userScore !== undefined ? layerData.userScore : (layerData.aiSuggestedScore || '')}
+                  onChange={handleScoreInputChange}
+                  min="0"
+                  max={maxScore}
+                  step="0.5"
+                  className="w-20 px-2 py-1 bg-slate-600 border border-slate-500 rounded-md focus:ring-1 focus:ring-amber-500 focus:border-amber-500 outline-none text-slate-100 text-sm text-center"
+                  placeholder={`0-${maxScore}`}
+                  disabled={!canInteract}
+                  aria-label={`Score for ${layerData.title} (0-${maxScore})`}
+                />
+                <span className="text-sm text-slate-400">/ {maxScore}</span>
+              </div>
+            </div>
+            
+            {layerData.aiSuggestedScore && !layerData.userScore && (
+              <p className="text-xs text-slate-400 italic">💡 Tip: AI suggested {layerData.aiSuggestedScore}/{maxScore}. You can use this or enter your own score.</p>
+            )}
           </div>
         </div>
       )}

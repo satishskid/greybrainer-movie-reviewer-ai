@@ -23,6 +23,8 @@ export interface GeminiModelConfig {
   costTier: 'premium' | 'standard' | 'economy' | 'legacy';
   lastVerified: string;
   isDeprecated?: boolean;
+  deprecationWarning?: string;
+  useCase?: string;
   apiVersion?: string;
 }
 

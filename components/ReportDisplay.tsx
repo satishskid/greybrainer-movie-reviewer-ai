@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { ClipboardIcon } from './icons/ClipboardIcon';
 import { DownloadIcon } from './icons/DownloadIcon'; // New Icon
-import { LayerAnalysisData, GroundingChunkWeb, PersonnelData, SummaryReportData, ActualPerformanceData, FinancialAnalysisData } from '../types'; 
+import { LayerAnalysisData, GroundingChunkWeb, PersonnelData, SummaryReportData, ActualPerformanceData, FinancialAnalysisData, MorphokineticsAnalysis } from '../types'; 
 import { LAYER_DEFINITIONS, MAX_SCORE, LAYER_SHORT_NAMES } from '../constants'; 
 import { ConcentricRingsVisualization } from './ConcentricRingsVisualization';
 import { LightBulbIcon } from './icons/LightBulbIcon';
@@ -17,6 +17,8 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { ChartPieIcon } from './icons/ChartPieIcon'; // For Financial/ROI section
 import { TwitterIcon } from './icons/TwitterIcon';
 import { LinkedInIcon } from './icons/LinkedInIcon';
+import { PublishableAnalysisReport } from './PublishableAnalysisReport';
+import { ShareIcon } from './icons/ShareIcon';
 
 
 interface ReportDisplayProps {
@@ -27,7 +29,8 @@ interface ReportDisplayProps {
   maxScore: number;
   initialActualPerformance: ActualPerformanceData | null;
   onActualPerformanceChange: (data: ActualPerformanceData) => void;
-  financialAnalysisData: FinancialAnalysisData | null; // Added
+  financialAnalysisData: FinancialAnalysisData | null;
+  morphokineticsAnalysis?: MorphokineticsAnalysis | null;
 }
 
 export const ReportDisplay: React.FC<ReportDisplayProps> = ({ 
@@ -38,7 +41,8 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
   maxScore,
   initialActualPerformance,
   onActualPerformanceChange,
-  financialAnalysisData 
+  financialAnalysisData,
+  morphokineticsAnalysis
 }) => {
   const [copiedReport, setCopiedReport] = useState(false);
   const [copiedTwitter, setCopiedTwitter] = useState(false);
@@ -46,6 +50,7 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
   const [localActualPerformance, setLocalActualPerformance] = useState<ActualPerformanceData>(initialActualPerformance || {});
   const [showActualsInput, setShowActualsInput] = useState(false);
   const [showBlogExportModal, setShowBlogExportModal] = useState(false);
+  const [showPublishableReport, setShowPublishableReport] = useState(false);
 
   useEffect(() => {
     setLocalActualPerformance(initialActualPerformance || {});
@@ -332,6 +337,14 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
             >
               <DocumentTextIcon className="w-4 h-4 mr-2" />
               Blog/Social Export
+            </button>
+            <button
+              onClick={() => setShowPublishableReport(true)}
+              className="flex items-center justify-center px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-sm font-medium rounded-lg shadow-md transition-all duration-150 w-full sm:w-auto"
+              title="Generate publication-ready HTML report for Medium, LinkedIn, or personal blog"
+            >
+              <ShareIcon className="w-4 h-4 mr-2" />
+              Publish Report
             </button>
             <button
               onClick={() => handleCopyToClipboard(generateFullReportTextForCopy(), 'report')}
@@ -671,6 +684,19 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
         financialAnalysisData={financialAnalysisData}
         maxScore={maxScore}
       />
+
+      {/* Publishable Analysis Report Modal */}
+      {showPublishableReport && (
+        <PublishableAnalysisReport
+          movieTitle={title}
+          layerAnalyses={layerAnalyses}
+          summaryReport={summaryReportData}
+          morphokineticsAnalysis={morphokineticsAnalysis}
+          personnelData={personnelData}
+          financialAnalysisData={financialAnalysisData}
+          onClose={() => setShowPublishableReport(false)}
+        />
+      )}
     </div>
   );
 };

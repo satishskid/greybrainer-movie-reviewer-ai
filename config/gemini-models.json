@@ -1,89 +1,105 @@
 {
   "modelConfiguration": {
-    "version": "1.0.0",
-    "lastUpdated": "2024-11-03",
-    "description": "Gemini AI model configuration for Greybrainer Film Analysis Platform"
+    "version": "2.0.0",
+    "lastUpdated": "2024-11-04",
+    "description": "Gemini AI model configuration for Greybrainer Film Analysis Platform - Updated for Gemini 2.5 series"
   },
   "defaultModels": {
-    "preferred": "gemini-pro",
-    "fallback": "gemini-1.5-flash",
-    "legacy": "text-bison-001"
+    "preferred": "gemini-2.5-flash",
+    "fallback": "gemini-2.5-pro",
+    "legacy": "gemini-2.5-flash"
   },
   "availableModels": [
     {
-      "id": "gemini-pro",
-      "name": "Greybrainer Pro (Recommended)",
-      "description": "Most stable model for detailed film analysis and character development",
+      "id": "gemini-2.5-flash",
+      "name": "Greybrainer Fast (Recommended)",
+      "description": "Current recommended model for basic text tasks - fast analysis and rapid reviews",
+      "category": "standard",
+      "isRecommended": true,
+      "isStable": true,
+      "maxTokens": 32768,
+      "costTier": "economy",
+      "lastVerified": "2024-11-04",
+      "useCase": "Basic text tasks (summarization, simple Q&A)"
+    },
+    {
+      "id": "gemini-2.5-pro",
+      "name": "Greybrainer Pro (Advanced)",
+      "description": "Advanced model for complex reasoning, detailed analysis and character development",
       "category": "premium",
       "isRecommended": true,
       "isStable": true,
       "maxTokens": 32768,
       "costTier": "standard",
-      "lastVerified": "2024-11-03"
+      "lastVerified": "2024-11-04",
+      "useCase": "Complex text tasks (advanced reasoning, coding, math)"
     },
     {
       "id": "gemini-1.5-flash",
-      "name": "Greybrainer Fast",
-      "description": "Fast model for quick analysis and rapid reviews",
-      "category": "standard",
-      "isRecommended": false,
-      "isStable": true,
-      "maxTokens": 32768,
-      "costTier": "economy",
-      "lastVerified": "2024-11-03"
-    },
-    {
-      "id": "text-bison-001",
-      "name": "Legacy Text Model",
-      "description": "Legacy model for emergency fallback only",
+      "name": "Greybrainer Legacy Fast (DEPRECATED)",
+      "description": "DEPRECATED: Will be turned down. Use gemini-2.5-flash instead.",
       "category": "legacy",
       "isRecommended": false,
       "isStable": false,
-      "maxTokens": 8192,
-      "costTier": "legacy",
-      "lastVerified": "2024-11-03"
+      "isDeprecated": true,
+      "maxTokens": 32768,
+      "costTier": "economy",
+      "lastVerified": "2024-11-04",
+      "deprecationWarning": "This model is deprecated and will be turned down. Migrate to gemini-2.5-flash."
+    },
+    {
+      "id": "gemini-1.5-pro",
+      "name": "Greybrainer Legacy Pro (DEPRECATED)",
+      "description": "DEPRECATED: Will be turned down. Use gemini-2.5-pro instead.",
+      "category": "legacy",
+      "isRecommended": false,
+      "isStable": false,
+      "isDeprecated": true,
+      "maxTokens": 32768,
+      "costTier": "standard",
+      "lastVerified": "2024-11-04",
+      "deprecationWarning": "This model is deprecated and will be turned down. Migrate to gemini-2.5-pro."
     }
   ],
   "modelPriority": [
-    "gemini-pro",
-    "gemini-1.5-flash", 
-    "text-bison-001"
+    "gemini-2.5-flash",
+    "gemini-2.5-pro"
   ],
   "discoveryPatterns": [
     {
-      "pattern": "gemini.*pro.*latest",
+      "pattern": "gemini-2\\.5-flash",
       "priority": 1,
-      "description": "Latest pro models"
+      "description": "Current recommended model for basic text tasks"
     },
     {
-      "pattern": "gemini.*flash.*latest", 
+      "pattern": "gemini-2\\.5-pro",
       "priority": 2,
-      "description": "Latest flash models"
+      "description": "Current recommended model for complex tasks"
     },
     {
-      "pattern": "gemini.*2\\.\\d+.*pro",
+      "pattern": "gemini.*2\\.5.*flash",
       "priority": 3,
-      "description": "Version 2.x pro models"
+      "description": "Any Gemini 2.5 flash variant"
     },
     {
-      "pattern": "gemini.*1\\.\\d+.*pro",
+      "pattern": "gemini.*2\\.5.*pro",
       "priority": 4,
-      "description": "Version 1.x pro models"
+      "description": "Any Gemini 2.5 pro variant"
     },
     {
-      "pattern": "gemini.*pro",
+      "pattern": "gemini.*flash.*latest",
       "priority": 5,
-      "description": "Any pro model"
+      "description": "Latest flash models with -latest tag"
     },
     {
-      "pattern": "gemini.*flash",
+      "pattern": "gemini.*pro.*latest",
       "priority": 6,
-      "description": "Any flash model"
+      "description": "Latest pro models with -latest tag"
     },
     {
-      "pattern": "gemini",
+      "pattern": "gemini.*2\\.\\d+",
       "priority": 7,
-      "description": "Any gemini model"
+      "description": "Any Gemini 2.x models"
     }
   ],
   "errorHandling": {
