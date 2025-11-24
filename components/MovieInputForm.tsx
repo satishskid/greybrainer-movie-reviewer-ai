@@ -29,6 +29,8 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
   const [originalInput, setOriginalInput] = useState('');
   const [debounceTimer, setDebounceTimer] = useState<NodeJS.Timeout | null>(null);
   const [showBudgetEstimates, setShowBudgetEstimates] = useState(false);
+  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
+  const inputContainerRef = React.useRef<HTMLDivElement>(null);
 
   // Debounced suggestion fetching
   const debouncedGetSuggestions = useCallback(
@@ -77,6 +79,9 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
       clearTimeout(debounceTimer);
     }
 
+    // Reset selected index when input changes
+    setSelectedSuggestionIndex(-1);
+
     const timer = setTimeout(() => {
       if (movieInput.movieTitle.trim()) {
         debouncedGetSuggestions(movieInput.movieTitle);
@@ -103,6 +108,20 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
     };
   }, [debounceTimer]);
 
+  // Click outside handler
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (inputContainerRef.current && !inputContainerRef.current.contains(event.target as Node)) {
+        handleDismissSuggestions();
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setMovieInput({
@@ -125,6 +144,7 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
       setDebounceTimer(null);
     }
     setIsLoadingSuggestions(false);
+    setSelectedSuggestionIndex(-1);
 
     setMovieInput({
       ...movieInput,
@@ -143,12 +163,45 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
     setIsLoadingSuggestions(false);
     setSuggestions([]);
     setShowSuggestions(false);
+    setSelectedSuggestionIndex(-1);
+  };
+
+  // Keyboard navigation for suggestions
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (!showSuggestions || suggestions.length === 0) return;
+
+    switch (e.key) {
+      case 'ArrowDown':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => 
+          prev < suggestions.length - 1 ? prev + 1 : prev
+        );
+        break;
+      case 'ArrowUp':
+        e.preventDefault();
+        setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1);
+        break;
+      case 'Enter':
+        e.preventDefault();
+        if (selectedSuggestionIndex >= 0) {
+          handleSuggestionSelect(suggestions[selectedSuggestionIndex]);
+        }
+        break;
+      case 'Escape':
+        e.preventDefault();
+        handleDismissSuggestions();
+        break;
+      case 'Tab':
+        // Allow tab to move to next field, but hide suggestions
+        handleDismissSuggestions();
+        break;
+    }
   };
 
   return (
     <div className="p-6 bg-slate-800/70 rounded-xl shadow-2xl mb-8 border border-slate-700">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start"> {/* Changed to items-start for better alignment with multiline helper text */}
-        <div className="md:col-span-1 relative">
+        <div className="md:col-span-1 relative" ref={inputContainerRef}>
           <label htmlFor="movieTitle" className="block text-sm font-medium text-indigo-300 mb-1">
             Movie/Series Title <span className="text-red-400">*</span>
           </label>
@@ -159,10 +212,12 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
               name="movieTitle"
               value={movieInput.movieTitle}
               onChange={handleInputChange}
+              onKeyDown={handleKeyDown}
               placeholder="e.g., Dune: Part Two"
               className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-slate-100 placeholder-slate-400"
               aria-label="Movie or Series Title Input"
               required
+              autoComplete="off"
             />
             {isLoadingSuggestions && (
               <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
@@ -175,9 +230,12 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
           {showSuggestions && suggestions.length > 0 && (
             <div className="absolute z-10 w-full mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
               <div className="p-2 border-b border-slate-600">
-                <div className="flex items-center text-xs text-slate-400">
-                  <LightBulbIcon className="w-3 h-3 mr-1" />
-                  <span>Suggestions for "{originalInput}"</span>
+                <div className="flex items-center justify-between text-xs text-slate-400">
+                  <div className="flex items-center">
+                    <LightBulbIcon className="w-3 h-3 mr-1" />
+                    <span>Suggestions for "{originalInput}"</span>
+                  </div>
+                  <span className="text-xs">↑↓ navigate • Enter select • Esc dismiss</span>
                 </div>
               </div>
               <div className="py-1">
@@ -185,12 +243,21 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
                   <button
                     key={index}
                     onClick={() => handleSuggestionSelect(suggestion)}
-                    className="w-full text-left px-3 py-2 text-sm text-slate-200 hover:bg-slate-600 transition-colors flex items-center justify-between group"
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between group ${
+                      selectedSuggestionIndex === index
+                        ? 'bg-indigo-600 text-white'
+                        : 'text-slate-200 hover:bg-slate-600'
+                    }`}
                   >
-                    <span>{suggestion}</span>
+                    <span className="flex-1">{suggestion}</span>
                     {index === 0 && (
-                      <span className="text-xs bg-indigo-600 px-2 py-0.5 rounded-full opacity-75 group-hover:opacity-100">
+                      <span className="text-xs bg-green-600 px-2 py-0.5 rounded-full opacity-75 group-hover:opacity-100 ml-2">
                         Best Match
+                      </span>
+                    )}
+                    {selectedSuggestionIndex === index && (
+                      <span className="text-xs bg-indigo-400 px-2 py-0.5 rounded-full ml-2">
+                        Selected
                       </span>
                     )}
                   </button>
@@ -201,7 +268,7 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
                   onClick={handleDismissSuggestions}
                   className="w-full text-xs text-slate-400 hover:text-slate-300 py-1"
                 >
-                  Dismiss suggestions
+                  Dismiss suggestions (Esc)
                 </button>
               </div>
             </div>

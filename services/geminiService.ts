@@ -24,7 +24,143 @@ const getGeminiAI = (): GoogleGenerativeAI => {
     throw new Error("Gemini API key not found. Please provide your API key to continue.");
   }
   return new GoogleGenerativeAI(apiKey);
+};
+
+// Simple movie title suggestions using Gemini API
+export const suggestMovieTitles = async (
+  partialTitle: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string[]> => {
+  if (!partialTitle || partialTitle.trim().length < 2) {
+    return [];
+  }
+
+  const prompt = `
+You are a movie database assistant. The user is typing: "${partialTitle}"
+
+List 8 movie or TV series titles that match or contain this text. Include:
+- Exact matches first
+- Popular titles containing these letters
+- Recent releases when relevant
+- Both movies and series
+
+Format: Just the titles, one per line, no explanations.
+
+Examples:
+Input: "fam"
+Output:
+The Family Man
+The Family Man (Series)
+Famous
+Fame
+Family Plot
+
+Input: "stranger"
+Output:
+Stranger Things
+Stranger Than Fiction
+The Stranger
+
+Now suggest titles for: "${partialTitle}"
+  `.trim();
+
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: getSelectedGeminiModel(),
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 200
+      }
+    });
+    
+    // Add timeout for better reliability
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+    
+    const response = await model.generateContent(prompt);
+    clearTimeout(timeoutId);
+    
+    const responseText = response.response.text().trim();
+    logTokenUsage?.('Movie Title Suggestions (Gemini)', prompt.length, responseText.length);
+    
+    // Parse response - one title per line
+    const suggestions = responseText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0 && line.length < 100)
+      .slice(0, 8); // Limit to 8 suggestions
+    
+    return suggestions;
+  } catch (error) {
+    console.error('Gemini API error getting movie suggestions:', error);
+    handleGeminiError(error as Error, 'Movie Title Suggestions');
+    return []; // Return empty array on error - user can type manually
+  }
 }; 
+
+// Lookup movie title by IMDb ID using Gemini API
+export const lookupMovieByImdbId = async (
+  imdbId: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string | null> => {
+  if (!imdbId || !imdbId.trim()) {
+    return null;
+  }
+
+  // Validate IMDb ID format (tt1234567 or tt12345678)
+  const imdbIdPattern = /^tt\d{7,8}$/;
+  if (!imdbIdPattern.test(imdbId.trim())) {
+    throw new Error('Invalid IMDb ID format. Must be "tt" followed by 7-8 digits (e.g., tt1234567)');
+  }
+
+  const prompt = `
+You are a movie database assistant. Look up the movie or TV series with IMDb ID: ${imdbId}
+
+Return only the exact title of the movie or series. If it's a series, include "(Series)" at the end.
+
+Examples:
+Input: tt1234567
+Output: The Family Man (Series)
+
+Input: tt7658407
+Output: The Family Man
+
+If the ID is not found or invalid, return "NOT_FOUND".
+
+Look up: ${imdbId}
+  `.trim();
+
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: getSelectedGeminiModel(),
+      generationConfig: {
+        temperature: 0.1,
+        maxOutputTokens: 100
+      }
+    });
+    
+    // Add timeout for better reliability
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
+    
+    const response = await model.generateContent(prompt);
+    clearTimeout(timeoutId);
+    
+    const responseText = response.response.text().trim();
+    logTokenUsage?.('IMDb ID Lookup (Gemini)', prompt.length, responseText.length);
+    
+    if (responseText.toUpperCase().includes('NOT_FOUND')) {
+      return null;
+    }
+    
+    return responseText;
+  } catch (error) {
+    console.error('Gemini API error looking up IMDb ID:', error);
+    handleGeminiError(error as Error, 'IMDb ID Lookup');
+  }
+  
+  return null; // Fallback return
+};
 
 export type LogTokenUsageFn = (operation: string, inputChars: number, outputChars: number) => void;
 
@@ -123,16 +259,25 @@ const generatePromptForLayer = (
 ): string => {
   // This prompt engineering is a core part of the IP.
   // In a production system, this function would be on the backend.
+  
+  // Get current date for release validation
+  const { currentYear } = getDynamicDateRange();
+  
   let context = "";
+  let releaseStatusNote = "";
+  
   switch (reviewStage) {
     case ReviewStage.IDEA_ANNOUNCEMENT:
       context = `The movie/series "${movieTitle}" has just been announced.`;
+      releaseStatusNote = "This appears to be an announced project that may not have been released yet.";
       break;
     case ReviewStage.TRAILER:
       context = `A trailer for the movie/series "${movieTitle}" has been released.`;
+      releaseStatusNote = "Based on the trailer stage, this content is likely upcoming or recently released.";
       break;
     case ReviewStage.MOVIE_RELEASED:
       context = `The movie/series "${movieTitle}" has been released.`;
+      releaseStatusNote = "This content should be available to audiences. Focus on analyzing the released work.";
       break;
   }
 
@@ -196,6 +341,9 @@ const generatePromptForLayer = (
     
     IMPORTANT: Analyze ONLY the content provided for "${movieTitle}" (${reviewStage}). Do NOT make assumptions about whether this movie/series exists, has been released, or is announced. Focus ONLY on analyzing the creative content as presented to you.
     
+    RELEASE STATUS GUIDANCE: ${releaseStatusNote}
+    Current year: ${currentYear}. Only consider content as "not released" if you have specific information indicating a future release date.
+    
     Analyze "${movieTitle}" (${reviewStage}) focusing on "${layerTitle}" (${layerDescription}).
     ${context}
     ${searchInstructions} 
@@ -219,6 +367,37 @@ const parseDirector = (text: string): string | undefined => {
   const match = text.match(/Director:\s*(.*)/i);
   return match?.[1]?.trim().split('\n')[0]; 
 };
+
+// Dynamic date range helper function
+const getDynamicDateRange = () => {
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const previousYear = currentYear - 1;
+  const twoYearsAgo = currentYear - 2;
+  
+  return {
+    currentYear,
+    previousYear,
+    twoYearsAgo,
+    currentDate: currentDate.toISOString().split('T')[0] // YYYY-MM-DD format
+  };
+};
+
+/* const isValidReleaseYear = (year?: string): boolean => {
+  if (!year || !/^\d{4}$/.test(year)) return true;
+  
+  try {
+    const currentYear = new Date().getFullYear();
+    const releaseYear = parseInt(year, 10);
+    
+    // Consider anything from previous years as valid/released
+    // For current year, assume it's valid (could be released or upcoming)
+    return releaseYear <= currentYear;
+  } catch (error) {
+    console.error('Error validating release year:', error);
+    return true;
+  }
+}; */
 
 const parseMainCast = (text: string): string[] | undefined => {
   const match = text.match(/Main Cast:\s*([\w\s,]+)/i);
@@ -1385,18 +1564,28 @@ export const findMovieMatches = async (
   userInput: string,
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<string[]> => {
+  const { currentYear, previousYear, twoYearsAgo } = getDynamicDateRange();
+  
   const prompt = `
 You are an expert film database consultant with comprehensive knowledge of:
-- Latest Bollywood/Hindi cinema (2023-2025) and current releases
+- Latest Bollywood/Hindi cinema (${twoYearsAgo}-${currentYear}) and current releases
 - Recent Regional Indian cinema (Tamil, Telugu, Malayalam, Kannada, Bengali, Marathi, etc.)
-- Current Hollywood and international English-language films (2024-2025)
+- Current Hollywood and international English-language films (${previousYear}-${currentYear})
 - Latest popular TV series and web series (Netflix, Amazon Prime, Disney+, Hotstar, etc.)
-- 2025 new releases, trending movies, and current box office hits
+- ${currentYear} new releases, trending movies, and current box office hits
 - Film transliterations and alternate spellings
 
 User input: "${userInput}"
 
-Find and suggest the most likely movie/series matches for this input. **PRIORITIZE 2024-2025 RELEASES AND CURRENT FILMS** but also include relevant classics if they match well.
+Current year: ${currentYear}
+
+Find and suggest the most likely movie/series matches for this input. **PRIORITIZE ${currentYear} RELEASES AND CURRENT FILMS** but also include relevant classics if they match well.
+
+**RELEASE STATUS GUIDANCE:** 
+- Only mark content as "unreleased" or "upcoming" if you have specific knowledge of a future release date
+- Assume content from ${currentYear} and earlier is available/released unless you know otherwise
+- For ${currentYear} content, indicate if it's released or upcoming based on your knowledge
+- Do NOT assume all recent content is unreleased
 
 **Matching Strategies:**
 - Exact title matches (prioritize recent releases)

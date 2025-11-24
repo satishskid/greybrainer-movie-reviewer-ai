@@ -4,16 +4,15 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
-import { MovieInputForm } from './components/MovieInputForm';
+import { EnhancedMovieInputForm } from './components/EnhancedMovieInputForm';
 import { LayerAnalysisCard } from './components/LayerAnalysisCard';
 import { ReportDisplay } from './components/ReportDisplay';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { SparklesIcon } from './components/icons/SparklesIcon';
 import { ReviewStage, LayerAnalysisData, ReviewLayer, PersonnelData, SummaryReportData, MagicFactorAnalysis, CreativeSparkResult, TokenUsageEntry, TokenBudgetConfig, ActualPerformanceData, ScriptIdeaInput, MagicQuotientAnalysis, MovieAnalysisInput, MorphokineticsAnalysis, MonthlyScoreboardItem, FinancialAnalysisData } from './types';
 import { initialLayerAnalyses, LAYER_DEFINITIONS, REVIEW_STAGES_OPTIONS, MAX_SCORE, COMMON_GENRES, INITIAL_TOKEN_BUDGET_CONFIG, CHARS_PER_TOKEN_ESTIMATE, MAX_TOKEN_LOG_ENTRIES, MOCK_MONTHLY_SCOREBOARD_DATA } from './constants';
-import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, findMovieMatches, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini } from './services/geminiService';
+import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini, suggestMovieTitles } from './services/geminiService';
 import { AdminService } from './services/adminService';
-import { googleSearchService } from './services/googleSearchService';
 import { PersonnelDisplay } from './components/PersonnelDisplay';
 import { CreativeSparkGenerator } from './components/CreativeSparkGenerator';
 import { TokenBudgetDashboard } from './components/TokenBudgetDashboard'; 
@@ -21,7 +20,6 @@ import { ScriptMagicQuotientAnalyzer } from './components/ScriptMagicQuotientAna
 import { InformationCircleIcon } from './components/icons/InformationCircleIcon';
 import { MotionIcon } from './components/icons/MotionIcon';
 import { MorphokineticsDisplay } from './components/MorphokineticsDisplay';
-import { MonthlyMagicScoreboard } from './components/MonthlyMagicScoreboard';
 import { LightBulbIcon } from './components/icons/LightBulbIcon';
 import { GreybrainerInsights } from './components/GreybrainerInsights';
 import { GreybrainerComparison } from './components/GreybrainerComparison';
@@ -183,8 +181,9 @@ const App: React.FC = () => {
 
   const handleGetSuggestions = useCallback(async (title: string): Promise<string[]> => {
     try {
-      const movieResults = await googleSearchService.suggestMovies(title);
-      return movieResults.map(movie => movie.year ? `${movie.title} (${movie.year})` : movie.title);
+      // Use Gemini API for movie suggestions instead of Google Search
+      const suggestions = await suggestMovieTitles(title);
+      return suggestions;
     } catch (error) {
       console.error('Error getting movie title suggestions:', error);
       return [];
@@ -358,7 +357,7 @@ const App: React.FC = () => {
             </button>
           </div>
           
-          <MovieInputForm
+          <EnhancedMovieInputForm
             movieInput={movieInput}
             setMovieInput={setMovieInput}
             reviewStages={REVIEW_STAGES_OPTIONS}
