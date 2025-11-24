@@ -75,10 +75,15 @@ export class MonthlyScoreboardService {
         }
       }
       
-      // Step 3: Sort by score and assign final rankings
-      const rankedItems = scoredItems
+      // Step 3: Sort by score and assign final rankings with required properties
+      const rankedItems: EnhancedMonthlyScoreboardItem[] = scoredItems
         .sort((a, b) => b.greybrainerScore - a.greybrainerScore)
-        .map((item, index) => ({ ...item, ranking: index + 1 }));
+        .map((item, index) => ({ 
+          ...item, 
+          ranking: index + 1,
+          dataSource: 'web_search' as const,
+          confidence: 0.8 // Default confidence for AI-generated scores
+        }));
       
       // Step 4: Create cache object
       const cacheData: MonthlyScoreboardCache = {
@@ -110,7 +115,6 @@ export class MonthlyScoreboardService {
     const cacheId = `${year}-${monthIndex.toString().padStart(2, '0')}`;
     
     try {
-      const docRef = doc(db, this.COLLECTION_NAME, cacheId);
       const docSnap = await getDocs(query(collection(db, this.COLLECTION_NAME), where('id', '==', cacheId)));
       
       if (!docSnap.empty) {
@@ -164,13 +168,29 @@ export class MonthlyScoreboardService {
     logTokenUsage?: LogTokenUsageFn
   ): Promise<Omit<MonthlyScoreboardItem, 'greybrainerScore' | 'ranking'>[]> {
     try {
-      const geminiAI = new GoogleGenerativeAI(getGeminiApiKeyString());
+      const apiKey = getGeminiApiKeyString();
+      if (!apiKey) {
+        throw new Error('Gemini API key not configured');
+      }
+      const geminiAI = new GoogleGenerativeAI(apiKey);
       const model = geminiAI.getGenerativeModel({ model: getSelectedGeminiModel() });
       
       const prompt = `
         IMPORTANT: You must respond with ONLY a valid JSON array. Do not include any explanatory text, apologies, or comments.
         
-        Find movie and web series releases in India for ${month} ${year}. If you cannot find specific releases for this exact month, create a realistic JSON array with plausible titles that could have been released in ${month} ${year}.
+        Find the ACTUAL and CONFIRMED Indian movie and web series releases that are specifically scheduled for ${month} ${year}.
+        
+        CRITICAL REQUIREMENTS:
+        - Only include releases with confirmed ${month} ${year} release dates
+        - DO NOT include movies from ${year - 1} or earlier
+        - DO NOT include speculative or wishlist content
+        - Focus on OFFICIALLY ANNOUNCED releases with marketing campaigns
+        
+        For October 2025, look for:
+        - Diwali 2025 releases (typically big Bollywood blockbusters)
+        - Festival season releases
+        - OTT platform confirmed release schedules
+        - Production house official announcements
         
         Return exactly this JSON format:
         [
@@ -180,15 +200,17 @@ export class MonthlyScoreboardService {
             "platform": "Theatrical",
             "language": "Hindi",
             "region": "Maharashtra", 
-            "summary": "Brief description"
+            "summary": "Brief description of what's special about this release"
           }
         ]
         
-        Include 5-10 entries. Mix of:
-        - Bollywood movies (Theatrical)
-        - South Indian movies (Theatrical) 
-        - OTT series (Netflix, Amazon Prime Video, Disney+ Hotstar)
-        - Regional content (Tamil, Telugu, Malayalam)
+        Include 8-12 entries that are VERIFIED for ${month} ${year}. Sources to check:
+        - Trade analyst Taran Adarsh announcements
+        - Production house official social media
+        - OTT platform release calendars
+        - Film trade magazine confirmations
+        
+        DO NOT include: Pushpa 2, Bhool Bhulaiyaa 3, or any ${year - 1} releases
         
         RESPOND WITH ONLY THE JSON ARRAY - NO OTHER TEXT.
       `;
@@ -230,6 +252,14 @@ export class MonthlyScoreboardService {
       
     } catch (error) {
       console.error(`Failed to fetch releases for ${month} ${year}:`, error);
+      
+      // Log more details about the error
+      if (error instanceof Error) {
+        console.error(`Error details: ${error.message}`);
+        if (error.message.includes('429')) {
+          console.error('Gemini API rate limit exceeded - this is expected for free tier');
+        }
+      }
       
       // Fallback to mock data if search fails
       return [

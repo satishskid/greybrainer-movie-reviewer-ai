@@ -1475,8 +1475,19 @@ export const analyzeMovieMorphokinetics = async (
   movieTitle: string,
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<MorphokineticsAnalysis> => {
+  // Get current date for release validation
+  const { currentYear } = getDynamicDateRange();
+  
   const prompt = `
 Analyze the "Morphokinetics" (dynamic flow and emotional journey) of the movie "${movieTitle}".
+
+Current year: ${currentYear}
+
+IMPORTANT: When analyzing this movie, consider its actual release status:
+- Content from ${currentYear} and earlier should be considered released/available
+- Only mark content as "unreleased" or "upcoming" if you have specific knowledge of a future release date
+- Do not assume all recent content is unreleased
+- Use the current year (${currentYear}) as the reference point for determining release status
 
 Provide:
 
@@ -1659,8 +1670,13 @@ export const generateGreybrainerComparisonWithGemini = async (
   item2: { title: string; type: string; description?: string },
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<string> => {
+  // Get current date for release validation
+  const { currentYear } = getDynamicDateRange();
+  
   const prompt = `
     You are a film and media expert conducting a detailed comparative analysis using the "Greybrainer" methodology.
+    
+    Current year: ${currentYear}
     
     Compare these two items:
     
@@ -1673,6 +1689,12 @@ export const generateGreybrainerComparisonWithGemini = async (
     - Type: ${item2.type}
     - Title/Name: "${item2.title}"
     ${item2.description ? `- Additional Context: ${item2.description}` : ''}
+    
+    IMPORTANT: When analyzing these items, consider their actual release status:
+    - Content from ${currentYear} and earlier should be considered released/available
+    - Only mark content as "unreleased" or "upcoming" if you have specific knowledge of a future release date
+    - Do not assume all recent content is unreleased
+    - Use the current year (${currentYear}) as the reference point for determining release status
     
     Provide a comprehensive comparative analysis (400-600 words) structured as follows:
     
