@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayerAnalysisData, SummaryReportData, MorphokineticsAnalysis, PersonnelData, FinancialAnalysisData } from '../types';
+import { LayerAnalysisData, SummaryReportData, MorphokineticsAnalysis, PersonnelData, FinancialAnalysisData, ReviewLayer } from '../types';
 import { LAYER_DEFINITIONS, MAX_SCORE } from '../constants';
 import { ClipboardIcon } from './icons/ClipboardIcon';
 import { ShareIcon } from './icons/ShareIcon';
@@ -251,7 +251,7 @@ export const PublishableAnalysisReport: React.FC<PublishableAnalysisReportProps>
                         <!-- Layer label -->
                         <text x="${200 + Math.cos(angle) * 180}" y="${200 + Math.sin(angle) * 180}" 
                               text-anchor="middle" fill="#374151" font-size="14" font-weight="bold">
-                          ${layer.id === 'story' ? 'Story' : layer.id === 'conceptualization' ? 'Concept' : 'Performance'}
+                          ${layer.id === ReviewLayer.STORY ? 'Story' : layer.id === ReviewLayer.CONCEPTUALIZATION ? 'Concept' : 'Performance'}
                         </text>
                         
                         <!-- Score labels -->
@@ -407,6 +407,22 @@ export const PublishableAnalysisReport: React.FC<PublishableAnalysisReportProps>
                 ${summaryReport.reportText.replace(/\n/g, '<br>')}
             </div>
         </section>
+
+        ${summaryReport.pixarStyleScenes && summaryReport.pixarStyleScenes.length > 0 ? `
+        <section style="margin: 30px 0; padding: 20px; background: linear-gradient(135deg, #fdf4ff 0%, #f5f3ff 100%); border-radius: 12px; border: 1px solid #e9d5ff;">
+            <h2 style="color: #7e22ce; font-size: 1.6em; margin-bottom: 20px; display: flex; align-items: center;">
+                <span style="margin-right: 10px;">✨</span> Representative Scenes (Pixar Style)
+            </h2>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                ${summaryReport.pixarStyleScenes.map((scene, index) => `
+                    <div style="background: white; padding: 15px; border-radius: 8px; border: 1px solid #e2e8f0; box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);">
+                        <div style="font-size: 0.8em; font-weight: bold; color: #9333ea; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px;">Scene ${index + 1}</div>
+                        <p style="font-style: italic; color: #4b5563; line-height: 1.6;">"${scene}"</p>
+                    </div>
+                `).join('')}
+            </div>
+        </section>
+        ` : ''}
 
         ${summaryReport.socialSnippets?.twitter || summaryReport.socialSnippets?.linkedin ? `
         <section style="margin: 30px 0; padding: 20px; background: #f1f5f9; border-radius: 8px;">

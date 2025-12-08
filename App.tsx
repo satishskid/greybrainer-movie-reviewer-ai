@@ -9,9 +9,9 @@ import { LayerAnalysisCard } from './components/LayerAnalysisCard';
 import { ReportDisplay } from './components/ReportDisplay';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { SparklesIcon } from './components/icons/SparklesIcon';
-import { ReviewStage, LayerAnalysisData, ReviewLayer, PersonnelData, SummaryReportData, MagicFactorAnalysis, CreativeSparkResult, TokenUsageEntry, TokenBudgetConfig, ActualPerformanceData, ScriptIdeaInput, MagicQuotientAnalysis, MovieAnalysisInput, MorphokineticsAnalysis, MonthlyScoreboardItem, FinancialAnalysisData } from './types';
+import { ReviewStage, LayerAnalysisData, ReviewLayer, PersonnelData, SummaryReportData, MagicFactorAnalysis, CreativeSparkResult, TokenUsageEntry, TokenBudgetConfig, ActualPerformanceData, ScriptIdeaInput, MagicQuotientAnalysis, MovieAnalysisInput, MorphokineticsAnalysis, MonthlyScoreboardItem, FinancialAnalysisData, MovieSuggestion } from './types';
 import { initialLayerAnalyses, LAYER_DEFINITIONS, REVIEW_STAGES_OPTIONS, MAX_SCORE, COMMON_GENRES, INITIAL_TOKEN_BUDGET_CONFIG, CHARS_PER_TOKEN_ESTIMATE, MAX_TOKEN_LOG_ENTRIES, MOCK_MONTHLY_SCOREBOARD_DATA } from './constants';
-import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini, suggestMovieTitles } from './services/geminiService';
+import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini, searchMovies } from './services/geminiService';
 import { AdminService } from './services/adminService';
 import { PersonnelDisplay } from './components/PersonnelDisplay';
 import { CreativeSparkGenerator } from './components/CreativeSparkGenerator';
@@ -179,16 +179,16 @@ const App: React.FC = () => {
     await analyzeMovieFlowInternal(movieInput.movieTitle.trim());
   }, [movieInput.movieTitle, analyzeMovieFlowInternal]);
 
-  const handleGetSuggestions = useCallback(async (title: string): Promise<string[]> => {
+  const handleGetSuggestions = useCallback(async (title: string): Promise<MovieSuggestion[]> => {
     try {
       // Use Gemini API for movie suggestions instead of Google Search
-      const suggestions = await suggestMovieTitles(title);
+      const suggestions = await searchMovies(title, logTokenUsage);
       return suggestions;
     } catch (error) {
       console.error('Error getting movie title suggestions:', error);
       return [];
     }
-  }, []);
+  }, [logTokenUsage]);
   
 
 

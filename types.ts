@@ -1,7 +1,14 @@
-
 export interface SocialSnippets {
   twitter?: string;
   linkedin?: string;
+}
+
+export interface MovieSuggestion {
+  title: string;
+  year?: string;
+  director?: string;
+  type?: 'Movie' | 'Series';
+  description?: string;
 }
 
 export enum ReviewLayer {
@@ -98,6 +105,7 @@ export interface SummaryReportData {
   overallImprovementSuggestions?: string | string[];
   actualPerformance?: ActualPerformanceData; 
   financialAnalysis?: FinancialAnalysisData; // Added
+  pixarStyleScenes?: string[]; // Added for visual descriptions
   isFallbackResult?: boolean; 
 }
 

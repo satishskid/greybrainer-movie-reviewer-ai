@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import GeminiDebugTest from './GeminiDebugTest';
+import { FeatureVerificationTest } from './FeatureVerificationTest';
 import { FirebaseAdminDashboard } from './FirebaseAdminDashboard';
 import { GeminiKeyManager } from './GeminiKeyManager';
 import { GoogleSearchKeyManager } from './GoogleSearchKeyManager';
@@ -276,6 +277,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
                 </p>
               </div>
               <GeminiDebugTest />
+              <FeatureVerificationTest />
             </div>
           )}
         </div>

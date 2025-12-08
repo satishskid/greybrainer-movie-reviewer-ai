@@ -1,6 +1,6 @@
 // Simplified movie input form with basic search and IMDb ID lookup
 import React, { useState, useEffect, useCallback } from 'react';
-import { ReviewStage, MovieAnalysisInput } from '../types';
+import { ReviewStage, MovieAnalysisInput, MovieSuggestion } from '../types';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { LoadingSpinner } from './LoadingSpinner';
 import { LightBulbIcon } from './icons/LightBulbIcon';
@@ -12,7 +12,7 @@ interface EnhancedMovieInputFormProps {
   reviewStages: { value: ReviewStage; label: string }[];
   onAnalyze: () => void;
   isAnalyzing: boolean;
-  onGetSuggestions?: (title: string) => Promise<string[]>;
+  onGetSuggestions?: (title: string) => Promise<MovieSuggestion[]>;
 }
 
 export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
@@ -31,7 +31,7 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
   const [idError, setIdError] = useState('');
   
   // Original search states
-  const [suggestions, setSuggestions] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<MovieSuggestion[]>([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
   const [originalInput, setOriginalInput] = useState('');
@@ -115,17 +115,11 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
       try {
         const suggestionResults = await onGetSuggestions(title.trim());
         if (suggestionResults && suggestionResults.length > 0) {
-          const filteredSuggestions = suggestionResults.filter(
-            s => s.toLowerCase() !== title.trim().toLowerCase()
-          );
-          if (filteredSuggestions.length > 0) {
-            setSuggestions(filteredSuggestions);
-            setOriginalInput(title.trim());
-            setShowSuggestions(true);
-          } else {
-            setSuggestions([]);
-            setShowSuggestions(false);
-          }
+          // Filter out exact matches if needed, or just show all
+          // For rich objects, we probably want to show them even if title matches, to show year/director
+          setSuggestions(suggestionResults);
+          setOriginalInput(title.trim());
+          setShowSuggestions(true);
         } else {
           setSuggestions([]);
           setShowSuggestions(false);
@@ -199,7 +193,7 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
   };
 
   // Handle suggestion select
-  const handleSuggestionSelect = (suggestion: string) => {
+  const handleSuggestionSelect = (suggestion: MovieSuggestion) => {
     if (debounceTimer) {
       clearTimeout(debounceTimer);
       setDebounceTimer(null);
@@ -207,9 +201,11 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
     setIsLoadingSuggestions(false);
     setSelectedSuggestionIndex(-1);
 
+    const titleWithYear = suggestion.year ? `${suggestion.title} (${suggestion.year})` : suggestion.title;
+
     setMovieInput({
       ...movieInput,
-      movieTitle: suggestion,
+      movieTitle: titleWithYear,
     });
     setSuggestions([]);
     setShowSuggestions(false);
@@ -405,7 +401,11 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
                           : 'text-slate-200 hover:bg-slate-600'
                       }`}
                     >
-                      <span className="flex-1">{suggestion}</span>
+                      <div className="flex-1">
+                        <div className="font-medium">{suggestion.title} {suggestion.year && <span className="opacity-75">({suggestion.year})</span>}</div>
+                        <div className="text-xs opacity-75">{suggestion.type} • {suggestion.director}</div>
+                        {suggestion.description && <div className="text-xs opacity-60 truncate">{suggestion.description}</div>}
+                      </div>
                       {index === 0 && (
                         <span className="text-xs bg-green-600 px-2 py-0.5 rounded-full opacity-75 group-hover:opacity-100 ml-2">
                           Best Match

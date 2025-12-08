@@ -1,8 +1,5 @@
-
-
-
 import { GoogleGenerativeAI, GenerateContentResult } from "@google/generative-ai";
-import { ReviewLayer, ReviewStage, LayerAnalysisData, GroundingChunkWeb, GroundingMetadata, PersonnelData, SummaryReportData, CreativeSparkResult, VonnegutShapeData, PlotPoint, ScriptIdeaInput, MagicQuotientAnalysis, MorphokineticsAnalysis, FinancialAnalysisData, SocialSnippets } from '../types';
+import { ReviewLayer, ReviewStage, LayerAnalysisData, GroundingChunkWeb, GroundingMetadata, PersonnelData, SummaryReportData, CreativeSparkResult, VonnegutShapeData, PlotPoint, ScriptIdeaInput, MagicQuotientAnalysis, MorphokineticsAnalysis, FinancialAnalysisData, SocialSnippets, MovieSuggestion } from '../types';
 import { MAX_SCORE, MAGIC_QUOTIENT_DISCLAIMER } from '../constants';
 import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
@@ -261,7 +258,7 @@ const generatePromptForLayer = (
   // In a production system, this function would be on the backend.
   
   // Get current date for release validation
-  const { currentYear } = getDynamicDateRange();
+  const { currentDate } = getDynamicDateRange();
   
   let context = "";
   let releaseStatusNote = "";
@@ -342,7 +339,8 @@ const generatePromptForLayer = (
     IMPORTANT: Analyze ONLY the content provided for "${movieTitle}" (${reviewStage}). Do NOT make assumptions about whether this movie/series exists, has been released, or is announced. Focus ONLY on analyzing the creative content as presented to you.
     
     RELEASE STATUS GUIDANCE: ${releaseStatusNote}
-    Current year: ${currentYear}. Only consider content as "not released" if you have specific information indicating a future release date.
+    Current Date: ${currentDate}. 
+    CONTEXT: The user is primarily interested in Indian cinema (Bollywood, Tollywood, etc.) and recent global releases. If the title is ambiguous, prioritize Indian movies or recent releases from late 2024/2025.
     
     Analyze "${movieTitle}" (${reviewStage}) focusing on "${layerTitle}" (${layerDescription}).
     ${context}
@@ -666,6 +664,16 @@ const generatePromptForFinalReport = (
     
     After the main report and improvement opportunities, generate two distinct social media posts formatted as follows. Do not use markdown like "###" or "**" inside these social media blocks.
 
+    ---PIXAR STYLE SCENES START---
+    Generate 3 distinct, vivid descriptions of representative scenes from the movie, imagined in a "Pixar Animation Style".
+    Focus on:
+    - Vibrant colors and lighting.
+    - Expressive character emotions.
+    - Whimsical or dramatic composition.
+    - "Nano Banana" aesthetic (playful, detailed, slightly stylized).
+    Format: Just the 3 descriptions, separated by newlines. No numbering or bullet points.
+    ---PIXAR STYLE SCENES END---
+
     ---TWITTER POST START---
     Generate a compelling Twitter (X) post (under 280 characters).
     - Start with a strong hook to grab attention.
@@ -697,12 +705,18 @@ const parseFinalReportAndMore = (fullResponse: string, existingFinancialData?: F
   const linkedinMatch = fullResponse.match(/---LINKEDIN POST START---([\s\S]*?)---LINKEDIN POST END---/im);
   const linkedin = linkedinMatch ? linkedinMatch[1].trim() : undefined;
 
+  const pixarScenesMatch = fullResponse.match(/---PIXAR STYLE SCENES START---([\s\S]*?)---PIXAR STYLE SCENES END---/im);
+  const pixarStyleScenes = pixarScenesMatch 
+    ? pixarScenesMatch[1].trim().split('\n').filter(line => line.trim().length > 0) 
+    : undefined;
+
   const socialSnippets: SocialSnippets = { twitter, linkedin };
 
   let reportText = fullResponse;
   // Strip social media blocks from the main text
   if (twitterMatch) reportText = reportText.replace(twitterMatch[0], '');
   if (linkedinMatch) reportText = reportText.replace(linkedinMatch[0], '');
+  if (pixarScenesMatch) reportText = reportText.replace(pixarScenesMatch[0], '');
 
   // Parse overall improvements
   let overallImprovementSuggestionsRaw: string | undefined = undefined;
@@ -720,7 +734,8 @@ const parseFinalReportAndMore = (fullResponse: string, existingFinancialData?: F
     reportText, 
     socialSnippets,
     overallImprovementSuggestions,
-    financialAnalysis: existingFinancialData || undefined
+    financialAnalysis: existingFinancialData || undefined,
+    pixarStyleScenes // Added
   };
 };
 
@@ -1663,7 +1678,6 @@ Begin matching:
 };
 
 
-
 // Greybrainer Comparison Analysis
 export const generateGreybrainerComparisonWithGemini = async (
   item1: { title: string; type: string; description?: string },
@@ -1786,5 +1800,75 @@ export const generateDetailedReportFromInsightWithGemini = async (
     console.error('Gemini API error generating detailed insight report:', error);
     handleGeminiError(error as Error, 'Detailed Report Generation');
     throw new Error('Unexpected error in detailed report generation');
+  }
+};
+
+// Simple movie title suggestions using Gemini API
+export const searchMovies = async (
+  query: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<MovieSuggestion[]> => {
+  if (!query || query.trim().length < 2) {
+    return [];
+  }
+
+  const { currentDate } = getDynamicDateRange();
+
+  const prompt = `
+You are a movie database assistant. The user is searching for: "${query}"
+Current Date: ${currentDate}
+
+List up to 5 movies or TV series that match this query.
+CONTEXT: The user is primarily interested in Indian cinema (Bollywood, Tollywood, etc.) and recent global releases. If the title is ambiguous, prioritize Indian movies or recent releases from late 2024/2025.
+
+For each match, provide:
+- Title
+- Year of release
+- Director (or Creator for series)
+- Type (Movie or Series)
+- A very brief one-line description (max 10 words) to help identify it.
+
+Format the output as a JSON array of objects.
+Example JSON format:
+[
+  { "title": "Avatar", "year": "2009", "director": "James Cameron", "type": "Movie", "description": "Paraplegic Marine on alien planet Pandora." },
+  { "title": "Avatar: The Last Airbender", "year": "2005", "director": "Michael Dante DiMartino", "type": "Series", "description": "Aang must master four elements." }
+]
+
+Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
+  `.trim();
+
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: getSelectedGeminiModel(),
+      generationConfig: {
+        temperature: 0.3,
+        responseMimeType: "application/json"
+      }
+    });
+    
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); 
+    
+    const response = await model.generateContent(prompt);
+    clearTimeout(timeoutId);
+    
+    const responseText = response.response.text().trim();
+    logTokenUsage?.('Movie Search (Gemini)', prompt.length, responseText.length);
+    
+    // Clean up potential markdown code blocks if the model ignores the instruction
+    const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    
+    const suggestions: MovieSuggestion[] = JSON.parse(cleanJson);
+    return suggestions;
+  } catch (error) {
+    console.error('Gemini API error searching movies:', error);
+    // Fallback to simple suggestions if JSON parsing fails or other error
+    try {
+       const simpleSuggestions = await suggestMovieTitles(query, logTokenUsage);
+       return simpleSuggestions.map(s => ({ title: s }));
+    } catch (e) {
+       return [];
+    }
   }
 };

@@ -1,5 +1,3 @@
-
-
 import React, { useState, useMemo, useEffect } from 'react';
 import { ClipboardIcon } from './icons/ClipboardIcon';
 import { DownloadIcon } from './icons/DownloadIcon'; // New Icon
@@ -19,6 +17,7 @@ import { TwitterIcon } from './icons/TwitterIcon';
 import { LinkedInIcon } from './icons/LinkedInIcon';
 import { PublishableAnalysisReport } from './PublishableAnalysisReport';
 import { ShareIcon } from './icons/ShareIcon';
+import { SparklesIcon } from './icons/SparklesIcon'; // Added import
 
 
 interface ReportDisplayProps {
@@ -471,6 +470,26 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
         </p>
       </div>
 
+      {/* Pixar Style Scenes Section */}
+      {summaryReportData.pixarStyleScenes && summaryReportData.pixarStyleScenes.length > 0 && (
+        <div className="mb-8 p-6 bg-gradient-to-br from-purple-900/50 to-indigo-900/50 rounded-xl border border-purple-500/30">
+          <div className="flex items-center mb-4">
+            <SparklesIcon className="w-6 h-6 text-yellow-400 mr-3" />
+            <h3 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 to-pink-300">
+              Representative Scenes (Pixar Style)
+            </h3>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {summaryReportData.pixarStyleScenes.map((scene, index) => (
+              <div key={index} className="p-4 bg-slate-800/80 rounded-lg border border-slate-600 hover:border-purple-400 transition-colors shadow-lg">
+                <div className="text-xs font-bold text-purple-300 mb-2 uppercase tracking-wider">Scene {index + 1}</div>
+                <p className="text-sm text-slate-200 leading-relaxed italic">"{scene}"</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Financial & ROI Insights Section */}
       {financialAnalysisData && (
         <div className="my-8 p-4 bg-slate-700/40 border border-slate-600/60 rounded-lg">
@@ -681,7 +700,7 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
         layerAnalyses={layerAnalyses}
         personnelData={personnelData}
         actualPerformance={localActualPerformance}
-        financialAnalysisData={financialAnalysisData}
+        financialAnalysisData={financialAnalysisData || undefined}
         maxScore={maxScore}
       />
 
@@ -691,9 +710,9 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
           movieTitle={title}
           layerAnalyses={layerAnalyses}
           summaryReport={summaryReportData}
-          morphokineticsAnalysis={morphokineticsAnalysis}
+          morphokineticsAnalysis={morphokineticsAnalysis || undefined}
           personnelData={personnelData}
-          financialAnalysisData={financialAnalysisData}
+          financialAnalysisData={financialAnalysisData || undefined}
           onClose={() => setShowPublishableReport(false)}
         />
       )}
