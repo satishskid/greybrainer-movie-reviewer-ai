@@ -206,6 +206,8 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
     setMovieInput({
       ...movieInput,
       movieTitle: titleWithYear,
+      year: suggestion.year,
+      director: suggestion.director,
     });
     setSuggestions([]);
     setShowSuggestions(false);

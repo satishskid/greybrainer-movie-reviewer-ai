@@ -185,6 +185,8 @@ export interface MovieAnalysisInput {
     reviewStage: ReviewStage;
     productionBudget?: number; // User-provided budget
     enableROIAnalysis?: boolean; // Opt-in for ROI/financial analysis
+    year?: string;
+    director?: string;
 }
 
 // For AI Morphokinetics Analysis

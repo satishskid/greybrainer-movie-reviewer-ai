@@ -190,11 +190,22 @@ interface SceneIdea {
 }
 
 // Add missing generateAnalysisPrompt function
-const generateAnalysisPrompt = (movieTitle: string, reviewStage: ReviewStage, layer: ReviewLayer, layerTitle: string, layerDescription: string): string => {
+const generateAnalysisPrompt = (movieTitle: string, reviewStage: ReviewStage, layer: ReviewLayer, layerTitle: string, layerDescription: string, year?: string, director?: string): string => {
+  const contextInfo = [
+    year ? `Year: ${year}` : '',
+    director ? `Director: ${director}` : ''
+  ].filter(Boolean).join(', ');
+
+  const titleWithContext = contextInfo ? `"${movieTitle}" (${contextInfo})` : `"${movieTitle}"`;
+
   return `
-    You are an expert film critic analyzing "${movieTitle}" (${reviewStage}).
+    You are an expert film critic analyzing ${titleWithContext} (${reviewStage}).
     Focus on the ${layerTitle}: ${layerDescription}
     
+    IMPORTANT: Ensure you are analyzing the correct movie.
+    ${year ? `Release Year: ${year}` : ''}
+    ${director ? `Director: ${director}` : ''}
+
     Provide a comprehensive analysis including:
     1. Detailed critique of this specific aspect
     2. Strengths and weaknesses
@@ -592,6 +603,8 @@ const generatePromptForFinalReport = (
   analyses: LayerAnalysisData[], 
   personnelData?: PersonnelData,
   financialData?: FinancialAnalysisData | null,
+  year?: string,
+  director?: string,
 ): string => {
   const storyAnalysis = analyses.find(a => a.id === ReviewLayer.STORY);
   const conceptualizationAnalysis = analyses.find(a => a.id === ReviewLayer.CONCEPTUALIZATION);
@@ -604,6 +617,14 @@ const generatePromptForFinalReport = (
     if (personnelData.mainCast && personnelData.mainCast.length > 0) personnelContext += `Main Cast - ${personnelData.mainCast.join(', ')}. `;
     personnelContext += "\n";
   }
+
+  // Add explicit context for disambiguation
+  const explicitContext = [
+    year ? `Year: ${year}` : '',
+    director ? `Director: ${director}` : ''
+  ].filter(Boolean).join(', ');
+  
+  const titleWithContext = explicitContext ? `"${movieTitle}" (${explicitContext})` : `"${movieTitle}"`;
 
   const scoredLayers = analyses.filter(l => typeof l.userScore === 'number');
   const overallScore = scoredLayers.length > 0 ? (scoredLayers.reduce((sum, l) => sum + (l.userScore as number), 0) / scoredLayers.length) : null;
@@ -643,7 +664,12 @@ const generatePromptForFinalReport = (
 
 
   return `
-    You are an expert film critic generating a "Greybrainer" summary report for "${movieTitle}" (${reviewStage}).
+    You are an expert film critic generating a "Greybrainer" summary report for ${titleWithContext} (${reviewStage}).
+    
+    IMPORTANT: Ensure you are analyzing the correct movie.
+    ${year ? `Release Year: ${year}` : ''}
+    ${director ? `Director: ${director}` : ''}
+
     Synthesize insights from Story/Script, Conceptualization, and Performance/Execution layers.
     The Conceptualization analysis includes casting assessment. Story analysis details plot, characters, themes, originality.
     Output: A cohesive, engaging summary (250-350 words) for blog/social media. Tone: exciting, academic, critical.
@@ -1150,8 +1176,10 @@ export const analyzeLayerWithGemini = async (
   layerTitle: string,
   layerDescription: string,
   logTokenUsage?: LogTokenUsageFn,
+  year?: string,
+  director?: string,
 ): Promise<ParsedLayerAnalysis> => {
-  const prompt = generateAnalysisPrompt(movieTitle, reviewStage, layer, layerTitle, layerDescription);
+  const prompt = generateAnalysisPrompt(movieTitle, reviewStage, layer, layerTitle, layerDescription, year, director);
   
   try {
     const model = getGeminiAI().getGenerativeModel({ 
@@ -1217,6 +1245,8 @@ export const generateFinalReportWithGemini = async (
   personnelData: PersonnelData | undefined,
   financialData: FinancialAnalysisData | null,
   logTokenUsage?: LogTokenUsageFn,
+  year?: string,
+  director?: string,
 ): Promise<SummaryReportData> => {
   const storyAnalysis = analyses.find(a => a.id === ReviewLayer.STORY);
   const conceptAnalysis = analyses.find(a => a.id === ReviewLayer.CONCEPTUALIZATION);
@@ -1243,8 +1273,19 @@ export const generateFinalReportWithGemini = async (
     analysisContext += `**Main Cast:** ${personnelData.mainCast.join(', ')}\n`;
   }
 
+  const explicitContext = [
+    year ? `Year: ${year}` : '',
+    director ? `Director: ${director}` : ''
+  ].filter(Boolean).join(', ');
+  
+  const titleWithContext = explicitContext ? `"${movieTitle}" (${explicitContext})` : `"${movieTitle}"`;
+
   const prompt = `
-You are a film industry expert creating a comprehensive summary report for "${movieTitle}".
+You are a film industry expert creating a comprehensive summary report for ${titleWithContext}.
+
+IMPORTANT: Ensure you are analyzing the correct movie.
+${year ? `Release Year: ${year}` : ''}
+${director ? `Director: ${director}` : ''}
 
 ${analysisContext}
 

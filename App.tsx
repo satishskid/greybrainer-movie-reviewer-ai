@@ -132,7 +132,16 @@ const App: React.FC = () => {
     const analysesPromises = LAYER_DEFINITIONS.map(async (layerDef) => {
       setLayerAnalyses(prev => prev.map(l => l.id === layerDef.id ? { ...l, isLoading: true, error: null, aiGeneratedText: '', editedText: '', userScore: undefined, aiSuggestedScore: undefined, groundingSources: [], improvementSuggestions: undefined, vonnegutShape: undefined } : l));
       try {
-        const result: ParsedLayerAnalysis = await analyzeLayerWithGemini(confirmedMovieTitle, movieInput.reviewStage, layerDef.id, layerDef.title, layerDef.description, logTokenUsage);
+        const result: ParsedLayerAnalysis = await analyzeLayerWithGemini(
+          confirmedMovieTitle, 
+          movieInput.reviewStage, 
+          layerDef.id, 
+          layerDef.title, 
+          layerDef.description, 
+          logTokenUsage,
+          movieInput.year,
+          movieInput.director
+        );
         setLayerAnalyses(prev => prev.map(l => l.id === layerDef.id ? { 
           ...l, aiGeneratedText: result.analysisText, editedText: result.analysisText, isLoading: false,
           aiSuggestedScore: result.aiSuggestedScore, userScore: result.aiSuggestedScore !== undefined ? result.aiSuggestedScore : undefined, 
@@ -243,7 +252,16 @@ const App: React.FC = () => {
     }
 
     try {
-      const reportData = await generateFinalReportWithGemini(movieInput.movieTitle, movieInput.reviewStage, layerAnalyses, personnelData, currentFinancialData, logTokenUsage);
+      const reportData = await generateFinalReportWithGemini(
+        movieInput.movieTitle, 
+        movieInput.reviewStage, 
+        layerAnalyses, 
+        personnelData, 
+        currentFinancialData, 
+        logTokenUsage,
+        movieInput.year,
+        movieInput.director
+      );
       setSummaryReport(reportData);
     } catch (error) {
       console.error('Error generating final report:', error);
