@@ -11,9 +11,6 @@
 [build.environment]
   # Node.js version
   NODE_VERSION = "18"
-  
-  # NPM version (optional)
-  NPM_VERSION = "9"
 
 # Redirect rules for SPA (Single Page Application)
 [[redirects]]
