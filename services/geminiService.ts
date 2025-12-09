@@ -1679,7 +1679,7 @@ Provide 8-12 most likely matches as a numbered list, ordered by relevance (recen
 3. [Recent alternate spelling/transliteration]
 ...
 
-Focus on real, existing movies and series. **Strongly prioritize 2024-2025 releases and current year films** and currently popular titles. Include release years when helpful for disambiguation.
+Focus on real, existing movies and series. **Strongly prioritize ${previousYear}-${currentYear} releases and current year films** and currently popular titles. Include release years when helpful for disambiguation.
 
 Begin matching:
   `.trim();
@@ -1853,14 +1853,14 @@ export const searchMovies = async (
     return [];
   }
 
-  const { currentDate } = getDynamicDateRange();
+  const { currentDate, currentYear, previousYear } = getDynamicDateRange();
 
   const prompt = `
 You are a movie database assistant. The user is searching for: "${query}"
 Current Date: ${currentDate}
 
 List up to 5 movies or TV series that match this query.
-CONTEXT: The user is primarily interested in Indian cinema (Bollywood, Tollywood, etc.) and recent global releases. If the title is ambiguous, prioritize Indian movies or recent releases from late 2024/2025.
+CONTEXT: The user is primarily interested in Indian cinema (Bollywood, Tollywood, etc.) and recent global releases. If the title is ambiguous, prioritize Indian movies or recent releases from late ${previousYear}/${currentYear}.
 
 For each match, provide:
 - Title
