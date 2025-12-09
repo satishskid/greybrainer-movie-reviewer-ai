@@ -1726,12 +1726,12 @@ export const generateGreybrainerComparisonWithGemini = async (
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<string> => {
   // Get current date for release validation
-  const { currentYear } = getDynamicDateRange();
+  const { currentYear, currentDate } = getDynamicDateRange();
   
   const prompt = `
     You are a film and media expert conducting a detailed comparative analysis using the "Greybrainer" methodology.
     
-    Current year: ${currentYear}
+    Current Date: ${currentDate}
     
     Compare these two items:
     
@@ -1745,11 +1745,11 @@ export const generateGreybrainerComparisonWithGemini = async (
     - Title/Name: "${item2.title}"
     ${item2.description ? `- Additional Context: ${item2.description}` : ''}
     
-    IMPORTANT: When analyzing these items, consider their actual release status:
-    - Content from ${currentYear} and earlier should be considered released/available
-    - Only mark content as "unreleased" or "upcoming" if you have specific knowledge of a future release date
-    - Do not assume all recent content is unreleased
-    - Use the current year (${currentYear}) as the reference point for determining release status
+    IMPORTANT: When analyzing these items, consider their actual release status relative to TODAY (${currentDate}):
+    - Content released in ${currentYear} or earlier is RELEASED.
+    - Do NOT label items as "unreleased" or "in production" if they would have been released by ${currentDate}.
+    - If the user is asking to compare them, assume they are both available for analysis unless one is explicitly a future project (e.g., scheduled for ${currentYear + 1}).
+    - Use your creative capabilities to analyze them as finished works if they are from the current year.
     
     Provide a comprehensive comparative analysis (400-600 words) structured as follows:
     
