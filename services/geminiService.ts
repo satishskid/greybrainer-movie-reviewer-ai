@@ -1258,6 +1258,95 @@ export const generateFinalReportWithGemini = async (
   }
 };
 
+export const generateDirectorModeBlogPost = async (
+  movieTitle: string,
+  summaryReport: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string> => {
+  const prompt = `
+You are a hybrid Film Director and Content Strategy Consultant for my blog. Your job is to:
+
+Turn my topic into a cinematic narrative with visual moments, and
+
+Turn that same narrative into a strategic content system (blog posts, social posts, and email ideas) designed to grow my audience and revenue.​
+
+The topic is a review and analysis of the movie: "${movieTitle}".
+Here is the summary of the analysis:
+"${summaryReport}"
+
+When I give you a topic, follow this exact workflow:
+
+A. Film‑style story for the blog
+Protagonist & audience fit
+
+Define a detailed protagonist profile that represents my ideal reader: demographics, backstory, current frustrations, desires, and transformation they want.
+
+Explain in 2–3 bullet points why this character is the perfect stand‑in for my audience.​
+
+Mini‑film narrative for the article
+
+Outline an 8‑minute “mini‑film” story that can be told as a long‑form blog post:
+
+Act 1: Hook scene (where they are stuck).
+
+Act 2: Turning point (discovery of my idea/process).
+
+Act 3: Transformation (what life looks like after applying it).
+
+For each act, give:
+
+A scene summary written in plain language I can turn into paragraphs.
+
+Emotions to highlight.
+
+2–3 concrete visual details I can describe (environment, objects, specific actions).​
+
+Storyboards as section structure
+
+Create 6 “storyboard frames” that double as blog sections. For each frame:
+
+Section title (H2).
+
+1–2 sentences describing the scene.
+
+3–5 bullet points for what I should cover in that section (advice, examples, or steps).​
+
+B. Content strategy consultant for my niche
+Assume the Dan Koe‑style framework: strong hooks, relatable problems, unique solutions, big promised benefit, confident stance, and a novel perspective.​​
+
+Hook & angle bank
+
+Generate 15 potential article titles/hooks for this topic using that framework.
+
+For each, break down:
+
+Hook line.
+
+Relatable problem.
+
+Big benefit.
+
+Polarizing or contrarian angle.​​
+  `.trim();
+
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: getSelectedGeminiModel(),
+      generationConfig: {
+        temperature: 0.8
+      }
+    });
+    const response = await model.generateContent(prompt);
+    const blogPost = response.response.text().trim();
+    logTokenUsage?.('Director Mode Blog Generation (Gemini)', prompt.length, blogPost.length);
+    return blogPost;
+  } catch (error) {
+    console.error('Gemini API error generating director mode blog post:', error);
+    handleGeminiError(error as Error, 'Director Mode Blog Generation');
+    throw new Error('Unexpected error in director mode blog generation');
+  }
+};
+
 // Personnel Analysis
 export const analyzeStakeholderMagicFactor = async (
   name: string,
@@ -1508,7 +1597,7 @@ Begin your analysis:
         const match = line.match(/Time:\s*([\d.]+)\s*\|\s*Intensity:\s*(\d+)\s*\|\s*Valence:\s*([-\d.]+)\s*\|\s*Emotion:\s*([^|]+)\s*\|\s*Twist:\s*([^|]+)\s*\|\s*Pacing:\s*([^|]+)\s*\|\s*Description:\s*(.+)/i);
         
         if (match) {
-          keyMoments.push({
+                   keyMoments.push({
             time: parseFloat(match[1]),
             intensityScore: parseInt(match[2]),
             emotionalValence: parseFloat(match[3]),
@@ -1553,7 +1642,7 @@ You are an expert film database consultant with comprehensive knowledge of:
 
 User input: "${userInput}"
 
-Current year: ${currentYear}
+Current Date: ${currentYear}
 
 Find and suggest the most likely movie/series matches for this input. **PRIORITIZE ${currentYear} RELEASES AND CURRENT FILMS** but also include relevant classics if they match well.
 

@@ -4,7 +4,8 @@ import { ClipboardIcon } from './icons/ClipboardIcon';
 import { DownloadIcon } from './icons/DownloadIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
 import { LayerAnalysisData, SummaryReportData, PersonnelData, ActualPerformanceData, FinancialAnalysisData } from '../types';
-import { LAYER_DEFINITIONS, MAX_SCORE, LAYER_SHORT_NAMES } from '../constants';
+import { LAYER_DEFINITIONS, LAYER_SHORT_NAMES } from '../constants';
+import { generateDirectorModeBlogPost } from '../services/geminiService';
 
 interface BlogExportModalProps {
   isOpen: boolean;
@@ -32,12 +33,31 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
   const [copiedBlog, setCopiedBlog] = useState(false);
   const [copiedSocial, setCopiedSocial] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState<'blog' | 'social'>('blog');
+  const [directorMode, setDirectorMode] = useState(false);
+  const [isGeneratingDirectorMode, setIsGeneratingDirectorMode] = useState(false);
+  const [directorModeContent, setDirectorModeContent] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
   const overallScore = layerAnalyses.reduce((sum, layer) => sum + (layer.userScore || 0), 0);
 
+  const handleGenerateDirectorMode = async () => {
+    setIsGeneratingDirectorMode(true);
+    try {
+      const content = await generateDirectorModeBlogPost(title, summaryReportData.reportText);
+      setDirectorModeContent(content);
+    } catch (error) {
+      console.error("Failed to generate director mode blog post:", error);
+    } finally {
+      setIsGeneratingDirectorMode(false);
+    }
+  };
+
   const generateBlogPost = (): string => {
+    if (directorMode && directorModeContent) {
+      return directorModeContent;
+    }
+
     let blog = `# 🎬 Greybrainer AI Movie Review: ${title}\n\n`;
     
     // Hero section with score
@@ -124,9 +144,9 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
     }
 
     // ROI Analysis if available
-    if (financialAnalysisData?.roiAnalysisText) {
+    if (financialAnalysisData?.qualitativeROIAnalysis) {
       blog += `## 📈 ROI & Market Analysis\n\n`;
-      blog += `${financialAnalysisData.roiAnalysisText}\n\n`;
+      blog += `${financialAnalysisData.qualitativeROIAnalysis}\n\n`;
     }
 
     // Footer
@@ -205,7 +225,7 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
     const link = document.createElement('a');
     link.href = url;
     const safeTitle = title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const suffix = selectedFormat === 'blog' ? 'blog_post' : 'social_post';
+    const suffix = selectedFormat === 'blog' ? (directorMode ? 'director_cut' : 'blog_post') : 'social_post';
     link.download = `${safeTitle}_${suffix}.md`;
     document.body.appendChild(link);
     link.click();
@@ -233,35 +253,78 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-140px)]">
           {/* Format Selection */}
-          <div className="flex space-x-4 mb-6">
-            <button
-              onClick={() => setSelectedFormat('blog')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                selectedFormat === 'blog'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              }`}
-            >
-              📝 Blog Post Format
-            </button>
-            <button
-              onClick={() => setSelectedFormat('social')}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                selectedFormat === 'social'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              }`}
-            >
-              📱 Social Media Format
-            </button>
+          <div className="flex flex-col space-y-4 mb-6">
+            <div className="flex space-x-4">
+              <button
+                onClick={() => setSelectedFormat('blog')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedFormat === 'blog'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                📝 Blog Post Format
+              </button>
+              <button
+                onClick={() => setSelectedFormat('social')}
+                className={`px-4 py-2 rounded-lg font-medium transition-colors ${
+                  selectedFormat === 'social'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                📱 Social Media Format
+              </button>
+            </div>
+
+            {selectedFormat === 'blog' && (
+              <div className="flex items-center space-x-3 bg-slate-700/30 p-3 rounded-lg border border-slate-600/50">
+                <div className="flex items-center h-5">
+                  <input
+                    id="director-mode"
+                    type="checkbox"
+                    checked={directorMode}
+                    onChange={(e) => setDirectorMode(e.target.checked)}
+                    className="w-4 h-4 text-indigo-600 bg-slate-700 border-slate-500 rounded focus:ring-indigo-500 focus:ring-2"
+                  />
+                </div>
+                <div className="ml-2 text-sm">
+                  <label htmlFor="director-mode" className="font-medium text-slate-200">
+                    🎬 Director Mode (Cinematic Narrative)
+                  </label>
+                  <p className="text-slate-400 text-xs">
+                    Transforms the review into a cinematic story with visual moments and strategic content hooks.
+                  </p>
+                </div>
+                {directorMode && !directorModeContent && (
+                  <button
+                    onClick={handleGenerateDirectorMode}
+                    disabled={isGeneratingDirectorMode}
+                    className={`ml-auto px-3 py-1.5 text-xs font-medium rounded-md text-white transition-colors ${
+                      isGeneratingDirectorMode 
+                        ? 'bg-indigo-500/50 cursor-not-allowed' 
+                        : 'bg-indigo-600 hover:bg-indigo-500'
+                    }`}
+                  >
+                    {isGeneratingDirectorMode ? 'Generating...' : 'Generate Cinematic Cut'}
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Preview */}
           <div className="bg-slate-900 rounded-lg p-4 mb-6 border border-slate-600">
-            <h3 className="text-lg font-semibold text-slate-200 mb-3">Preview:</h3>
+            <h3 className="text-lg font-semibold text-slate-200 mb-3">
+              Preview: {directorMode && selectedFormat === 'blog' ? '🎬 Director\'s Cut' : ''}
+            </h3>
             <div className="bg-slate-800 rounded p-4 max-h-96 overflow-y-auto">
               <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono">
-                {selectedFormat === 'blog' ? generateBlogPost() : generateSocialPost()}
+                {selectedFormat === 'blog' 
+                  ? (directorMode && !directorModeContent 
+                      ? (isGeneratingDirectorMode ? "Generating cinematic narrative... please wait..." : "Enable Director Mode and click 'Generate Cinematic Cut' to create a story-driven blog post.") 
+                      : generateBlogPost())
+                  : generateSocialPost()}
               </pre>
             </div>
           </div>
@@ -270,7 +333,12 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => handleCopy(selectedFormat)}
-              className="flex items-center px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-medium rounded-lg transition-colors"
+              disabled={selectedFormat === 'blog' && directorMode && !directorModeContent}
+              className={`flex items-center px-4 py-2 font-medium rounded-lg transition-colors ${
+                selectedFormat === 'blog' && directorMode && !directorModeContent
+                  ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                  : 'bg-indigo-600 hover:bg-indigo-500 text-white'
+              }`}
             >
               <ClipboardIcon className="w-4 h-4 mr-2" />
               {selectedFormat === 'blog' 
@@ -281,7 +349,12 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
             
             <button
               onClick={handleDownload}
-              className="flex items-center px-4 py-2 bg-teal-600 hover:bg-teal-500 text-white font-medium rounded-lg transition-colors"
+              disabled={selectedFormat === 'blog' && directorMode && !directorModeContent}
+              className={`flex items-center px-4 py-2 font-medium rounded-lg transition-colors ${
+                selectedFormat === 'blog' && directorMode && !directorModeContent
+                  ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
+                  : 'bg-teal-600 hover:bg-teal-500 text-white'
+              }`}
             >
               <DownloadIcon className="w-4 h-4 mr-2" />
               Download {selectedFormat === 'blog' ? 'Blog' : 'Social'} Post
