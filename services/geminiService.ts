@@ -205,6 +205,7 @@ const generateAnalysisPrompt = (movieTitle: string, reviewStage: ReviewStage, la
     IMPORTANT: Ensure you are analyzing the correct movie.
     ${year ? `Release Year: ${year}` : ''}
     ${director ? `Director: ${director}` : ''}
+    If the movie is a very recent release, use Google Search to find the latest details.
 
     Provide a comprehensive analysis including:
     1. Detailed critique of this specific aspect
@@ -593,132 +594,6 @@ const filterRelevantSources = (sources: GroundingChunkWeb[]): GroundingChunkWeb[
 
         return hasRelevantKeyword || isRelevantDomain;
     }).slice(0, 5); // Limit to top 5 most relevant sources
-};
-
-// Duplicate function removed - using the one at the end of the file
-
-const generatePromptForFinalReport = (
-  movieTitle: string, 
-  reviewStage: ReviewStage, 
-  analyses: LayerAnalysisData[], 
-  personnelData?: PersonnelData,
-  financialData?: FinancialAnalysisData | null,
-  year?: string,
-  director?: string,
-): string => {
-  const storyAnalysis = analyses.find(a => a.id === ReviewLayer.STORY);
-  const conceptualizationAnalysis = analyses.find(a => a.id === ReviewLayer.CONCEPTUALIZATION);
-  const performanceAnalysis = analyses.find(a => a.id === ReviewLayer.PERFORMANCE);
-
-  let personnelContext = "";
-  if (personnelData && (personnelData.director || (personnelData.mainCast && personnelData.mainCast.length > 0))) {
-    personnelContext = "Key personnel considered: ";
-    if (personnelData.director) personnelContext += `Director - ${personnelData.director}. `;
-    if (personnelData.mainCast && personnelData.mainCast.length > 0) personnelContext += `Main Cast - ${personnelData.mainCast.join(', ')}. `;
-    personnelContext += "\n";
-  }
-
-  // Add explicit context for disambiguation
-  const explicitContext = [
-    year ? `Year: ${year}` : '',
-    director ? `Director: ${director}` : ''
-  ].filter(Boolean).join(', ');
-  
-  const titleWithContext = explicitContext ? `"${movieTitle}" (${explicitContext})` : `"${movieTitle}"`;
-
-  const scoredLayers = analyses.filter(l => typeof l.userScore === 'number');
-  const overallScore = scoredLayers.length > 0 ? (scoredLayers.reduce((sum, l) => sum + (l.userScore as number), 0) / scoredLayers.length) : null;
-  const overallScoreString = overallScore ? `${overallScore.toFixed(1)}/${MAX_SCORE}` : 'Not Scored';
-  const safeMovieTitle = movieTitle.replace(/[^a-zA-Z0-9]/g, '');
-
-  let scoreContext = scoredLayers.length > 0 ? `Editor-assigned scores complement this qualitative summary. The overall score is ${overallScoreString}.` : "";
-
-  const formatSuggestions = (suggestions: string | string[] | undefined): string => {
-    if (!suggestions) return "N/A";
-    if (Array.isArray(suggestions)) return suggestions.map(s => `- ${s}`).join('\n');
-    return suggestions;
-  };
-
-  const improvementSuggestionsContext = `
-    Individual layer analyses also suggested potential enhancements:
-    Story: ${formatSuggestions(storyAnalysis?.improvementSuggestions)}
-    Conceptualization: ${formatSuggestions(conceptualizationAnalysis?.improvementSuggestions)}
-    Performance: ${formatSuggestions(performanceAnalysis?.improvementSuggestions)}
-  `;
-
-  let financialContext = "";
-  if (financialData) {
-    if (financialData.userProvidedBudget) {
-        financialContext += `The user provided an estimated budget of ${financialData.userProvidedBudget} USD.\n`;
-    } else if (financialData.fetchedBudget) {
-        financialContext += `An AI-estimated budget of approximately ${financialData.fetchedBudget} ${financialData.fetchedBudgetCurrency || 'USD'} was found. `;
-        if (financialData.fetchedDuration) {
-            financialContext += `The estimated production duration was ${financialData.fetchedDuration}. `;
-        }
-        financialContext += `This financial data is approximate.\n`;
-    }
-    if (financialData.qualitativeROIAnalysis) {
-        financialContext += `A qualitative ROI analysis was also generated, considering this budget against creative factors.\n`;
-    }
-  }
-
-
-  return `
-    You are an expert film critic generating a "Greybrainer" summary report for ${titleWithContext} (${reviewStage}).
-    
-    IMPORTANT: Ensure you are analyzing the correct movie.
-    ${year ? `Release Year: ${year}` : ''}
-    ${director ? `Director: ${director}` : ''}
-
-    Synthesize insights from Story/Script, Conceptualization, and Performance/Execution layers.
-    The Conceptualization analysis includes casting assessment. Story analysis details plot, characters, themes, originality.
-    Output: A cohesive, engaging summary (250-350 words) for blog/social media. Tone: exciting, academic, critical.
-    ${personnelContext}
-    ${scoreContext}
-    ${financialContext}
-
-    Layer Analyses:
-    1. Story/Script: "${storyAnalysis?.editedText || "No analysis."}"
-    2. Conceptualization: "${conceptualizationAnalysis?.editedText || "No analysis."}"
-    3. Performance/Execution: "${performanceAnalysis?.editedText || "No analysis."}"
-
-    ${improvementSuggestionsContext}
-
-    Craft a compelling "Greybrainer Summary Report". Focus on interplay, overall originality (weaving in story similarity/casting notes if significant), and potential impact.
-    
-    After the main report, provide "Overall Improvement Opportunities:" - a short section (2-3 bullet points, 100-150 words total, using standard bullet points like - item).
-    
-    After the main report and improvement opportunities, generate two distinct social media posts formatted as follows. Do not use markdown like "###" or "**" inside these social media blocks.
-
-    ---PIXAR STYLE SCENES START---
-    Generate 3 distinct, vivid descriptions of representative scenes from the movie, imagined in a "Pixar Animation Style".
-    Focus on:
-    - Vibrant colors and lighting.
-    - Expressive character emotions.
-    - Whimsical or dramatic composition.
-    - "Nano Banana" aesthetic (playful, detailed, slightly stylized).
-    Format: Just the 3 descriptions, separated by newlines. No numbering or bullet points.
-    ---PIXAR STYLE SCENES END---
-
-    ---TWITTER POST START---
-    Generate a compelling Twitter (X) post (under 280 characters).
-    - Start with a strong hook to grab attention.
-    - Mention the movie title "${movieTitle}".
-    - Include the Overall Greybrainer Score if available: ${overallScoreString}.
-    - Use 3-4 relevant hashtags (e.g., #${safeMovieTitle}, #FilmAnalysis, #MovieReview, #GreybrainerAI).
-    - End with a call to action and the placeholder "[LINK_TO_FULL_REPORT_HERE]".
-    ---TWITTER POST END---
-
-    ---LINKEDIN POST START---
-    Generate a professional LinkedIn post (approx. 2-3 short paragraphs).
-    - Target audience: Filmmakers, producers, analysts, and film students.
-    - Start with an analytical or thought-provoking question about "${movieTitle}".
-    - Summarize the key findings from the Greybrainer analysis (e.g., "Our analysis reveals exceptional story architecture but identifies potential gaps in conceptualization...").
-    - Mention the core layers (Story, Conceptualization, Performance) and the overall score if available: ${overallScoreString}.
-    - Conclude with an invitation for professional discussion and the placeholder "[LINK_TO_FULL_REPORT_HERE]".
-    - Include relevant professional hashtags (e.g., #FilmIndustry, #Screenwriting, #FilmProduction, #CreativeAnalysis, #Greybrainer).
-    ---LINKEDIN POST END---
-  `;
 };
 
 const parseFinalReportAndMore = (fullResponse: string, existingFinancialData?: FinancialAnalysisData | null): SummaryReportData => {
@@ -1184,6 +1059,7 @@ export const analyzeLayerWithGemini = async (
   try {
     const model = getGeminiAI().getGenerativeModel({ 
       model: getSelectedGeminiModel(),
+      tools: [{ googleSearch: {} }],
       generationConfig: {
         temperature: 0.7
       }
@@ -1249,30 +1125,18 @@ export const generateFinalReportWithGemini = async (
   director?: string,
 ): Promise<SummaryReportData> => {
   const storyAnalysis = analyses.find(a => a.id === ReviewLayer.STORY);
-  const conceptAnalysis = analyses.find(a => a.id === ReviewLayer.CONCEPTUALIZATION);
+  const conceptualizationAnalysis = analyses.find(a => a.id === ReviewLayer.CONCEPTUALIZATION);
   const performanceAnalysis = analyses.find(a => a.id === ReviewLayer.PERFORMANCE);
 
-  let analysisContext = `Based on the detailed analysis of "${movieTitle}" (${reviewStage}), here are the key findings:\n\n`;
-  
-  if (storyAnalysis) {
-    analysisContext += `**Story/Script Analysis (Score: ${storyAnalysis.userScore || storyAnalysis.aiSuggestedScore || 'N/A'}/${MAX_SCORE}):**\n${storyAnalysis.editedText || storyAnalysis.aiGeneratedText}\n\n`;
-  }
-  
-  if (conceptAnalysis) {
-    analysisContext += `**Conceptualization Analysis (Score: ${conceptAnalysis.userScore || conceptAnalysis.aiSuggestedScore || 'N/A'}/${MAX_SCORE}):**\n${conceptAnalysis.editedText || conceptAnalysis.aiGeneratedText}\n\n`;
-  }
-  
-  if (performanceAnalysis) {
-    analysisContext += `**Performance Analysis (Score: ${performanceAnalysis.userScore || performanceAnalysis.aiSuggestedScore || 'N/A'}/${MAX_SCORE}):**\n${performanceAnalysis.editedText || performanceAnalysis.aiGeneratedText}\n\n`;
+  let personnelContext = "";
+  if (personnelData && (personnelData.director || (personnelData.mainCast && personnelData.mainCast.length > 0))) {
+    personnelContext = "Key personnel considered: ";
+    if (personnelData.director) personnelContext += `Director - ${personnelData.director}. `;
+    if (personnelData.mainCast && personnelData.mainCast.length > 0) personnelContext += `Main Cast - ${personnelData.mainCast.join(', ')}. `;
+    personnelContext += "\n";
   }
 
-  if (personnelData?.director) {
-    analysisContext += `**Director:** ${personnelData.director}\n`;
-  }
-  if (personnelData?.mainCast && personnelData.mainCast.length > 0) {
-    analysisContext += `**Main Cast:** ${personnelData.mainCast.join(', ')}\n`;
-  }
-
+  // Add explicit context for disambiguation
   const explicitContext = [
     year ? `Year: ${year}` : '',
     director ? `Director: ${director}` : ''
@@ -1280,39 +1144,104 @@ export const generateFinalReportWithGemini = async (
   
   const titleWithContext = explicitContext ? `"${movieTitle}" (${explicitContext})` : `"${movieTitle}"`;
 
+  const scoredLayers = analyses.filter(l => typeof l.userScore === 'number');
+  const overallScore = scoredLayers.length > 0 ? (scoredLayers.reduce((sum, l) => sum + (l.userScore as number), 0) / scoredLayers.length) : null;
+  const overallScoreString = overallScore ? `${overallScore.toFixed(1)}/${MAX_SCORE}` : 'Not Scored';
+  const safeMovieTitle = movieTitle.replace(/[^a-zA-Z0-9]/g, '');
+
+  let scoreContext = scoredLayers.length > 0 ? `Editor-assigned scores complement this qualitative summary. The overall score is ${overallScoreString}.` : "";
+
+  const formatSuggestions = (suggestions: string | string[] | undefined): string => {
+    if (!suggestions) return "N/A";
+    if (Array.isArray(suggestions)) return suggestions.map(s => `- ${s}`).join('\n');
+    return suggestions;
+  };
+
+  const improvementSuggestionsContext = `
+    Individual layer analyses also suggested potential enhancements:
+    Story: ${formatSuggestions(storyAnalysis?.improvementSuggestions)}
+    Conceptualization: ${formatSuggestions(conceptualizationAnalysis?.improvementSuggestions)}
+    Performance: ${formatSuggestions(performanceAnalysis?.improvementSuggestions)}
+  `;
+
+  let financialContext = "";
+  if (financialData) {
+    if (financialData.userProvidedBudget) {
+        financialContext += `The user provided an estimated budget of ${financialData.userProvidedBudget} USD.\n`;
+    } else if (financialData.fetchedBudget) {
+        financialContext += `An AI-estimated budget of approximately ${financialData.fetchedBudget} ${financialData.fetchedBudgetCurrency || 'USD'} was found. `;
+        if (financialData.fetchedDuration) {
+            financialContext += `The estimated production duration was ${financialData.fetchedDuration}. `;
+        }
+        financialContext += `This financial data is approximate.\n`;
+    }
+    if (financialData.qualitativeROIAnalysis) {
+        financialContext += `A qualitative ROI analysis was also generated, considering this budget against creative factors.\n`;
+    }
+  }
+
+
   const prompt = `
-You are a film industry expert creating a comprehensive summary report for ${titleWithContext}.
+    You are an expert film critic generating a "Greybrainer" summary report for ${titleWithContext} (${reviewStage}).
+    
+    IMPORTANT: Ensure you are analyzing the correct movie.
+    ${year ? `Release Year: ${year}` : ''}
+    ${director ? `Director: ${director}` : ''}
 
-IMPORTANT: Ensure you are analyzing the correct movie.
-${year ? `Release Year: ${year}` : ''}
-${director ? `Director: ${director}` : ''}
+    Synthesize insights from Story/Script, Conceptualization, and Performance/Execution layers.
+    The Conceptualization analysis includes casting assessment. Story analysis details plot, characters, themes, originality.
+    Output: A cohesive, engaging summary (250-350 words) for blog/social media. Tone: exciting, academic, critical.
+    ${personnelContext}
+    ${scoreContext}
+    ${financialContext}
 
-${analysisContext}
+    Layer Analyses:
+    1. Story/Script: "${storyAnalysis?.editedText || "No analysis."}"
+    2. Conceptualization: "${conceptualizationAnalysis?.editedText || "No analysis."}"
+    3. Performance/Execution: "${performanceAnalysis?.editedText || "No analysis."}"
 
-Create a well-structured final report (300-500 words) that:
-1. Synthesizes the key insights from all three analysis layers
-2. Provides an overall assessment of the film's creative merit and potential impact
-3. Highlights the most significant strengths and areas for improvement
-4. Offers a balanced perspective on the film's place within its genre and the broader cinematic landscape
+    ${improvementSuggestionsContext}
 
-Additionally, create social media snippets:
-- Twitter: A compelling 280-character summary highlighting the most intriguing aspect
-- LinkedIn: A professional 150-word analysis suitable for industry professionals
+    Craft a compelling "Greybrainer Summary Report". Focus on interplay, overall originality (weaving in story similarity/casting notes if significant), and potential impact.
+    
+    After the main report, provide "Overall Improvement Opportunities:" - a short section (2-3 bullet points, 100-150 words total, using standard bullet points like - item).
+    
+    After the main report and improvement opportunities, generate two distinct social media posts formatted as follows. Do not use markdown like "###" or "**" inside these social media blocks.
 
-Format your response as:
-**FINAL REPORT:**
-[Your comprehensive report]
+    ---PIXAR STYLE SCENES START---
+    Generate 3 distinct, vivid descriptions of representative scenes from the movie, imagined in a "Pixar Animation Style".
+    Focus on:
+    - Vibrant colors and lighting.
+    - Expressive character emotions.
+    - Whimsical or dramatic composition.
+    - "Nano Banana" aesthetic (playful, detailed, slightly stylized).
+    Format: Just the 3 descriptions, separated by newlines. No numbering or bullet points.
+    ---PIXAR STYLE SCENES END---
 
-**SOCIAL SNIPPETS:**
-Twitter: [280-character snippet]
-LinkedIn: [150-word professional snippet]
+    ---TWITTER POST START---
+    Generate a compelling Twitter (X) post (under 280 characters).
+    - Start with a strong hook to grab attention.
+    - Mention the movie title "${movieTitle}".
+    - Include the Overall Greybrainer Score if available: ${overallScoreString}.
+    - Use 3-4 relevant hashtags (e.g., #${safeMovieTitle}, #FilmAnalysis, #MovieReview, #GreybrainerAI).
+    - End with a call to action and the placeholder "[LINK_TO_FULL_REPORT_HERE]".
+    ---TWITTER POST END---
 
-Begin your analysis:
+    ---LINKEDIN POST START---
+    Generate a professional LinkedIn post (approx. 2-3 short paragraphs).
+    - Target audience: Filmmakers, producers, analysts, and film students.
+    - Start with an analytical or thought-provoking question about "${movieTitle}".
+    - Summarize the key findings from the Greybrainer analysis (e.g., "Our analysis reveals exceptional story architecture but identifies potential gaps in conceptualization...").
+    - Mention the core layers (Story, Conceptualization, Performance) and the overall score if available: ${overallScoreString}.
+    - Conclude with an invitation for professional discussion and the placeholder "[LINK_TO_FULL_REPORT_HERE]".
+    - Include relevant professional hashtags (e.g., #FilmIndustry, #Screenwriting, #FilmProduction, #CreativeAnalysis, #Greybrainer).
+    ---LINKEDIN POST END---
   `.trim();
-  
+
   try {
     const model = getGeminiAI().getGenerativeModel({ 
       model: getSelectedGeminiModel(),
+      tools: [{ googleSearch: {} }],
       generationConfig: {
         temperature: 0.7
       }
@@ -1321,27 +1250,7 @@ Begin your analysis:
     const fullResponse = response.response.text().trim();
     logTokenUsage?.('Final Report Generation (Gemini)', prompt.length, fullResponse.length);
     
-    const reportMatch = fullResponse.match(/\*\*FINAL REPORT:\*\*\s*([\s\S]*?)(?=\*\*SOCIAL SNIPPETS:\*\*|$)/i);
-    const socialMatch = fullResponse.match(/\*\*SOCIAL SNIPPETS:\*\*\s*([\s\S]*)/i);
-    
-    let reportText = reportMatch ? reportMatch[1].trim() : fullResponse;
-    let socialSnippets: SocialSnippets = {};
-    
-    if (socialMatch) {
-      const socialContent = socialMatch[1];
-      const twitterMatch = socialContent.match(/Twitter:\s*([^\n]+)/i);
-      const linkedinMatch = socialContent.match(/LinkedIn:\s*([\s\S]*?)(?=Twitter:|$)/i);
-      
-      if (twitterMatch) socialSnippets.twitter = twitterMatch[1].trim();
-      if (linkedinMatch) socialSnippets.linkedin = linkedinMatch[1].trim();
-    }
-    
-    return {
-      reportText,
-      socialSnippets,
-      financialAnalysis: financialData || undefined,
-      isFallbackResult: false
-    };
+    return parseFinalReportAndMore(fullResponse, financialData);
   } catch (error) {
     console.error('Gemini API error generating final report:', error);
     handleGeminiError(error as Error, 'Final Report Generation');
@@ -1862,6 +1771,8 @@ Current Date: ${currentDate}
 List up to 5 movies or TV series that match this query.
 CONTEXT: The user is primarily interested in Indian cinema (Bollywood, Tollywood, etc.) and recent global releases. If the title is ambiguous, prioritize Indian movies or recent releases from late ${previousYear}/${currentYear}.
 
+IMPORTANT: Use your Google Search tool to find the most up-to-date information, especially for movies released in the last few months.
+
 For each match, provide:
 - Title
 - Year of release
@@ -1882,6 +1793,7 @@ Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
   try {
     const model = getGeminiAI().getGenerativeModel({ 
       model: getSelectedGeminiModel(),
+      tools: [{ googleSearch: {} }],
       generationConfig: {
         temperature: 0.3,
         responseMimeType: "application/json"
@@ -1889,7 +1801,7 @@ Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
     });
     
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000); 
+    const timeoutId = setTimeout(() => controller.abort(), 15000); 
     
     const response = await model.generateContent(prompt);
     clearTimeout(timeoutId);
