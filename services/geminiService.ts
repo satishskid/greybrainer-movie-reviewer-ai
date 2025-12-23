@@ -1009,21 +1009,56 @@ export const generateQualitativeROIAnalysisWithGemini = async (
 export const generateGreybrainerInsightWithGemini = async (
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<string> => {
+  const currentDate = new Date().toLocaleDateString('en-US', { 
+    month: 'long', 
+    day: 'numeric', 
+    year: 'numeric' 
+  });
+  
   const prompt = `
-    You are a film industry analyst for Greybrainer AI.
-    Generate a single, concise, and insightful observation (around 40-70 words) about a current trend in filmmaking, movie consumption, narrative techniques, or film technology.
-    This insight should be suitable for a 'Research & Insights' section of an AI film analysis platform.
-    If relevant to current events or very recent trends, use your search capabilities to inform your response.
-    The insight should sound professional and data-informed, even if specific percentages or data points are illustrative or conceptual.
-    Avoid overly generic statements. Aim for something thought-provoking or noteworthy.
-    Provide only the insight text. Do not include any preamble like "Here's an insight:".
+You are a distinguished film scholar analyzing cinema and OTT content consumed in India.
 
-    Example of good insight: "The rise of interactive narratives on streaming platforms is pushing filmmakers to reconsider story branching and audience agency, potentially reshaping episodic content structure for deeper engagement."
-    Another example: "AI-driven virtual production techniques are increasingly democratizing high-concept visuals, allowing independent filmmakers to explore genres previously limited by budget, which could lead to more diverse sci-fi and fantasy offerings."
-  `;
+Current date: ${currentDate}
+
+Generate an insight (100-150 words) about patterns/evolution in Indian cinema and streaming content.
+
+TEMPORAL APPROACH - CRITICAL:
+- ANCHOR with recent releases from THIS MONTH/CURRENT MONTH
+- Show evolution over PAST 2-3 YEARS maximum (not more)
+- Use RELATIVE time references: "recent releases", "this year", "past 2 years", "compared to 2-3 years ago"
+- Audience should recognize the current examples from what they watched recently
+- Never use hardcoded years - always relative to current date
+
+Example phrases to use:
+- "Recent releases this month..."
+- "Compared to content from 2-3 years ago..."
+- "Over the past two years..."
+- "This year's biggest hits..."
+
+Analyze across these dimensions:
+1. STORY LAYER: Character archetypes (hero, heroine, protagonist, anti-hero), genre evolution (comedy, tragedy, dramedy)
+2. ORCHESTRATION LAYER: Visual language, directorial trends, casting strategies
+3. PERFORMANCE LAYER: Acting styles, authenticity, star system evolution
+4. MORPHOKINETICS: Visual aesthetic (look, color grading, cinematography) and pacing (editing speed, rhythm, tempo)
+
+Content scope:
+- Indian theatrical: Bollywood, Tollywood, regional cinema
+- Indian OTT: Original web series and films
+- International content popular in India: Korean, Hollywood, Spanish
+- Platform differences: Theatrical vs OTT pacing and aesthetics
+
+Cite 2-3 specific examples (current month + past 2-3 years).
+Reveal what the PATTERN means for Indian filmmaking and audience consumption.
+
+Start with: [STORY LAYER], [ORCHESTRATION], [PERFORMANCE], or [MORPHOKINETICS]
+
+Generate insight:
+  `.trim();
+  
   try {
     const model = getGeminiAI().getGenerativeModel({ 
       model: getSelectedGeminiModel(),
+      tools: [{ googleSearch: {} }],
       generationConfig: {
         temperature: 0.75,
         topP: 0.9,
@@ -1040,6 +1075,81 @@ export const generateGreybrainerInsightWithGemini = async (
          throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
     }
     throw new Error('Failed to generate Greybrainer insight from AI.');
+  }
+};
+
+// NEW: Movie-Anchored Insight Generation
+export const generateMovieAnchoredInsightWithGemini = async (
+  movieTitle: string,
+  selectedLayer: 'story' | 'orchestration' | 'performance' | 'morphokinetics' | 'random',
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string> => {
+  const currentDate = new Date().toLocaleDateString('en-US', { 
+    month: 'long', 
+    day: 'numeric', 
+    year: 'numeric' 
+  });
+  
+  const layerInstruction = selectedLayer === 'random' 
+    ? 'Choose the most relevant layer (Story, Orchestration, Performance, or Morphokinetics) for this movie' 
+    : `Focus specifically on ${selectedLayer.toUpperCase()} LAYER`;
+  
+  const prompt = `
+You are a distinguished film scholar analyzing cinema and OTT content consumed in India.
+
+Current date: ${currentDate}
+
+MOVIE ANCHOR: "${movieTitle}"
+
+Generate an insight (100-150 words) using this movie as the hook/anchor point, then trace the pattern backward.
+
+${layerInstruction}
+
+STRUCTURE:
+1. START with the anchored movie "${movieTitle}" and identify a specific element
+2. THEN trace how this element evolved over past 2-3 years
+3. REVEAL what this pattern means for Indian cinema/OTT
+
+LAYERS EXPLANATION:
+- STORY LAYER: Character archetypes (hero, heroine, protagonist, anti-hero), genre treatment (comedy, tragedy, dramedy), narrative structure
+- ORCHESTRATION LAYER: Visual language, casting strategy, directorial vision, cinematography, production design
+- PERFORMANCE LAYER: Acting style, authenticity, star system, performance techniques
+- MORPHOKINETICS: Visual aesthetic (look, color grading), pacing (editing speed, rhythm, shot length)
+
+TEMPORAL APPROACH:
+- Use relative time: "current release", "recent", "past 2-3 years ago"
+- Movie audience just watched → how it compares to recent past → evolution insight
+
+Content scope: Indian theatrical + OTT + international content popular in India
+
+Start with: [STORY LAYER], [ORCHESTRATION], [PERFORMANCE], or [MORPHOKINETICS]
+
+Example structure:
+"[LAYER] *${movieTitle}* demonstrates [specific element]. Compared to releases from past 2-3 years like [examples], this reveals [evolution pattern and meaning]."
+
+Generate insight:
+  `.trim();
+
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: getSelectedGeminiModel(),
+      tools: [{ googleSearch: {} }],
+      generationConfig: {
+        temperature: 0.75,
+        topP: 0.9,
+        topK: 50,
+      }
+    });
+    const response = await model.generateContent(prompt);
+    const insightText = response.response.text().trim();
+    logTokenUsage?.('Movie-Anchored Insight Generation (Gemini)', prompt.length, insightText.length);
+    return insightText;
+  } catch (error) {
+    console.error('Gemini API error generating movie-anchored insight:', error);
+    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
+         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
+    }
+    throw new Error('Failed to generate movie-anchored insight from AI.');
   }
 };
 

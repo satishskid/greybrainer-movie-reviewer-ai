@@ -5,7 +5,9 @@ import { DownloadIcon } from './icons/DownloadIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
 import { LayerAnalysisData, SummaryReportData, PersonnelData, ActualPerformanceData, FinancialAnalysisData } from '../types';
 import { LAYER_DEFINITIONS, LAYER_SHORT_NAMES } from '../constants';
-import { generateDirectorModeBlogPost } from '../services/geminiService';
+import { generateDirectorModeBlogPost, LogTokenUsageFn } from '../services/geminiService';
+import { generateEnhancedBlogPost, formatBlogForPlatform } from '../services/blogImageService';
+import { LoadingSpinner } from './LoadingSpinner';
 
 interface BlogExportModalProps {
   isOpen: boolean;
@@ -17,6 +19,7 @@ interface BlogExportModalProps {
   actualPerformance?: ActualPerformanceData;
   financialAnalysisData?: FinancialAnalysisData;
   maxScore: number;
+  logTokenUsage?: LogTokenUsageFn;
 }
 
 export const BlogExportModal: React.FC<BlogExportModalProps> = ({
@@ -28,7 +31,8 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
   personnelData,
   actualPerformance,
   financialAnalysisData,
-  maxScore
+  maxScore,
+  logTokenUsage
 }) => {
   const [copiedBlog, setCopiedBlog] = useState(false);
   const [copiedSocial, setCopiedSocial] = useState(false);
@@ -36,6 +40,12 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
   const [directorMode, setDirectorMode] = useState(false);
   const [isGeneratingDirectorMode, setIsGeneratingDirectorMode] = useState(false);
   const [directorModeContent, setDirectorModeContent] = useState<string | null>(null);
+  
+  // New state for enhanced blog with images
+  const [enhancedMode, setEnhancedMode] = useState(false);
+  const [isGeneratingEnhanced, setIsGeneratingEnhanced] = useState(false);
+  const [enhancedBlogData, setEnhancedBlogData] = useState<any>(null);
+  const [selectedPlatform, setSelectedPlatform] = useState<'markdown' | 'medium' | 'wordpress' | 'html'>('markdown');
 
   if (!isOpen) return null;
 
@@ -53,7 +63,27 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
     }
   };
 
+  const handleGenerateEnhancedBlog = async () => {
+    setIsGeneratingEnhanced(true);
+    setEnhancedMode(true);
+    try {
+      const currentBlog = generateBlogPost();
+      const enhanced = await generateEnhancedBlogPost(title, currentBlog, logTokenUsage);
+      setEnhancedBlogData(enhanced);
+    } catch (error) {
+      console.error("Failed to generate enhanced blog post:", error);
+      alert("Failed to generate enhanced blog post with images. Please try again.");
+    } finally {
+      setIsGeneratingEnhanced(false);
+    }
+  };
+
   const generateBlogPost = (): string => {
+    // If enhanced mode is active and we have enhanced data, use formatted version
+    if (enhancedMode && enhancedBlogData) {
+      return formatBlogForPlatform(enhancedBlogData, selectedPlatform);
+    }
+
     if (directorMode && directorModeContent) {
       return directorModeContent;
     }
@@ -278,56 +308,200 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
             </div>
 
             {selectedFormat === 'blog' && (
-              <div className="flex items-center space-x-3 bg-slate-700/30 p-3 rounded-lg border border-slate-600/50">
-                <div className="flex items-center h-5">
-                  <input
-                    id="director-mode"
-                    type="checkbox"
-                    checked={directorMode}
-                    onChange={(e) => setDirectorMode(e.target.checked)}
-                    className="w-4 h-4 text-indigo-600 bg-slate-700 border-slate-500 rounded focus:ring-indigo-500 focus:ring-2"
-                  />
+              <>
+                {/* Director Mode */}
+                <div className="flex items-center space-x-3 bg-slate-700/30 p-3 rounded-lg border border-slate-600/50 mb-3">
+                  <div className="flex items-center h-5">
+                    <input
+                      id="director-mode"
+                      type="checkbox"
+                      checked={directorMode}
+                      onChange={(e) => setDirectorMode(e.target.checked)}
+                      className="w-4 h-4 text-indigo-600 bg-slate-700 border-slate-500 rounded focus:ring-indigo-500 focus:ring-2"
+                    />
+                  </div>
+                  <div className="ml-2 text-sm flex-1">
+                    <label htmlFor="director-mode" className="font-medium text-slate-200">
+                      🎬 Director Mode (Cinematic Narrative)
+                    </label>
+                    <p className="text-slate-400 text-xs">
+                      Transforms the review into a cinematic story with visual moments and strategic content hooks.
+                    </p>
+                  </div>
+                  {directorMode && !directorModeContent && (
+                    <button
+                      onClick={handleGenerateDirectorMode}
+                      disabled={isGeneratingDirectorMode}
+                      className={`ml-auto px-3 py-1.5 text-xs font-medium rounded-md text-white transition-colors ${
+                        isGeneratingDirectorMode 
+                          ? 'bg-indigo-500/50 cursor-not-allowed' 
+                          : 'bg-indigo-600 hover:bg-indigo-500'
+                      }`}
+                    >
+                      {isGeneratingDirectorMode ? 'Generating...' : 'Generate Cinematic Cut'}
+                    </button>
+                  )}
                 </div>
-                <div className="ml-2 text-sm">
-                  <label htmlFor="director-mode" className="font-medium text-slate-200">
-                    🎬 Director Mode (Cinematic Narrative)
-                  </label>
-                  <p className="text-slate-400 text-xs">
-                    Transforms the review into a cinematic story with visual moments and strategic content hooks.
-                  </p>
+
+                {/* Enhanced Mode with Images */}
+                <div className="flex items-center space-x-3 bg-gradient-to-r from-purple-700/30 to-pink-700/30 p-3 rounded-lg border border-purple-500/50">
+                  <div className="flex items-center h-5">
+                    <input
+                      id="enhanced-mode"
+                      type="checkbox"
+                      checked={enhancedMode}
+                      onChange={(e) => setEnhancedMode(e.target.checked)}
+                      className="w-4 h-4 text-purple-600 bg-slate-700 border-slate-500 rounded focus:ring-purple-500 focus:ring-2"
+                    />
+                  </div>
+                  <div className="ml-2 text-sm flex-1">
+                    <label htmlFor="enhanced-mode" className="font-medium text-purple-200 flex items-center gap-2">
+                      🖼️ Enhanced Mode (Images + SEO) <span className="text-xs bg-purple-600 px-2 py-0.5 rounded-full">NEW</span>
+                    </label>
+                    <p className="text-purple-200 text-xs">
+                      AI-generated image prompts, thumbnails, and complete SEO metadata. Publish-ready, viral-optimized!
+                    </p>
+                  </div>
+                  {enhancedMode && !enhancedBlogData && (
+                    <button
+                      onClick={handleGenerateEnhancedBlog}
+                      disabled={isGeneratingEnhanced}
+                      className={`ml-auto px-3 py-1.5 text-xs font-medium rounded-md text-white transition-colors flex items-center gap-2 ${
+                        isGeneratingEnhanced 
+                          ? 'bg-purple-500/50 cursor-not-allowed' 
+                          : 'bg-purple-600 hover:bg-purple-500'
+                      }`}
+                    >
+                      {isGeneratingEnhanced ? (
+                        <>
+                          <LoadingSpinner size="sm" />
+                          Generating...
+                        </>
+                      ) : (
+                        '✨ Generate Enhanced Version'
+                      )}
+                    </button>
+                  )}
                 </div>
-                {directorMode && !directorModeContent && (
-                  <button
-                    onClick={handleGenerateDirectorMode}
-                    disabled={isGeneratingDirectorMode}
-                    className={`ml-auto px-3 py-1.5 text-xs font-medium rounded-md text-white transition-colors ${
-                      isGeneratingDirectorMode 
-                        ? 'bg-indigo-500/50 cursor-not-allowed' 
-                        : 'bg-indigo-600 hover:bg-indigo-500'
-                    }`}
-                  >
-                    {isGeneratingDirectorMode ? 'Generating...' : 'Generate Cinematic Cut'}
-                  </button>
+
+                {/* Platform Selector for Enhanced Mode */}
+                {enhancedMode && enhancedBlogData && (
+                  <div className="mt-3 p-3 bg-slate-700/30 rounded-lg border border-slate-600/50">
+                    <label className="block text-xs font-medium text-slate-300 mb-2">
+                      Export Platform:
+                    </label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {(['markdown', 'medium', 'wordpress', 'html'] as const).map((platform) => (
+                        <button
+                          key={platform}
+                          onClick={() => setSelectedPlatform(platform)}
+                          className={`px-3 py-1.5 text-xs rounded-md transition-colors ${
+                            selectedPlatform === platform
+                              ? 'bg-purple-600 text-white'
+                              : 'bg-slate-600 text-slate-300 hover:bg-slate-500'
+                          }`}
+                        >
+                          {platform === 'markdown' ? '📝 Markdown' : 
+                           platform === 'medium' ? '📰 Medium' :
+                           platform === 'wordpress' ? '🌐 WordPress' : '💻 HTML'}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 )}
-              </div>
+              </>
             )}
           </div>
 
           {/* Preview */}
           <div className="bg-slate-900 rounded-lg p-4 mb-6 border border-slate-600">
             <h3 className="text-lg font-semibold text-slate-200 mb-3">
-              Preview: {directorMode && selectedFormat === 'blog' ? '🎬 Director\'s Cut' : ''}
+              Preview: {enhancedMode && enhancedBlogData ? '✨ Enhanced with Images' : directorMode && selectedFormat === 'blog' ? '🎬 Director\'s Cut' : ''}
             </h3>
             <div className="bg-slate-800 rounded p-4 max-h-96 overflow-y-auto">
               <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono">
                 {selectedFormat === 'blog' 
                   ? (directorMode && !directorModeContent 
                       ? (isGeneratingDirectorMode ? "Generating cinematic narrative... please wait..." : "Enable Director Mode and click 'Generate Cinematic Cut' to create a story-driven blog post.") 
-                      : generateBlogPost())
+                      : (enhancedMode && !enhancedBlogData
+                          ? (isGeneratingEnhanced ? "Generating enhanced version with images and SEO... please wait..." : "Enable Enhanced Mode and click 'Generate Enhanced Version' to add AI-generated images and SEO!")
+                          : generateBlogPost()))
                   : generateSocialPost()}
               </pre>
             </div>
           </div>
+
+          {/* Image Prompts Section (Enhanced Mode) */}
+          {enhancedMode && enhancedBlogData && selectedFormat === 'blog' && (
+            <div className="bg-gradient-to-br from-purple-900/30 to-pink-900/30 rounded-lg p-4 mb-6 border-2 border-purple-500/50">
+              <h3 className="text-lg font-semibold text-purple-200 mb-3 flex items-center gap-2">
+                🖼️ AI Image Prompts ({enhancedBlogData.images.length} images)
+              </h3>
+              <p className="text-xs text-purple-200 mb-4">
+                Copy these prompts to Midjourney, DALL-E, or Imagen to generate stunning visuals for your blog post!
+              </p>
+              
+              <div className="space-y-4">
+                {enhancedBlogData.images.map((img: any, index: number) => (
+                  <div key={index} className="bg-slate-800/70 rounded-lg p-3 border border-purple-500/30">
+                    <div className="flex items-start justify-between mb-2">
+                      <div>
+                        <span className="text-xs font-semibold text-purple-300">Image {index + 1}</span>
+                        <h4 className="text-sm font-medium text-slate-200">{img.title}</h4>
+                      </div>
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(img.imagePrompt);
+                        }}
+                        className="text-xs bg-purple-600 hover:bg-purple-500 text-white px-2 py-1 rounded transition-colors"
+                      >
+                        Copy Prompt
+                      </button>
+                    </div>
+                    <p className="text-xs text-slate-400 mb-2">{img.description}</p>
+                    <div className="bg-slate-900/50 rounded p-2 mb-2">
+                      <p className="text-xs font-mono text-green-300">{img.imagePrompt}</p>
+                    </div>
+                    <div className="flex gap-2 text-xs">
+                      <span className="text-slate-400">Alt:</span>
+                      <span className="text-slate-300">{img.altText}</span>
+                    </div>
+                    <div className="flex gap-2 text-xs mt-1">
+                      <span className="text-slate-400">Caption:</span>
+                      <span className="text-slate-300 italic">{img.caption}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* SEO Metadata */}
+              <div className="mt-6 pt-4 border-t border-purple-500/30">
+                <h4 className="text-sm font-semibold text-purple-200 mb-3">📊 SEO Metadata</h4>
+                <div className="space-y-2 text-xs">
+                  <div>
+                    <span className="text-slate-400 font-medium">Meta Title:</span>
+                    <p className="text-slate-300">{enhancedBlogData.seoMetadata.metaTitle}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-medium">Meta Description:</span>
+                    <p className="text-slate-300">{enhancedBlogData.seoMetadata.metaDescription}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-medium">Keywords:</span>
+                    <p className="text-slate-300">{enhancedBlogData.seoMetadata.keywords.join(', ')}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-medium">OG Title:</span>
+                    <p className="text-slate-300">{enhancedBlogData.seoMetadata.ogTitle}</p>
+                  </div>
+                  <div>
+                    <span className="text-slate-400 font-medium">OG Description:</span>
+                    <p className="text-slate-300">{enhancedBlogData.seoMetadata.ogDescription}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex flex-wrap gap-3">
