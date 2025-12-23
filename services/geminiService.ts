@@ -1009,31 +1009,37 @@ export const generateQualitativeROIAnalysisWithGemini = async (
 export const generateGreybrainerInsightWithGemini = async (
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<string> => {
-  const currentDate = new Date().toLocaleDateString('en-US', { 
+  const now = new Date();
+  const currentDate = now.toLocaleDateString('en-US', { 
     month: 'long', 
     day: 'numeric', 
     year: 'numeric' 
   });
+  const currentYear = now.getFullYear();
+  const currentMonth = now.toLocaleDateString('en-US', { month: 'long' });
   
   const prompt = `
 You are a distinguished film scholar analyzing cinema and OTT content consumed in India.
 
-Current date: ${currentDate}
+CURRENT DATE: ${currentDate}
+CURRENT YEAR: ${currentYear}
+CURRENT MONTH: ${currentMonth} ${currentYear}
 
 Generate an insight (100-150 words) about patterns/evolution in Indian cinema and streaming content.
 
-TEMPORAL APPROACH - CRITICAL:
-- ANCHOR with recent releases from THIS MONTH/CURRENT MONTH
-- Show evolution over PAST 2-3 YEARS maximum (not more)
-- Use RELATIVE time references: "recent releases", "this year", "past 2 years", "compared to 2-3 years ago"
-- Audience should recognize the current examples from what they watched recently
-- Never use hardcoded years - always relative to current date
+TEMPORAL APPROACH - CRITICAL RULES:
+- The current year is ${currentYear}, NOT 2024 or any other year
+- When referencing "this year", you MUST mean ${currentYear}
+- When referencing "this month", you MUST mean ${currentMonth} ${currentYear}
+- Analyze evolution over the past 2-3 years (${currentYear - 3} to ${currentYear})
+- Use RELATIVE time phrases like:
+  * "Recent releases in ${currentMonth} ${currentYear}..."
+  * "Compared to ${currentYear - 2}-${currentYear - 3}..."
+  * "Over the past two years (${currentYear - 2}-${currentYear})..."
+  * "${currentYear}'s biggest hits..."
+  * "Films from ${currentMonth} ${currentYear} alongside content from ${currentYear - 1}-${currentYear - 2}..."
 
-Example phrases to use:
-- "Recent releases this month..."
-- "Compared to content from 2-3 years ago..."
-- "Over the past two years..."
-- "This year's biggest hits..."
+NEVER EVER use 2024 or any hardcoded year - always reference ${currentYear} as the current year.
 
 Analyze across these dimensions:
 1. STORY LAYER: Character archetypes (hero, heroine, protagonist, anti-hero), genre evolution (comedy, tragedy, dramedy)
@@ -1047,7 +1053,7 @@ Content scope:
 - International content popular in India: Korean, Hollywood, Spanish
 - Platform differences: Theatrical vs OTT pacing and aesthetics
 
-Cite 2-3 specific examples (current month + past 2-3 years).
+Cite 2-3 specific examples from ${currentMonth} ${currentYear} or recent months, comparing to ${currentYear - 2}-${currentYear - 3}.
 Reveal what the PATTERN means for Indian filmmaking and audience consumption.
 
 Start with: [STORY LAYER], [ORCHESTRATION], [PERFORMANCE], or [MORPHOKINETICS]
@@ -1084,11 +1090,14 @@ export const generateMovieAnchoredInsightWithGemini = async (
   selectedLayer: 'story' | 'orchestration' | 'performance' | 'morphokinetics' | 'random',
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<string> => {
-  const currentDate = new Date().toLocaleDateString('en-US', { 
+  const now = new Date();
+  const currentDate = now.toLocaleDateString('en-US', { 
     month: 'long', 
     day: 'numeric', 
     year: 'numeric' 
   });
+  const currentYear = now.getFullYear();
+  const currentMonth = now.toLocaleDateString('en-US', { month: 'long' });
   
   const layerInstruction = selectedLayer === 'random' 
     ? 'Choose the most relevant layer (Story, Orchestration, Performance, or Morphokinetics) for this movie' 
@@ -1097,7 +1106,9 @@ export const generateMovieAnchoredInsightWithGemini = async (
   const prompt = `
 You are a distinguished film scholar analyzing cinema and OTT content consumed in India.
 
-Current date: ${currentDate}
+CURRENT DATE: ${currentDate}
+CURRENT YEAR: ${currentYear}
+CURRENT MONTH: ${currentMonth} ${currentYear}
 
 MOVIE ANCHOR: "${movieTitle}"
 
@@ -1105,9 +1116,15 @@ Generate an insight (100-150 words) using this movie as the hook/anchor point, t
 
 ${layerInstruction}
 
+TEMPORAL RULES - CRITICAL:
+- The current year is ${currentYear}, NOT 2024 or any other year
+- When referencing "this year", you MUST mean ${currentYear}
+- Trace evolution over past 2-3 years (${currentYear - 3} to ${currentYear})
+- NEVER use 2024 or any hardcoded year except ${currentYear}
+
 STRUCTURE:
 1. START with the anchored movie "${movieTitle}" and identify a specific element
-2. THEN trace how this element evolved over past 2-3 years
+2. THEN trace how this element evolved from ${currentYear - 3} to ${currentYear}
 3. REVEAL what this pattern means for Indian cinema/OTT
 
 LAYERS EXPLANATION:
@@ -1116,16 +1133,12 @@ LAYERS EXPLANATION:
 - PERFORMANCE LAYER: Acting style, authenticity, star system, performance techniques
 - MORPHOKINETICS: Visual aesthetic (look, color grading), pacing (editing speed, rhythm, shot length)
 
-TEMPORAL APPROACH:
-- Use relative time: "current release", "recent", "past 2-3 years ago"
-- Movie audience just watched → how it compares to recent past → evolution insight
-
 Content scope: Indian theatrical + OTT + international content popular in India
 
 Start with: [STORY LAYER], [ORCHESTRATION], [PERFORMANCE], or [MORPHOKINETICS]
 
 Example structure:
-"[LAYER] *${movieTitle}* demonstrates [specific element]. Compared to releases from past 2-3 years like [examples], this reveals [evolution pattern and meaning]."
+"[LAYER] *${movieTitle}* demonstrates [specific element]. Compared to releases from ${currentYear - 2}-${currentYear - 3} like [examples], this reveals [evolution pattern and meaning]."
 
 Generate insight:
   `.trim();
