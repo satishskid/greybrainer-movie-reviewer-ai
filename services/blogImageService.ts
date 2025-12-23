@@ -4,7 +4,24 @@
  * using Gemini's multimodal capabilities for viral, publish-ready content
  */
 
-import { getGeminiAI, getSelectedGeminiModel, LogTokenUsageFn } from './geminiService';
+import { GoogleGenerativeAI } from '@google/generative-ai';
+import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
+
+// Initialize Gemini AI (same pattern as geminiService.ts)
+const getGeminiAI = (): GoogleGenerativeAI => {
+  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey) {
+    throw new Error('VITE_GEMINI_API_KEY is not set in environment variables');
+  }
+  return new GoogleGenerativeAI(apiKey);
+};
+
+export type LogTokenUsageFn = (
+  modelName: string,
+  promptTokens: number,
+  completionTokens: number,
+  totalTokens: number
+) => void;
 
 interface ImageSuggestion {
   position: number;
@@ -42,7 +59,7 @@ export async function generateEnhancedBlogPost(
 ): Promise<EnhancedBlogPost> {
   const ai = getGeminiAI();
   const selectedModel = getSelectedGeminiModel();
-  const model = ai.getGenerativeModel({ model: selectedModel.name });
+  const model = ai.getGenerativeModel({ model: selectedModel });
 
   const prompt = `You are an expert content creator specializing in viral movie reviews and SEO-optimized blog posts.
 
@@ -128,7 +145,7 @@ Generate the enhanced blog post now in valid JSON format:`;
       const usageMetadata = response.usageMetadata;
       if (usageMetadata) {
         logTokenUsage(
-          selectedModel.name,
+          selectedModel,
           usageMetadata.promptTokenCount || 0,
           usageMetadata.candidatesTokenCount || 0,
           usageMetadata.totalTokenCount || 0
@@ -163,7 +180,7 @@ export async function generateHeroImagePrompt(
 ): Promise<string> {
   const ai = getGeminiAI();
   const selectedModel = getSelectedGeminiModel();
-  const model = ai.getGenerativeModel({ model: selectedModel.name });
+  const model = ai.getGenerativeModel({ model: selectedModel });
 
   const prompt = `Create a detailed AI image generation prompt for a viral hero/thumbnail image for this movie review:
 
@@ -192,7 +209,7 @@ Prompt:`;
       const usageMetadata = response.usageMetadata;
       if (usageMetadata) {
         logTokenUsage(
-          selectedModel.name,
+          selectedModel,
           usageMetadata.promptTokenCount || 0,
           usageMetadata.candidatesTokenCount || 0,
           usageMetadata.totalTokenCount || 0
