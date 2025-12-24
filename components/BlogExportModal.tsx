@@ -70,9 +70,11 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
       const currentBlog = generateBlogPost();
       const enhanced = await generateEnhancedBlogPost(title, currentBlog, logTokenUsage);
       setEnhancedBlogData(enhanced);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Failed to generate enhanced blog post:", error);
-      alert("Failed to generate enhanced blog post with images. Please try again.");
+      const errorMessage = error?.message || "Failed to generate enhanced blog post with images. Please try again.";
+      alert(errorMessage);
+      setEnhancedMode(false); // Reset enhanced mode on error
     } finally {
       setIsGeneratingEnhanced(false);
     }

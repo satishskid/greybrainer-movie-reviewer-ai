@@ -6,12 +6,13 @@
 
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
+import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
 
 // Initialize Gemini AI (same pattern as geminiService.ts)
 const getGeminiAI = (): GoogleGenerativeAI => {
-  const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = getGeminiApiKeyString();
   if (!apiKey) {
-    throw new Error('VITE_GEMINI_API_KEY is not set in environment variables');
+    throw new Error('Gemini API key not found. Please provide your API key to continue.');
   }
   return new GoogleGenerativeAI(apiKey);
 };
@@ -161,9 +162,16 @@ Generate the enhanced blog post now in valid JSON format:`;
 
     const enhancedData = JSON.parse(jsonMatch[0]) as EnhancedBlogPost;
     return enhancedData;
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error generating enhanced blog post:', error);
-    throw new Error('Failed to generate enhanced blog post with images');
+    
+    // Check for rate limit error
+    if (error?.message?.includes('429') || error?.message?.includes('quota') || error?.message?.includes('rate limit')) {
+      throw new Error('Gemini API rate limit reached. Please wait and try again later (20 requests/day limit for free tier).');
+    }
+    
+    // Re-throw the original error with more context
+    throw error instanceof Error ? error : new Error('Failed to generate enhanced blog post with images');
   }
 }
 
