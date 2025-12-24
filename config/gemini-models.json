@@ -1,99 +1,107 @@
 {
   "modelConfiguration": {
-    "version": "2.0.0",
-    "lastUpdated": "2024-11-04",
-    "description": "Gemini AI model configuration for Greybrainer Film Analysis Platform - Updated for Gemini 2.5 series"
+    "version": "3.0.0",
+    "lastUpdated": "2025-12-24",
+    "description": "Gemini AI model configuration for Greybrainer Film Analysis Platform - Reverted to stable Gemini 1.5 series"
   },
   "defaultModels": {
-    "preferred": "gemini-2.5-flash",
-    "fallback": "gemini-2.5-pro",
-    "legacy": "gemini-2.5-flash"
+    "preferred": "gemini-1.5-flash",
+    "fallback": "gemini-1.5-pro",
+    "legacy": "gemini-1.5-flash"
   },
   "availableModels": [
     {
-      "id": "gemini-2.5-flash",
+      "id": "gemini-1.5-flash",
       "name": "Greybrainer Fast (Recommended)",
-      "description": "Current recommended model for basic text tasks - fast analysis and rapid reviews",
+      "description": "Proven stable model - supports all Greybrainer features including JSON + Tools",
       "category": "standard",
       "isRecommended": true,
       "isStable": true,
-      "maxTokens": 32768,
+      "maxTokens": 1048576,
       "costTier": "economy",
-      "lastVerified": "2024-11-04",
-      "useCase": "Basic text tasks (summarization, simple Q&A)"
-    },
-    {
-      "id": "gemini-2.5-pro",
-      "name": "Greybrainer Pro (Advanced)",
-      "description": "Advanced model for complex reasoning, detailed analysis and character development",
-      "category": "premium",
-      "isRecommended": true,
-      "isStable": true,
-      "maxTokens": 32768,
-      "costTier": "standard",
-      "lastVerified": "2024-11-04",
-      "useCase": "Complex text tasks (advanced reasoning, coding, math)"
-    },
-    {
-      "id": "gemini-1.5-flash",
-      "name": "Greybrainer Legacy Fast (DEPRECATED)",
-      "description": "DEPRECATED: Will be turned down. Use gemini-2.5-flash instead.",
-      "category": "legacy",
-      "isRecommended": false,
-      "isStable": false,
-      "isDeprecated": true,
-      "maxTokens": 32768,
-      "costTier": "economy",
-      "lastVerified": "2024-11-04",
-      "deprecationWarning": "This model is deprecated and will be turned down. Migrate to gemini-2.5-flash."
+      "lastVerified": "2025-12-24",
+      "useCase": "All Greybrainer features (movie search, analysis, insights)"
     },
     {
       "id": "gemini-1.5-pro",
-      "name": "Greybrainer Legacy Pro (DEPRECATED)",
-      "description": "DEPRECATED: Will be turned down. Use gemini-2.5-pro instead.",
+      "name": "Greybrainer Pro (Advanced)",
+      "description": "Highest quality analysis with advanced reasoning and deep understanding",
+      "category": "premium",
+      "isRecommended": true,
+      "isStable": true,
+      "maxTokens": 2097152,
+      "costTier": "standard",
+      "lastVerified": "2025-12-24",
+      "useCase": "Detailed film analysis requiring complex reasoning"
+    },
+    {
+      "id": "gemini-3-flash",
+      "name": "Greybrainer Ultra (Latest - Preview)",
+      "description": "Newest Gemini 3 with superior intelligence and enhanced grounding",
+      "category": "premium",
+      "isRecommended": false,
+      "isStable": false,
+      "maxTokens": 1048576,
+      "costTier": "economy",
+      "lastVerified": "2025-12-24",
+      "useCase": "Experimental - latest model with enhanced capabilities"
+    },
+    {
+      "id": "gemini-2.5-flash",
+      "name": "Gemini 2.5 Flash (INCOMPATIBLE - DO NOT USE)",
+      "description": "INCOMPATIBLE: Does not support JSON mode with tools - breaks movie search",
       "category": "legacy",
       "isRecommended": false,
       "isStable": false,
       "isDeprecated": true,
-      "maxTokens": 32768,
-      "costTier": "standard",
-      "lastVerified": "2024-11-04",
-      "deprecationWarning": "This model is deprecated and will be turned down. Migrate to gemini-2.5-pro."
+      "maxTokens": 1048576,
+      "costTier": "economy",
+      "lastVerified": "2025-12-24",
+      "deprecationWarning": "This model doesn't support JSON + Tools combination. Causes 400 errors. Use gemini-1.5-flash instead.",
+      "useCase": "AVOID - Incompatible with Greybrainer features"
+    },
+    {
+      "id": "gemini-2.5-pro",
+      "name": "Gemini 2.5 Pro (Limited Compatibility)",
+      "description": "Advanced model but may have compatibility issues with some features",
+      "category": "premium",
+      "isRecommended": false,
+      "isStable": true,
+      "maxTokens": 2097152,
+      "costTier": "premium",
+      "lastVerified": "2025-12-24",
+      "useCase": "Use with caution - prefer gemini-1.5-pro for reliability"
     }
   ],
   "modelPriority": [
-    "gemini-2.5-flash",
-    "gemini-2.5-pro"
+    "gemini-1.5-flash",
+    "gemini-1.5-pro",
+    "gemini-3-flash"
   ],
   "discoveryPatterns": [
     {
-      "pattern": "gemini-2\\.5-flash",
+      "pattern": "gemini-1\\.5-flash",
       "priority": 1,
-      "description": "Current recommended model for basic text tasks"
+      "description": "Stable model - proven to work with all Greybrainer features"
     },
     {
-      "pattern": "gemini-2\\.5-pro",
+      "pattern": "gemini-1\\.5-pro",
       "priority": 2,
-      "description": "Current recommended model for complex tasks"
+      "description": "High-quality model for advanced analysis"
     },
     {
-      "pattern": "gemini.*2\\.5.*flash",
+      "pattern": "gemini-3.*flash",
       "priority": 3,
-      "description": "Any Gemini 2.5 flash variant"
-    },
-    {
-      "pattern": "gemini.*2\\.5.*pro",
-      "priority": 4,
-      "description": "Any Gemini 2.5 pro variant"
+      "description": "Newest Gemini 3 models (experimental)"
     },
     {
       "pattern": "gemini.*flash.*latest",
-      "priority": 5,
+      "priority": 4,
       "description": "Latest flash models with -latest tag"
     },
     {
       "pattern": "gemini.*pro.*latest",
-      "priority": 6,
+      "priority": 5,
       "description": "Latest pro models with -latest tag"
     },
     {
