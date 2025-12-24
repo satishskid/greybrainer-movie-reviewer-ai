@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Compare Original vs New Approach</title>
+    <style>
+        body { 
+            font-family: Arial; 
+            max-width: 1200px; 
+            margin: 20px auto; 
+            padding: 20px; 
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 { color: #333; border-bottom: 3px solid #4CAF50; padding-bottom: 10px; }
+        h2 { color: #666; margin-top: 30px; }
+        input { 
+            width: 100%; 
+            padding: 12px; 
+            margin: 10px 0; 
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            font-family: monospace; 
+        }
+        button { 
+            background: #4CAF50; 
+            color: white; 
+            padding: 15px 30px; 
+            border: none; 
+            border-radius: 4px; 
+            cursor: pointer; 
+            font-size: 16px;
+            font-weight: bold;
+            margin: 10px 5px;
+        }
+        button:hover { background: #45a049; }
+        button.secondary { background: #2196F3; }
+        button.secondary:hover { background: #0b7dda; }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 4px;
+            border-left: 4px solid #2196F3;
+        }
+        .result { 
+            margin-top: 15px; 
+            padding: 20px; 
+            border-radius: 4px; 
+            font-family: monospace;
+            white-space: pre-wrap;
+        }
+        .success { background: #d4edda; border: 2px solid #c3e6cb; color: #155724; }
+        .error { background: #f8d7da; border: 2px solid #f5c6cb; color: #721c24; }
+        .warning { background: #fff3cd; border: 2px solid #ffeaa7; color: #856404; }
+        .info { background: #d1ecf1; border: 2px solid #bee5eb; color: #0c5460; }
+        pre { 
+            background: #282c34; 
+            color: #abb2bf; 
+            padding: 15px; 
+            border-radius: 4px; 
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .comparison-box {
+            padding: 15px;
+            border-radius: 4px;
+        }
+        .original { background: #e3f2fd; border: 2px solid #2196F3; }
+        .new { background: #f3e5f5; border: 2px solid #9c27b0; }
+        .verdict {
+            margin-top: 30px;
+            padding: 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 8px;
+            font-size: 18px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 TEST: Original (Nov 2024) vs Current Approach</h1>
+        <p><strong>Goal:</strong> Compare the working November configuration with current approach to see what changed</p>
+        
+        <input type="text" id="apiKey" placeholder="Enter your Gemini API key..." />
+        
+        <div>
+            <button onclick="runComparison()">🔬 Run Full Comparison Test</button>
+            <button class="secondary" onclick="testOriginal()">Test Original (Nov 2024)</button>
+            <button class="secondary" onclick="testCurrent()">Test Current (Manual Parse)</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
+
+        const TEST_QUERY = "time travel";
+
+        // ORIGINAL APPROACH (November 2024 - What was working)
+        async function testOriginalApproach(apiKey) {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            
+            const model = genAI.getGenerativeModel({
+                model: 'gemini-2.5-flash',
+                tools: [{ googleSearch: {} }],
+                generationConfig: {
+                    temperature: 0.3,
+                    responseMimeType: "application/json"  // ← THE KEY DIFFERENCE
+                }
+            });
+
+            const prompt = `You are a movie database assistant. The user is searching for: "${TEST_QUERY}"
+
+List up to 5 movies or TV series that match this query.
+
+IMPORTANT: Use your Google Search tool to find the most up-to-date information.
+
+For each match, provide:
+- Title
+- Year of release
+- Director (or Creator for series)
+- Type (Movie or Series)
+- A very brief one-line description (max 10 words)
+
+Format the output as a JSON array of objects.
+Example JSON format:
+[
+  { "title": "Back to the Future", "year": "1985", "director": "Robert Zemeckis", "type": "Movie", "description": "Teen travels through time in DeLorean" }
+]
+
+Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.`;
+
+            const startTime = Date.now();
+            const response = await model.generateContent(prompt);
+            const responseTime = Date.now() - startTime;
+            
+            const responseText = response.response.text().trim();
+            const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+            const suggestions = JSON.parse(cleanJson);
+
+            return { suggestions, responseTime, rawResponse: responseText };
+        }
+
+        // CURRENT APPROACH (Manual JSON parsing, no responseMimeType)
+        async function testCurrentApproach(apiKey) {
+            const genAI = new GoogleGenerativeAI(apiKey);
+            
+            const model = genAI.getGenerativeModel({
+                model: 'gemini-2.5-flash',
+                tools: [{ googleSearch: {} }],
+                generationConfig: {
+                    temperature: 0.3
+                    // NO responseMimeType
+                }
+            });
+
+            const prompt = `You are a movie database assistant. The user is searching for: "${TEST_QUERY}"
+
+List up to 5 movies or TV series that match this query.
+
+IMPORTANT: Use your Google Search tool to find the most up-to-date information.
+
+For each match, provide:
+- Title
+- Year of release  
+- Director (or Creator for series)
+- Type (Movie or Series)
+- A very brief one-line description (max 10 words)
+
+Format the output as a JSON array of objects.
+Example JSON format:
+[
+  { "title": "Back to the Future", "year": "1985", "director": "Robert Zemeckis", "type": "Movie", "description": "Teen travels through time in DeLorean" }
+]
+
+Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.`;
+
+            const startTime = Date.now();
+            const response = await model.generateContent(prompt);
+            const responseTime = Date.now() - startTime;
+            
+            const responseText = response.response.text().trim();
+            
+            // Manual JSON extraction
+            let cleanJson = responseText;
+            const jsonBlockMatch = responseText.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+            if (jsonBlockMatch) {
+                cleanJson = jsonBlockMatch[1];
+            } else {
+                const jsonArrayMatch = responseText.match(/\[[\s\S]*\]/);
+                if (jsonArrayMatch) {
+                    cleanJson = jsonArrayMatch[0];
+                }
+            }
+            
+            const suggestions = JSON.parse(cleanJson.trim());
+
+            return { suggestions, responseTime, rawResponse: responseText };
+        }
+
+        window.testOriginal = async function() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) {
+                alert('Please enter your API key');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="result info">⏳ Testing ORIGINAL approach (Nov 2024 with JSON mode)...</div>';
+
+            try {
+                const result = await testOriginalApproach(apiKey);
+                
+                resultsDiv.innerHTML = `
+                    <div class="test-section original">
+                        <h2>✅ ORIGINAL APPROACH WORKS!</h2>
+                        <p><strong>Configuration:</strong> gemini-2.5-flash + tools + responseMimeType: "application/json"</p>
+                        <p><strong>Response Time:</strong> ${result.responseTime}ms</p>
+                        <p><strong>Movies Found:</strong> ${result.suggestions.length}</p>
+                        <h3>Results:</h3>
+                        <pre>${JSON.stringify(result.suggestions, null, 2)}</pre>
+                        <details>
+                            <summary>Raw Response</summary>
+                            <pre>${result.rawResponse}</pre>
+                        </details>
+                    </div>
+                `;
+
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="test-section original">
+                        <h2>❌ ORIGINAL APPROACH FAILED</h2>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <pre>${error.stack || error.toString()}</pre>
+                    </div>
+                `;
+            }
+        };
+
+        window.testCurrent = async function() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) {
+                alert('Please enter your API key');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="result info">⏳ Testing CURRENT approach (manual JSON parsing)...</div>';
+
+            try {
+                const result = await testCurrentApproach(apiKey);
+                
+                resultsDiv.innerHTML = `
+                    <div class="test-section new">
+                        <h2>✅ CURRENT APPROACH WORKS!</h2>
+                        <p><strong>Configuration:</strong> gemini-2.5-flash + tools (NO responseMimeType)</p>
+                        <p><strong>Response Time:</strong> ${result.responseTime}ms</p>
+                        <p><strong>Movies Found:</strong> ${result.suggestions.length}</p>
+                        <h3>Results:</h3>
+                        <pre>${JSON.stringify(result.suggestions, null, 2)}</pre>
+                        <details>
+                            <summary>Raw Response</summary>
+                            <pre>${result.rawResponse}</pre>
+                        </details>
+                    </div>
+                `;
+
+            } catch (error) {
+                resultsDiv.innerHTML = `
+                    <div class="test-section new">
+                        <h2>❌ CURRENT APPROACH FAILED</h2>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                        <pre>${error.stack || error.toString()}</pre>
+                    </div>
+                `;
+            }
+        };
+
+        window.runComparison = async function() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) {
+                alert('Please enter your API key');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<div class="result info">⏳ Running comparison test...</div>';
+
+            let originalResult = null;
+            let originalError = null;
+            let currentResult = null;
+            let currentError = null;
+
+            // Test Original
+            try {
+                originalResult = await testOriginalApproach(apiKey);
+            } catch (error) {
+                originalError = error;
+            }
+
+            // Test Current
+            try {
+                currentResult = await testCurrentApproach(apiKey);
+            } catch (error) {
+                currentError = error;
+            }
+
+            // Display comparison
+            let html = '<div class="comparison">';
+
+            // Original column
+            html += '<div class="comparison-box original">';
+            html += '<h2>📅 ORIGINAL (Nov 2024)</h2>';
+            html += '<p><strong>Config:</strong> JSON mode + Tools</p>';
+            if (originalError) {
+                html += `<div class="result error">
+                    ❌ FAILED<br>
+                    ${originalError.message.substring(0, 200)}
+                </div>`;
+            } else {
+                html += `<div class="result success">
+                    ✅ SUCCESS<br>
+                    Time: ${originalResult.responseTime}ms<br>
+                    Movies: ${originalResult.suggestions.length}
+                </div>`;
+                html += `<pre>${JSON.stringify(originalResult.suggestions, null, 2)}</pre>`;
+            }
+            html += '</div>';
+
+            // Current column
+            html += '<div class="comparison-box new">';
+            html += '<h2>🆕 CURRENT (Dec 2024)</h2>';
+            html += '<p><strong>Config:</strong> Manual parsing (no JSON mode)</p>';
+            if (currentError) {
+                html += `<div class="result error">
+                    ❌ FAILED<br>
+                    ${currentError.message.substring(0, 200)}
+                </div>`;
+            } else {
+                html += `<div class="result success">
+                    ✅ SUCCESS<br>
+                    Time: ${currentResult.responseTime}ms<br>
+                    Movies: ${currentResult.suggestions.length}
+                </div>`;
+                html += `<pre>${JSON.stringify(currentResult.suggestions, null, 2)}</pre>`;
+            }
+            html += '</div>';
+
+            html += '</div>';
+
+            // Verdict
+            html += '<div class="verdict">';
+            html += '<h2>🎯 VERDICT & RECOMMENDATION</h2>';
+            
+            if (originalError && currentError) {
+                html += '<p>❌ BOTH approaches failed! Need to investigate further.</p>';
+            } else if (originalError && !currentError) {
+                html += '<p>✅ <strong>USE CURRENT APPROACH</strong> - Original no longer works, current is functional.</p>';
+                html += '<p>Google changed API - responseMimeType with tools is no longer supported.</p>';
+            } else if (!originalError && currentError) {
+                html += '<p>✅ <strong>REVERT TO ORIGINAL</strong> - Original still works perfectly!</p>';
+                html += '<p>No need to change anything - the November code was correct.</p>';
+            } else {
+                // Both work - compare quality
+                html += '<p>✅ BOTH approaches work! Comparing quality...</p>';
+                if (originalResult.suggestions.length === currentResult.suggestions.length) {
+                    html += '<p>📊 Same number of results. <strong>Recommend: KEEP ORIGINAL</strong> (simpler, enforces JSON)</p>';
+                } else {
+                    html += `<p>📊 Original: ${originalResult.suggestions.length} movies, Current: ${currentResult.suggestions.length} movies</p>`;
+                }
+            }
+            
+            html += '</div>';
+
+            resultsDiv.innerHTML = html;
+        };
+    </script>
+</body>
+</html>
