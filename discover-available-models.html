@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discover Available Gemini Models</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 18px;
+            font-weight: 600;
+            margin: 10px 0;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        .result {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f9f9f9;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .model-card {
+            background: white;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 8px;
+            border: 2px solid #e0e0e0;
+        }
+        .model-card h3 {
+            margin: 0 0 10px 0;
+            color: #667eea;
+        }
+        .model-meta {
+            font-size: 12px;
+            color: #666;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 10px;
+            margin-top: 10px;
+        }
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+            margin: 2px;
+        }
+        .badge-flash { background: #e3f2fd; color: #1976d2; }
+        .badge-pro { background: #f3e5f5; color: #7b1fa2; }
+        .badge-experimental { background: #fff3e0; color: #f57c00; }
+        .badge-stable { background: #e8f5e9; color: #388e3c; }
+        pre {
+            background: #f4f4f4;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 12px;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+        }
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #667eea;
+            border-radius: 50%;
+            width: 40px;
+            height: 40px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Discover Available Gemini Models</h1>
+        <p>This will query Google's API to see which models are actually available right now.</p>
+        
+        <button onclick="discoverModels()">🚀 Discover Available Models</button>
+        
+        <div id="result"></div>
+    </div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from 'https://esm.run/@google/generative-ai';
+
+        window.discoverModels = async function() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div class="loading"><div class="spinner"></div><p>Querying Google Gemini API...</p></div>';
+
+            try {
+                const apiKey = prompt('Enter your Gemini API Key:');
+                if (!apiKey) throw new Error('API Key required');
+
+                const genAI = new GoogleGenerativeAI(apiKey);
+                
+                // List all available models
+                const models = await genAI.listModels();
+                
+                let html = '<div class="result">';
+                html += '<h2>✅ Available Models Found: ' + models.length + '</h2>';
+                
+                // Filter and categorize
+                const geminiModels = models.filter(m => m.name.includes('gemini'));
+                const flashModels = geminiModels.filter(m => m.name.includes('flash'));
+                const proModels = geminiModels.filter(m => m.name.includes('pro'));
+                
+                html += '<h3>📊 Summary:</h3>';
+                html += '<ul>';
+                html += '<li>Total Gemini Models: ' + geminiModels.length + '</li>';
+                html += '<li>Flash Models: ' + flashModels.length + '</li>';
+                html += '<li>Pro Models: ' + proModels.length + '</li>';
+                html += '</ul>';
+                
+                html += '<h3>🎯 Recommended Models for Greybrainer:</h3>';
+                
+                // Find models that support generateContent
+                for (const model of geminiModels) {
+                    const supportsGenerate = model.supportedGenerationMethods?.includes('generateContent');
+                    if (!supportsGenerate) continue;
+                    
+                    const modelName = model.name.replace('models/', '');
+                    const isFlash = modelName.includes('flash');
+                    const isPro = modelName.includes('pro');
+                    const version = modelName.match(/(\d+\.\d+)/)?.[0] || 'unknown';
+                    
+                    html += '<div class="model-card">';
+                    html += '<h3>' + modelName + '</h3>';
+                    
+                    // Badges
+                    if (isFlash) html += '<span class="badge badge-flash">FLASH</span>';
+                    if (isPro) html += '<span class="badge badge-pro">PRO</span>';
+                    if (modelName.includes('experimental')) {
+                        html += '<span class="badge badge-experimental">EXPERIMENTAL</span>';
+                    } else {
+                        html += '<span class="badge badge-stable">STABLE</span>';
+                    }
+                    
+                    html += '<div class="model-meta">';
+                    html += '<div><strong>Display Name:</strong> ' + (model.displayName || 'N/A') + '</div>';
+                    html += '<div><strong>Version:</strong> ' + model.version + '</div>';
+                    html += '<div><strong>Input Token Limit:</strong> ' + (model.inputTokenLimit || 'N/A') + '</div>';
+                    html += '<div><strong>Output Token Limit:</strong> ' + (model.outputTokenLimit || 'N/A') + '</div>';
+                    html += '<div><strong>Supported Methods:</strong> ' + (model.supportedGenerationMethods?.join(', ') || 'N/A') + '</div>';
+                    html += '</div>';
+                    
+                    html += '</div>';
+                }
+                
+                html += '<h3>📋 Full Model List (Raw Data):</h3>';
+                html += '<pre>' + JSON.stringify(geminiModels.map(m => ({
+                    name: m.name.replace('models/', ''),
+                    displayName: m.displayName,
+                    version: m.version,
+                    methods: m.supportedGenerationMethods
+                })), null, 2) + '</pre>';
+                
+                html += '</div>';
+                resultDiv.innerHTML = html;
+                
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="result" style="border-left-color: #dc3545;">
+                        <h2>❌ Error</h2>
+                        <p><strong>Message:</strong> ${error.message}</p>
+                        <pre>${error.stack || ''}</pre>
+                    </div>
+                `;
+            }
+        };
+    </script>
+</body>
+</html>

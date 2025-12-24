@@ -1,0 +1,408 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Model Verification - Final Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #667eea;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #764ba2;
+            margin-top: 30px;
+        }
+        .api-key-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: monospace;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .model-test {
+            background: #f8f9fa;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 6px;
+            border-left: 4px solid #667eea;
+        }
+        .model-name {
+            font-weight: bold;
+            color: #764ba2;
+            font-size: 18px;
+        }
+        .result {
+            margin-top: 10px;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #667eea;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        pre {
+            background: #282c34;
+            color: #abb2bf;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+            font-size: 13px;
+        }
+        .summary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-top: 30px;
+        }
+        .summary h3 {
+            margin-top: 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Gemini Model Verification - Final Test</h1>
+        <p><strong>Purpose:</strong> Verify that the corrected model configuration works with actual Google Gemini API</p>
+        
+        <div class="api-key-section">
+            <h3>🔑 Enter Your Gemini API Key</h3>
+            <input type="text" id="apiKey" placeholder="Enter your Google Gemini API key here..." />
+            <p style="color: #666; font-size: 14px;">Your API key is used locally and never sent anywhere except Google's API</p>
+        </div>
+
+        <h2>📋 Tests to Run</h2>
+        <div style="margin-bottom: 20px;">
+            <button onclick="testAllModels()">🚀 Test All Models</button>
+            <button onclick="testMovieSearch()">🎬 Test Movie Search (Full Feature)</button>
+            <button onclick="clearResults()">🗑️ Clear Results</button>
+        </div>
+
+        <div id="results"></div>
+
+        <div id="summary" class="summary" style="display: none;">
+            <h3>📊 Test Summary</h3>
+            <div id="summaryContent"></div>
+        </div>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
+
+        // Models to test based on new configuration
+        const modelsToTest = [
+            { id: 'gemini-1.5-flash-latest', name: 'Gemini 1.5 Flash Latest (Recommended)', priority: 1 },
+            { id: 'gemini-1.5-pro-latest', name: 'Gemini 1.5 Pro Latest (Advanced)', priority: 2 },
+            { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash (Pinned)', priority: 3 },
+            { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro (Pinned)', priority: 4 },
+            { id: 'gemini-1.5-flash-8b', name: 'Gemini 1.5 Flash 8B (Ultra Fast)', priority: 5 },
+            { id: 'gemini-2.0-flash-exp', name: 'Gemini 2.0 Flash Experimental', priority: 6 }
+        ];
+
+        let testResults = [];
+
+        window.testAllModels = async function() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) {
+                alert('Please enter your Gemini API key first');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h2>🔍 Testing Models...</h2>';
+            testResults = [];
+
+            for (const modelInfo of modelsToTest) {
+                await testModel(apiKey, modelInfo);
+            }
+
+            showSummary();
+        };
+
+        async function testModel(apiKey, modelInfo) {
+            const resultsDiv = document.getElementById('results');
+            const testDiv = document.createElement('div');
+            testDiv.className = 'model-test';
+            testDiv.innerHTML = `
+                <div class="model-name">${modelInfo.name}</div>
+                <div>Model ID: <code>${modelInfo.id}</code></div>
+                <div class="result info" id="result-${modelInfo.id.replace(/\./g, '-')}">
+                    <div class="loading"></div> Testing...
+                </div>
+            `;
+            resultsDiv.appendChild(testDiv);
+
+            const resultDiv = document.getElementById(`result-${modelInfo.id.replace(/\./g, '-')}`);
+
+            try {
+                const genAI = new GoogleGenerativeAI(apiKey);
+                
+                // Test 1: Basic text generation
+                const startTime = Date.now();
+                const model = genAI.getGenerativeModel({ model: modelInfo.id });
+                const result = await model.generateContent("Say 'test' and nothing else.");
+                const responseTime = Date.now() - startTime;
+                const text = result.response.text();
+
+                // Test 2: JSON mode
+                const modelJson = genAI.getGenerativeModel({ 
+                    model: modelInfo.id,
+                    generationConfig: {
+                        responseMimeType: "application/json"
+                    }
+                });
+                const jsonResult = await modelJson.generateContent('Return JSON: {"status": "ok"}');
+                const jsonText = jsonResult.response.text();
+                const jsonParsed = JSON.parse(jsonText);
+
+                // Test 3: JSON + Tools (the critical combination)
+                const modelWithTools = genAI.getGenerativeModel({ 
+                    model: modelInfo.id,
+                    tools: [{ googleSearch: {} }],
+                    generationConfig: {
+                        responseMimeType: "application/json"
+                    }
+                });
+                const toolsResult = await modelWithTools.generateContent('Search for "test" and return JSON: {"found": true}');
+                const toolsText = toolsResult.response.text();
+
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    ✅ <strong>ALL TESTS PASSED</strong><br>
+                    • Basic generation: ${responseTime}ms<br>
+                    • JSON mode: Working<br>
+                    • JSON + Tools: <strong>WORKING</strong> ✨<br>
+                    <small>Response: ${text.substring(0, 50)}</small>
+                `;
+
+                testResults.push({
+                    model: modelInfo.id,
+                    success: true,
+                    responseTime,
+                    supportsJsonTools: true
+                });
+
+            } catch (error) {
+                const errorMsg = error.message || error.toString();
+                let errorClass = 'error';
+                let errorType = 'ERROR';
+                
+                if (errorMsg.includes('404')) {
+                    errorType = 'NOT FOUND (404)';
+                } else if (errorMsg.includes('400')) {
+                    errorType = 'BAD REQUEST (400)';
+                    if (errorMsg.includes('Tool use')) {
+                        errorClass = 'warning';
+                        errorType = 'JSON + Tools NOT SUPPORTED';
+                    }
+                } else if (errorMsg.includes('429')) {
+                    errorType = 'RATE LIMIT (429)';
+                }
+
+                resultDiv.className = `result ${errorClass}`;
+                resultDiv.innerHTML = `
+                    ❌ <strong>${errorType}</strong><br>
+                    <small>${errorMsg.substring(0, 200)}</small>
+                `;
+
+                testResults.push({
+                    model: modelInfo.id,
+                    success: false,
+                    error: errorMsg,
+                    supportsJsonTools: false
+                });
+            }
+        }
+
+        window.testMovieSearch = async function() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) {
+                alert('Please enter your Gemini API key first');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<h2>🎬 Testing Movie Search Feature...</h2>';
+
+            const testDiv = document.createElement('div');
+            testDiv.className = 'model-test';
+            testDiv.innerHTML = `
+                <div class="model-name">Full Movie Search Test (Like Production)</div>
+                <div>Using: <code>gemini-1.5-flash-latest</code></div>
+                <div class="result info" id="movie-search-result">
+                    <div class="loading"></div> Searching for movies about "time travel"...
+                </div>
+            `;
+            resultsDiv.appendChild(testDiv);
+
+            const resultDiv = document.getElementById('movie-search-result');
+
+            try {
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ 
+                    model: 'gemini-1.5-flash-latest',
+                    tools: [{ googleSearch: {} }],
+                    generationConfig: {
+                        temperature: 0.3,
+                        responseMimeType: "application/json"
+                    }
+                });
+
+                const prompt = `Search for movies about "time travel" and return ONLY a JSON array of movie suggestions.
+                
+Format: [{"title": "Movie Name", "year": 2024, "reason": "why it matches"}]
+Return 5 suggestions.`;
+
+                const startTime = Date.now();
+                const result = await model.generateContent(prompt);
+                const responseTime = Date.now() - startTime;
+                const text = result.response.text();
+                
+                const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                const movies = JSON.parse(cleanJson);
+
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    ✅ <strong>MOVIE SEARCH WORKING PERFECTLY!</strong><br>
+                    • Response time: ${responseTime}ms<br>
+                    • Movies found: ${movies.length}<br>
+                    • JSON + Tools: ✨ <strong>WORKING</strong><br><br>
+                    <strong>Sample Results:</strong>
+                    <pre>${JSON.stringify(movies.slice(0, 3), null, 2)}</pre>
+                `;
+
+            } catch (error) {
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    ❌ <strong>MOVIE SEARCH FAILED</strong><br>
+                    ${error.message || error.toString()}
+                `;
+            }
+        };
+
+        function showSummary() {
+            const summaryDiv = document.getElementById('summary');
+            const summaryContent = document.getElementById('summaryContent');
+            
+            const successCount = testResults.filter(r => r.success).length;
+            const totalCount = testResults.length;
+            const jsonToolsSupport = testResults.filter(r => r.supportsJsonTools).length;
+
+            let html = `
+                <p><strong>Total Models Tested:</strong> ${totalCount}</p>
+                <p><strong>Successful:</strong> ${successCount} ✅</p>
+                <p><strong>Failed:</strong> ${totalCount - successCount} ❌</p>
+                <p><strong>Support JSON + Tools:</strong> ${jsonToolsSupport} models 🎯</p>
+            `;
+
+            if (successCount > 0) {
+                html += '<h4>✅ Working Models:</h4><ul>';
+                testResults.filter(r => r.success).forEach(r => {
+                    html += `<li><code>${r.model}</code> (${r.responseTime}ms)`;
+                    if (r.supportsJsonTools) html += ' <strong>← Supports JSON + Tools!</strong>';
+                    html += '</li>';
+                });
+                html += '</ul>';
+            }
+
+            if (totalCount - successCount > 0) {
+                html += '<h4>❌ Failed Models:</h4><ul>';
+                testResults.filter(r => !r.success).forEach(r => {
+                    html += `<li><code>${r.model}</code> - ${r.error.substring(0, 100)}</li>`;
+                });
+                html += '</ul>';
+            }
+
+            summaryContent.innerHTML = html;
+            summaryDiv.style.display = 'block';
+        }
+
+        window.clearResults = function() {
+            document.getElementById('results').innerHTML = '';
+            document.getElementById('summary').style.display = 'none';
+            testResults = [];
+        };
+    </script>
+</body>
+</html>

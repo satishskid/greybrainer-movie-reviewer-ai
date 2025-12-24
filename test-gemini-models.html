@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gemini Model Tester</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 10px;
+        }
+        .test-section {
+            margin: 20px 0;
+            padding: 20px;
+            border: 2px solid #e0e0e0;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .test-section h2 {
+            margin-top: 0;
+            color: #667eea;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: 600;
+            margin: 5px;
+            transition: transform 0.2s;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+            transform: none;
+        }
+        .result {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #d1ecf1;
+            border: 1px solid #bee5eb;
+            color: #0c5460;
+        }
+        .loading {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .stat-box {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+        }
+        .stat-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #333;
+        }
+        code {
+            background: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Gemini Model Compatibility Tester</h1>
+        <p>Testing Gemini models to verify compatibility with Greybrainer features (JSON mode + Tools)</p>
+
+        <!-- Test 1: Gemini 1.5 Flash -->
+        <div class="test-section">
+            <h2>Test 1: Gemini 1.5 Flash</h2>
+            <p>Testing: <code>gemini-1.5-flash</code></p>
+            <button onclick="testModel('gemini-1.5-flash', 'result1')">🚀 Test Basic Text Generation</button>
+            <button onclick="testModelWithJSON('gemini-1.5-flash', 'result1')">📊 Test JSON Mode</button>
+            <button onclick="testModelWithTools('gemini-1.5-flash', 'result1')">🔧 Test JSON + Tools</button>
+            <div id="result1"></div>
+        </div>
+
+        <!-- Test 2: Gemini 3 Flash -->
+        <div class="test-section">
+            <h2>Test 2: Gemini 3 Flash (Latest)</h2>
+            <p>Testing: <code>gemini-3-flash</code></p>
+            <button onclick="testModel('gemini-3-flash', 'result2')">🚀 Test Basic Text Generation</button>
+            <button onclick="testModelWithJSON('gemini-3-flash', 'result2')">📊 Test JSON Mode</button>
+            <button onclick="testModelWithTools('gemini-3-flash', 'result2')">🔧 Test JSON + Tools</button>
+            <div id="result2"></div>
+        </div>
+
+        <!-- Test 3: Gemini 2.5 Flash (Should Fail) -->
+        <div class="test-section">
+            <h2>Test 3: Gemini 2.5 Flash (Expected to FAIL with JSON + Tools)</h2>
+            <p>Testing: <code>gemini-2.5-flash</code></p>
+            <button onclick="testModel('gemini-2.5-flash', 'result3')">🚀 Test Basic Text Generation</button>
+            <button onclick="testModelWithJSON('gemini-2.5-flash', 'result3')">📊 Test JSON Mode</button>
+            <button onclick="testModelWithTools('gemini-2.5-flash', 'result3')">❌ Test JSON + Tools (Should Fail)</button>
+            <div id="result3"></div>
+        </div>
+
+        <!-- Test 4: Movie Search Simulation -->
+        <div class="test-section">
+            <h2>Test 4: Movie Search Simulation (Critical Feature)</h2>
+            <p>Simulating the exact movie search function that broke</p>
+            <button onclick="testMovieSearch('gemini-1.5-flash', 'result4')">🎬 Test with Gemini 1.5 Flash</button>
+            <button onclick="testMovieSearch('gemini-3-flash', 'result4')">🎬 Test with Gemini 3 Flash</button>
+            <button onclick="testMovieSearch('gemini-2.5-flash', 'result4')">❌ Test with Gemini 2.5 Flash (Should Fail)</button>
+            <div id="result4"></div>
+        </div>
+
+        <div class="stats" id="stats" style="display: none;">
+            <div class="stat-box">
+                <div class="stat-label">Tests Run</div>
+                <div class="stat-value" id="testsRun">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Passed</div>
+                <div class="stat-value" style="color: #28a745;" id="testsPassed">0</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Failed</div>
+                <div class="stat-value" style="color: #dc3545;" id="testsFailed">0</div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from 'https://esm.run/@google/generative-ai';
+
+        let testsRun = 0;
+        let testsPassed = 0;
+        let testsFailed = 0;
+
+        function updateStats() {
+            document.getElementById('stats').style.display = 'grid';
+            document.getElementById('testsRun').textContent = testsRun;
+            document.getElementById('testsPassed').textContent = testsPassed;
+            document.getElementById('testsFailed').textContent = testsFailed;
+        }
+
+        async function getAPIKey() {
+            const apiKey = prompt('Enter your Gemini API Key:');
+            if (!apiKey) throw new Error('API Key required');
+            return apiKey;
+        }
+
+        window.testModel = async function(modelName, resultId) {
+            const resultDiv = document.getElementById(resultId);
+            resultDiv.innerHTML = '<div class="result loading">⏳ Testing basic text generation...</div>';
+            testsRun++;
+
+            try {
+                const apiKey = await getAPIKey();
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ model: modelName });
+
+                const startTime = Date.now();
+                const result = await model.generateContent("Say 'Hello, I am " + modelName + "' and nothing else.");
+                const endTime = Date.now();
+
+                const response = await result.response;
+                const text = response.text();
+
+                testsPassed++;
+                updateStats();
+                resultDiv.innerHTML = `
+                    <div class="result success">
+                        ✅ <strong>SUCCESS</strong> - Basic text generation works!
+                        <br><strong>Model:</strong> ${modelName}
+                        <br><strong>Response Time:</strong> ${endTime - startTime}ms
+                        <br><strong>Response:</strong> ${text}
+                    </div>
+                `;
+            } catch (error) {
+                testsFailed++;
+                updateStats();
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        ❌ <strong>FAILED</strong>
+                        <br><strong>Model:</strong> ${modelName}
+                        <br><strong>Error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        };
+
+        window.testModelWithJSON = async function(modelName, resultId) {
+            const resultDiv = document.getElementById(resultId);
+            resultDiv.innerHTML = '<div class="result loading">⏳ Testing JSON mode...</div>';
+            testsRun++;
+
+            try {
+                const apiKey = await getAPIKey();
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ 
+                    model: modelName,
+                    generationConfig: {
+                        responseMimeType: "application/json"
+                    }
+                });
+
+                const prompt = 'Return a JSON object with two fields: "status" set to "success" and "model" set to "' + modelName + '"';
+                const startTime = Date.now();
+                const result = await model.generateContent(prompt);
+                const endTime = Date.now();
+
+                const response = await result.response;
+                const text = response.text();
+                const parsed = JSON.parse(text);
+
+                testsPassed++;
+                updateStats();
+                resultDiv.innerHTML = `
+                    <div class="result success">
+                        ✅ <strong>SUCCESS</strong> - JSON mode works!
+                        <br><strong>Model:</strong> ${modelName}
+                        <br><strong>Response Time:</strong> ${endTime - startTime}ms
+                        <br><strong>Parsed JSON:</strong> ${JSON.stringify(parsed, null, 2)}
+                    </div>
+                `;
+            } catch (error) {
+                testsFailed++;
+                updateStats();
+                resultDiv.innerHTML = `
+                    <div class="result error">
+                        ❌ <strong>FAILED</strong>
+                        <br><strong>Model:</strong> ${modelName}
+                        <br><strong>Error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        };
+
+        window.testModelWithTools = async function(modelName, resultId) {
+            const resultDiv = document.getElementById(resultId);
+            resultDiv.innerHTML = '<div class="result loading">⏳ Testing JSON mode + Google Search tool...</div>';
+            testsRun++;
+
+            try {
+                const apiKey = await getAPIKey();
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ 
+                    model: modelName,
+                    tools: [{ googleSearch: {} }],
+                    generationConfig: {
+                        responseMimeType: "application/json"
+                    }
+                });
+
+                const prompt = 'Search for "Pushpa 2 release date" and return JSON with fields: "movie", "releaseDate", "found" (boolean)';
+                const startTime = Date.now();
+                const result = await model.generateContent(prompt);
+                const endTime = Date.now();
+
+                const response = await result.response;
+                const text = response.text();
+                const parsed = JSON.parse(text);
+
+                testsPassed++;
+                updateStats();
+                resultDiv.innerHTML = `
+                    <div class="result success">
+                        ✅ <strong>SUCCESS</strong> - JSON + Tools works! (This is what Greybrainer needs!)
+                        <br><strong>Model:</strong> ${modelName}
+                        <br><strong>Response Time:</strong> ${endTime - startTime}ms
+                        <br><strong>Tools Used:</strong> Google Search
+                        <br><strong>Parsed JSON:</strong> ${JSON.stringify(parsed, null, 2)}
+                    </div>
+                `;
+            } catch (error) {
+                testsFailed++;
+                updateStats();
+                const expectedFailure = modelName === 'gemini-2.5-flash';
+                resultDiv.innerHTML = `
+                    <div class="result ${expectedFailure ? 'info' : 'error'}">
+                        ${expectedFailure ? '⚠️' : '❌'} <strong>${expectedFailure ? 'EXPECTED FAILURE' : 'FAILED'}</strong>
+                        <br><strong>Model:</strong> ${modelName}
+                        <br><strong>Error:</strong> ${error.message}
+                        ${expectedFailure ? '<br><br>✅ This confirms Gemini 2.5 Flash is incompatible with JSON + Tools' : ''}
+                    </div>
+                `;
+            }
+        };
+
+        window.testMovieSearch = async function(modelName, resultId) {
+            const resultDiv = document.getElementById(resultId);
+            resultDiv.innerHTML = '<div class="result loading">⏳ Testing movie search (exact Greybrainer function)...</div>';
+            testsRun++;
+
+            try {
+                const apiKey = await getAPIKey();
+                const genAI = new GoogleGenerativeAI(apiKey);
+                const model = genAI.getGenerativeModel({ 
+                    model: modelName,
+                    tools: [{ googleSearch: {} }],
+                    generationConfig: {
+                        temperature: 0.3,
+                        responseMimeType: "application/json"
+                    }
+                });
+
+                const prompt = `You are a movie database assistant. The user is searching for: "Pushpa 2"
+Current Date: December 24, 2025
+
+List up to 5 movies or TV series that match this query.
+CONTEXT: The user is primarily interested in Indian cinema (Bollywood, Tollywood, etc.) and recent global releases.
+
+IMPORTANT: Use your Google Search tool to find the most up-to-date information.
+
+For each match, provide:
+- Title
+- Year of release
+- Director (or Creator for series)
+- Type (Movie or Series)
+- A very brief one-line description (max 10 words)
+
+Format the output as a JSON array of objects.
+Example JSON format:
+[
+  { "title": "Pushpa 2: The Rule", "year": "2024", "director": "Sukumar", "type": "Movie", "description": "Allu Arjun returns as Pushpa in sequel." }
+]
+
+Ensure the JSON is valid. Do not include markdown formatting.`;
+
+                const startTime = Date.now();
+                const result = await model.generateContent(prompt);
+                const endTime = Date.now();
+
+                const response = await result.response;
+                const text = response.text();
+                const parsed = JSON.parse(text);
+
+                testsPassed++;
+                updateStats();
+                resultDiv.innerHTML = `
+                    <div class="result success">
+                        ✅ <strong>SUCCESS</strong> - Movie search works perfectly!
+                        <br><strong>Model:</strong> ${modelName}
+                        <br><strong>Response Time:</strong> ${endTime - startTime}ms
+                        <br><strong>Movies Found:</strong> ${parsed.length}
+                        <br><strong>Results:</strong>
+                        <pre>${JSON.stringify(parsed, null, 2)}</pre>
+                        <br>🎉 <strong>This model is compatible with Greybrainer!</strong>
+                    </div>
+                `;
+            } catch (error) {
+                testsFailed++;
+                updateStats();
+                const expectedFailure = modelName === 'gemini-2.5-flash';
+                resultDiv.innerHTML = `
+                    <div class="result ${expectedFailure ? 'info' : 'error'}">
+                        ${expectedFailure ? '⚠️' : '❌'} <strong>${expectedFailure ? 'EXPECTED FAILURE' : 'FAILED'}</strong>
+                        <br><strong>Model:</strong> ${modelName}
+                        <br><strong>Error:</strong> ${error.message}
+                        ${expectedFailure ? '<br><br>✅ This is why we reverted to Gemini 1.5 Flash!' : ''}
+                        ${expectedFailure ? '<br>Gemini 2.5 Flash cannot be used for movie search.' : ''}
+                    </div>
+                `;
+            }
+        };
+    </script>
+</body>
+</html>

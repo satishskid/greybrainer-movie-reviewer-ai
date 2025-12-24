@@ -2138,10 +2138,11 @@ Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
   `.trim();
 
   try {
-    // Use gemini-1.5-flash for JSON mode with tools (gemini-2.5-flash doesn't support this)
+    // Use config-based model (gemini-1.5-flash supports JSON mode with tools)
+    const selectedModel = getSelectedGeminiModel();
     const model = getGeminiAI().getGenerativeModel({ 
-      model: 'gemini-1.5-flash',
-      tools: [{ googleSearch: {} }],
+      model: selectedModel,
+      tools: [{ googleSearch: {} }] as any,
       generationConfig: {
         temperature: 0.3,
         responseMimeType: "application/json"
