@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Gemini 2.5 Flash - JSON + Tools</title>
+    <style>
+        body { font-family: Arial; max-width: 800px; margin: 40px auto; padding: 20px; }
+        input { width: 100%; padding: 10px; margin: 10px 0; font-family: monospace; }
+        button { background: #4CAF50; color: white; padding: 12px 24px; border: none; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #45a049; }
+        .result { margin-top: 20px; padding: 15px; border-radius: 4px; }
+        .success { background: #d4edda; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; border: 1px solid #f5c6cb; }
+        pre { background: #282c34; color: #abb2bf; padding: 15px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🧪 Test: Gemini 2.5 Flash with JSON + Tools</h1>
+    <p>Testing if <code>gemini-2.5-flash</code> supports JSON mode with Google Search tools</p>
+    
+    <input type="text" id="apiKey" placeholder="Enter your Gemini API key..." />
+    <button onclick="testModel()">🚀 Test gemini-2.5-flash</button>
+    
+    <div id="result"></div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
+
+        window.testModel = async function() {
+            const apiKey = document.getElementById('apiKey').value.trim();
+            if (!apiKey) {
+                alert('Please enter your API key');
+                return;
+            }
+
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = '<div class="result" style="background: #d1ecf1;">⏳ Testing gemini-2.5-flash...</div>';
+
+            try {
+                const genAI = new GoogleGenerativeAI(apiKey);
+                
+                // THE CRITICAL TEST: JSON mode + Tools
+                console.log('Testing: gemini-2.5-flash with JSON + Tools');
+                const model = genAI.getGenerativeModel({ 
+                    model: 'gemini-2.5-flash',
+                    tools: [{ googleSearch: {} }],
+                    generationConfig: {
+                        temperature: 0.3,
+                        responseMimeType: "application/json"
+                    }
+                });
+
+                const prompt = `Search for movies about "time travel" and return JSON array:
+[{"title": "Movie Name", "year": 2024, "reason": "Brief reason"}]
+
+Return 3 suggestions.`;
+
+                const startTime = Date.now();
+                const result = await model.generateContent(prompt);
+                const responseTime = Date.now() - startTime;
+                const text = result.response.text();
+                
+                const cleanJson = text.replace(/```json/g, '').replace(/```/g, '').trim();
+                const parsed = JSON.parse(cleanJson);
+
+                resultDiv.className = 'result success';
+                resultDiv.innerHTML = `
+                    <h2>✅ SUCCESS!</h2>
+                    <p><strong>gemini-2.5-flash WORKS with JSON + Tools!</strong></p>
+                    <p>Response time: ${responseTime}ms</p>
+                    <p>Results:</p>
+                    <pre>${JSON.stringify(parsed, null, 2)}</pre>
+                    <p style="margin-top: 20px; padding: 15px; background: #e8f5e9; border-radius: 4px;">
+                        <strong>✨ This means your Greybrainer app will work perfectly!</strong><br>
+                        The movie search feature uses exactly this configuration.
+                    </p>
+                `;
+
+            } catch (error) {
+                const errorMsg = error.message || error.toString();
+                let diagnosis = '';
+                
+                if (errorMsg.includes('400') && errorMsg.includes('Tool use')) {
+                    diagnosis = `
+                        <p><strong>❌ gemini-2.5-flash does NOT support JSON + Tools</strong></p>
+                        <p>We need to either:</p>
+                        <ul>
+                            <li>Remove JSON mode (parse response manually)</li>
+                            <li>Remove Tools (no Google Search grounding)</li>
+                            <li>Try a different model</li>
+                        </ul>
+                    `;
+                } else if (errorMsg.includes('404')) {
+                    diagnosis = '<p>❌ Model not found - this should not happen based on ListModels!</p>';
+                } else {
+                    diagnosis = `<p>Unexpected error: ${errorMsg}</p>`;
+                }
+
+                resultDiv.className = 'result error';
+                resultDiv.innerHTML = `
+                    <h2>❌ FAILED</h2>
+                    ${diagnosis}
+                    <details>
+                        <summary>Error Details</summary>
+                        <pre>${errorMsg}</pre>
+                    </details>
+                `;
+            }
+        };
+    </script>
+</body>
+</html>

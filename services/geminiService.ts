@@ -2138,14 +2138,14 @@ Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
   `.trim();
 
   try {
-    // Use config-based model (gemini-1.5-flash supports JSON mode with tools)
-    const selectedModel = getSelectedGeminiModel();
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: selectedModel,
+    // Note: As of Dec 2024, gemini-2.5-flash no longer supports JSON mode with Tools
+    // Removing responseMimeType and parsing JSON manually from response
+    const model = getGeminiAI().getGenerativeModel({
+      model: getSelectedGeminiModel(),
       tools: [{ googleSearch: {} }] as any,
       generationConfig: {
-        temperature: 0.3,
-        responseMimeType: "application/json"
+        temperature: 0.3
+        // responseMimeType removed - causes 400 error with tools
       }
     });
     
@@ -2158,10 +2158,22 @@ Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
     const responseText = response.response.text().trim();
     logTokenUsage?.('Movie Search (Gemini)', prompt.length, responseText.length);
     
-    // Clean up potential markdown code blocks if the model ignores the instruction
-    const cleanJson = responseText.replace(/```json/g, '').replace(/```/g, '').trim();
+    // Extract JSON from response - model may wrap in markdown or return plain JSON
+    let cleanJson = responseText;
     
-    const suggestions: MovieSuggestion[] = JSON.parse(cleanJson);
+    // Try to extract JSON from markdown code blocks
+    const jsonBlockMatch = responseText.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
+    if (jsonBlockMatch) {
+      cleanJson = jsonBlockMatch[1];
+    } else {
+      // Try to find raw JSON array
+      const jsonArrayMatch = responseText.match(/\[[\s\S]*\]/);
+      if (jsonArrayMatch) {
+        cleanJson = jsonArrayMatch[0];
+      }
+    }
+    
+    const suggestions: MovieSuggestion[] = JSON.parse(cleanJson.trim());
     return suggestions;
   } catch (error) {
     console.error('Gemini API error searching movies:', error);
