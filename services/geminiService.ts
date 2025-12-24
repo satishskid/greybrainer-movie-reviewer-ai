@@ -1084,6 +1084,141 @@ Generate insight:
   }
 };
 
+// NEW: Expanded Publication-Ready Insight (Medium Post / Opinion Piece)
+export const generateExpandedPublicationInsight = async (
+  originalInsight: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string> => {
+  const now = new Date();
+  const currentDate = now.toLocaleDateString('en-US', { 
+    month: 'long', 
+    day: 'numeric', 
+    year: 'numeric' 
+  });
+  const currentYear = now.getFullYear();
+  
+  const prompt = `
+You are a distinguished film critic and cultural commentator writing a publication-ready opinion piece for Medium, film industry journals, or major newspapers.
+
+CURRENT DATE: ${currentDate}
+CURRENT YEAR: ${currentYear}
+
+ORIGINAL GREYBRAINER INSIGHT:
+${originalInsight}
+
+YOUR TASK:
+Transform this insight into a compelling, detailed opinion piece (800-1200 words) that will make movie-goers, critics, and publishers rush to publish it.
+
+CRITICAL - HIGHLIGHT GREYBRAINER'S UNIQUE METHODOLOGY:
+You MUST emphasize that this analysis uses the proprietary **Greybrainer Framework**, a revolutionary three-layer concentric analytical system that NO other film criticism methodology employs:
+
+**THE GREYBRAINER THREE-LAYER FRAMEWORK:**
+1. **STORY LAYER (Core/Inner Ring):** The narrative foundation - character archetypes, genre evolution, thematic depth
+2. **ORCHESTRATION LAYER (Middle Ring):** Directorial vision, visual language, casting strategy, production design
+3. **PERFORMANCE LAYER (Outer Ring):** Acting authenticity, star system evolution, performance techniques
+
+**PLUS THE MORPHOKINETICS DIMENSION:**
+A groundbreaking scientific approach analyzing:
+- **Visual Aesthetic:** Color grading, cinematographic style, look design
+- **Pacing Dynamics:** Editing speed, rhythm, temporal flow, shot duration
+
+This is the ONLY analytical framework that treats cinema as a layered, interconnected system - like analyzing an organism's anatomy from core to surface.
+
+STRUCTURE YOUR ARTICLE:
+
+**HEADLINE (Compelling, Clickable):**
+Create a provocative headline that captures the insight's essence
+
+**OPENING HOOK (150 words):**
+Start with a vivid scene or recent cultural moment that embodies the trend. Make readers feel they're discovering something urgent.
+
+**THESIS STATEMENT (50 words):**
+Clearly state the evolution/pattern you're analyzing. Mention this is revealed through Greybrainer's proprietary three-layer + morphokinetics analysis.
+
+**SECTION 1: THE STORY LAYER EVOLUTION (250-300 words)**
+- Deep dive into character archetype shifts
+- Genre evolution and audience psychology
+- Specific film/series examples from ${currentYear} vs ${currentYear - 2}-${currentYear - 3}
+- Why this matters for storytelling
+- Quote hypothetical filmmaker or critic reactions
+
+**SECTION 2: THE ORCHESTRATION LAYER TRANSFORMATION (250-300 words)**
+- Directorial vision and visual language changes
+- How casting strategies evolved
+- Production design trends
+- Platform differences (theatrical vs OTT)
+- Industry implications for producers/directors
+
+**SECTION 3: THE PERFORMANCE LAYER & MORPHOKINETICS (250-300 words)**
+- Acting style evolution (theatrical to naturalistic)
+- Star system changes
+- **MORPHOKINETICS ANALYSIS:** How visual aesthetics and pacing changed
+  * Color grading trends (saturated Bollywood vs muted OTT)
+  * Editing rhythm differences (theatrical spectacle vs streaming subtlety)
+  * Shot duration evolution
+- Scientific approach to these measurable elements
+
+**SECTION 4: THE CONVERGENCE - What This Means (150-200 words)**
+- How all three layers + morphokinetics interact
+- Cultural/societal drivers behind this shift
+- Audience maturation and demand evolution
+- Future predictions for Indian cinema
+
+**CLOSING STATEMENT (100 words):**
+Powerful conclusion that ties back to opening hook. Leave readers thinking about their next theater/streaming choice differently.
+
+**SIDEBAR/CALLOUT BOX:**
+"The Greybrainer Methodology: Why Three Layers Matter"
+Brief explainer of how this framework reveals patterns other critics miss.
+
+WRITING STYLE REQUIREMENTS:
+- Authoritative yet accessible (New Yorker meets Variety)
+- Data-driven but emotionally resonant
+- Use specific examples (actual films/shows from ${currentYear} and past 2-3 years)
+- Include industry insider perspective
+- Quotable pull-quotes throughout
+- Make the Greybrainer framework sound indispensable
+- Emphasize originality - this analysis exists nowhere else
+
+TONE:
+- Confident cultural commentary
+- Thought leadership
+- Not academic jargon, but intellectually rigorous
+- Celebrates Indian cinema's maturation
+
+SEO/VIRAL ELEMENTS:
+- Subheadings that could be tweets
+- Pull-quotes that could go viral
+- Contrarian takes that spark debate
+- Data points that surprise
+
+Generate the full publication-ready article now:
+  `.trim();
+  
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: getSelectedGeminiModel(),
+      tools: [{ googleSearch: {} }],
+      generationConfig: {
+        temperature: 0.8,
+        topP: 0.95,
+        topK: 60,
+        maxOutputTokens: 4096,
+      }
+    });
+    const response = await model.generateContent(prompt);
+    const expandedInsight = response.response.text().trim();
+    logTokenUsage?.('Expanded Publication Insight (Gemini)', prompt.length, expandedInsight.length);
+    return expandedInsight;
+  } catch (error) {
+    console.error('Gemini API error generating expanded insight:', error);
+    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
+         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
+    }
+    throw new Error('Failed to generate expanded publication insight from AI.');
+  }
+};
+
 // NEW: Movie-Anchored Insight Generation
 export const generateMovieAnchoredInsightWithGemini = async (
   movieTitle: string,

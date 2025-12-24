@@ -2,13 +2,14 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
 import { LoadingSpinner } from './LoadingSpinner';
-import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, generateMovieAnchoredInsightWithGemini, LogTokenUsageFn } from '../services/geminiService';
+import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, generateMovieAnchoredInsightWithGemini, generateExpandedPublicationInsight, LogTokenUsageFn } from '../services/geminiService';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon'; // New Icon for detailed report
 import { ClipboardIcon } from './icons/ClipboardIcon';
 import { DownloadIcon } from './icons/DownloadIcon';
 import { ReadMoreLess } from './ReadMoreLess'; // For potentially long detailed reports
 import GeminiCanvasExport from './GeminiCanvasExport';
+import { FileText, Newspaper } from 'lucide-react';
 
 interface GreybrainerInsightsProps {
   logTokenUsage?: LogTokenUsageFn;
@@ -32,12 +33,24 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
   
   const [copiedDetailedReport, setCopiedDetailedReport] = useState<boolean>(false);
 
+  // Publication expansion state (new)
+  const [expandedArticle, setExpandedArticle] = useState<string | null>(null);
+  const [isGeneratingArticle, setIsGeneratingArticle] = useState<boolean>(false);
+  const [articleError, setArticleError] = useState<string | null>(null);
+  const [copiedArticle, setCopiedArticle] = useState<boolean>(false);
+
   // Movie-anchored insight state (new)
   const [selectedMovie, setSelectedMovie] = useState<string>('');
   const [selectedLayer, setSelectedLayer] = useState<AnalysisLayer>('random');
   const [movieAnchoredInsight, setMovieAnchoredInsight] = useState<string>('');
   const [isGeneratingMovieInsight, setIsGeneratingMovieInsight] = useState(false);
   const [movieInsightError, setMovieInsightError] = useState<string | null>(null);
+
+  // Movie-anchored publication expansion state
+  const [expandedMovieArticle, setExpandedMovieArticle] = useState<string | null>(null);
+  const [isGeneratingMovieArticle, setIsGeneratingMovieArticle] = useState<boolean>(false);
+  const [movieArticleError, setMovieArticleError] = useState<string | null>(null);
+  const [copiedMovieArticle, setCopiedMovieArticle] = useState<boolean>(false);
 
 
   const fetchDynamicInsight = useCallback(async () => {
@@ -102,6 +115,94 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
     link.href = url;
     const safeInsightStart = dynamicInsightText?.substring(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'insight';
     link.download = `detailed_report_${safeInsightStart}.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Publication expansion handlers
+  const handleGenerateExpandedArticle = useCallback(async () => {
+    if (!dynamicInsightText || isGeneratingArticle) return;
+
+    setIsGeneratingArticle(true);
+    setArticleError(null);
+    setExpandedArticle(null);
+    try {
+      const article = await generateExpandedPublicationInsight(dynamicInsightText, logTokenUsage);
+      setExpandedArticle(article);
+    } catch (err) {
+      console.error("Failed to generate expanded article:", err);
+      setArticleError(err instanceof Error ? err.message : "An unknown error occurred while generating the article.");
+    } finally {
+      setIsGeneratingArticle(false);
+    }
+  }, [dynamicInsightText, isGeneratingArticle, logTokenUsage]);
+
+  const handleCopyExpandedArticle = () => {
+    if (!expandedArticle) return;
+    navigator.clipboard.writeText(expandedArticle).then(() => {
+        setCopiedArticle(true);
+        setTimeout(() => setCopiedArticle(false), 2500);
+    }).catch(err => {
+        console.error('Failed to copy article: ', err);
+    });
+  };
+
+  const handleDownloadExpandedArticle = () => {
+    if (!expandedArticle) return;
+    
+    const markdownContent = expandedArticle.replace(/\n\s*\n/g, '\n\n'); 
+    const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeInsightStart = dynamicInsightText?.substring(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'insight';
+    link.download = `publication_article_${safeInsightStart}.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  // Movie-anchored publication expansion handlers
+  const handleGenerateExpandedMovieArticle = useCallback(async () => {
+    if (!movieAnchoredInsight || isGeneratingMovieArticle) return;
+
+    setIsGeneratingMovieArticle(true);
+    setMovieArticleError(null);
+    setExpandedMovieArticle(null);
+    try {
+      const article = await generateExpandedPublicationInsight(movieAnchoredInsight, logTokenUsage);
+      setExpandedMovieArticle(article);
+    } catch (err) {
+      console.error("Failed to generate expanded movie article:", err);
+      setMovieArticleError(err instanceof Error ? err.message : "An unknown error occurred while generating the article.");
+    } finally {
+      setIsGeneratingMovieArticle(false);
+    }
+  }, [movieAnchoredInsight, isGeneratingMovieArticle, logTokenUsage]);
+
+  const handleCopyExpandedMovieArticle = () => {
+    if (!expandedMovieArticle) return;
+    navigator.clipboard.writeText(expandedMovieArticle).then(() => {
+        setCopiedMovieArticle(true);
+        setTimeout(() => setCopiedMovieArticle(false), 2500);
+    }).catch(err => {
+        console.error('Failed to copy movie article: ', err);
+    });
+  };
+
+  const handleDownloadExpandedMovieArticle = () => {
+    if (!expandedMovieArticle) return;
+    
+    const markdownContent = expandedMovieArticle.replace(/\n\s*\n/g, '\n\n'); 
+    const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeMovieTitle = selectedMovie.substring(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'movie';
+    link.download = `publication_article_${safeMovieTitle}.md`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -176,7 +277,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
             <div className="mt-3 mb-3">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-1">
                 <p className="font-semibold text-yellow-300 mb-1 sm:mb-0">Dynamic AI Insight:</p>
-                <div className="flex space-x-2">
+                <div className="flex flex-wrap gap-2">
                   <button
                     onClick={fetchDynamicInsight}
                     disabled={isFetchingDynamicInsight || isGeneratingDetailedReport}
@@ -194,6 +295,15 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                   >
                     <DocumentTextIcon className="w-3 h-3 mr-1.5" />
                     Generate Detailed Report
+                  </button>
+                  <button
+                    onClick={handleGenerateExpandedArticle}
+                    disabled={!dynamicInsightText || isGeneratingArticle || isFetchingDynamicInsight}
+                    className="flex items-center px-2.5 py-1 text-xs font-medium text-white hover:text-amber-200 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-md transition-colors disabled:opacity-50 shadow-lg"
+                    title="Expand to Publication-Ready Article (800-1200 words)"
+                  >
+                    <Newspaper className="w-3 h-3 mr-1.5" />
+                    Expand to Publication
                   </button>
                 </div>
               </div>
@@ -217,6 +327,60 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                 )}
               </blockquote>
             </div>
+
+            {isGeneratingArticle && (
+              <div className="mt-4 p-4 border-t border-purple-700/50 bg-purple-900/20">
+                <div className="flex items-center justify-center">
+                  <LoadingSpinner />
+                  <span className="ml-3 text-slate-300">Generating publication-ready article (800-1200 words)...</span>
+                </div>
+              </div>
+            )}
+
+            {articleError && (
+              <div className="mt-4 p-3 bg-red-700/30 text-red-300 border border-red-500 rounded-md">
+                <strong>Error generating article:</strong> {articleError}
+              </div>
+            )}
+
+            {expandedArticle && !isGeneratingArticle && (
+              <div className="mt-6 pt-4 border-t border-purple-700/50 bg-gradient-to-br from-purple-900/20 to-indigo-900/20 rounded-lg p-4">
+                <div className="flex items-center mb-3">
+                  <Newspaper className="w-5 h-5 text-purple-400 mr-2" />
+                  <h3 className="text-lg font-semibold text-purple-300">Publication-Ready Article</h3>
+                  <span className="ml-auto text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded">Medium • Newspaper • Blog</span>
+                </div>
+                <div className="p-4 bg-slate-900/60 rounded-lg border border-purple-500/30 mb-3">
+                  <ReadMoreLess 
+                    text={expandedArticle} 
+                    initialVisibleLines={20} 
+                    className="text-slate-100 whitespace-pre-wrap leading-relaxed text-sm gb-content-area prose prose-invert max-w-none" 
+                  />
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <button
+                    onClick={handleCopyExpandedArticle}
+                    className="flex items-center px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                    title="Copy publication article"
+                  >
+                    <ClipboardIcon className="w-3 h-3 mr-1.5" />
+                    {copiedArticle ? 'Copied!' : 'Copy Article'}
+                  </button>
+                  <button
+                    onClick={handleDownloadExpandedArticle}
+                    className="flex items-center px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                    title="Download as Markdown"
+                  >
+                    <DownloadIcon className="w-3 h-3 mr-1.5" />
+                    Download Article
+                  </button>
+                  <div className="ml-auto text-xs text-slate-400 flex items-center">
+                    <FileText className="w-3 h-3 mr-1" />
+                    Ready for Medium, Film Journals, Newspapers
+                  </div>
+                </div>
+              </div>
+            )}
 
             {isGeneratingDetailedReport && (
               <div className="mt-4 p-4 border-t border-slate-700/50">
@@ -345,9 +509,76 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
 
             {/* Insight Display */}
             {movieAnchoredInsight && !isGeneratingMovieInsight && (
-              <div className="mt-4 p-4 bg-slate-900/80 rounded-lg border border-amber-500/30">
-                <h3 className="text-sm font-semibold text-amber-300 mb-2">Generated Insight:</h3>
-                <p className="text-slate-200 leading-relaxed">{movieAnchoredInsight}</p>
+              <div className="space-y-4">
+                <div className="p-4 bg-slate-900/80 rounded-lg border border-amber-500/30">
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="text-sm font-semibold text-amber-300">Generated Insight:</h3>
+                    <button
+                      onClick={handleGenerateExpandedMovieArticle}
+                      disabled={isGeneratingMovieArticle}
+                      className="flex items-center px-2.5 py-1 text-xs font-medium text-white hover:text-amber-200 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-md transition-colors disabled:opacity-50 shadow-lg"
+                      title="Expand to Publication-Ready Article (800-1200 words)"
+                    >
+                      <Newspaper className="w-3 h-3 mr-1.5" />
+                      Expand to Publication
+                    </button>
+                  </div>
+                  <p className="text-slate-200 leading-relaxed">{movieAnchoredInsight}</p>
+                </div>
+
+                {isGeneratingMovieArticle && (
+                  <div className="p-4 border-t border-purple-700/50 bg-purple-900/20 rounded-lg">
+                    <div className="flex items-center justify-center">
+                      <LoadingSpinner />
+                      <span className="ml-3 text-slate-300">Generating publication-ready article (800-1200 words)...</span>
+                    </div>
+                  </div>
+                )}
+
+                {movieArticleError && (
+                  <div className="p-3 bg-red-700/30 text-red-300 border border-red-500 rounded-md">
+                    <strong>Error generating article:</strong> {movieArticleError}
+                  </div>
+                )}
+
+                {expandedMovieArticle && !isGeneratingMovieArticle && (
+                  <div className="pt-4 border-t border-purple-700/50 bg-gradient-to-br from-purple-900/20 to-indigo-900/20 rounded-lg p-4">
+                    <div className="flex items-center mb-3">
+                      <Newspaper className="w-5 h-5 text-purple-400 mr-2" />
+                      <h3 className="text-lg font-semibold text-purple-300">Publication-Ready Article</h3>
+                      <span className="ml-auto text-xs text-slate-400 bg-slate-800 px-2 py-1 rounded">Medium • Newspaper • Blog</span>
+                    </div>
+                    <div className="p-4 bg-slate-900/60 rounded-lg border border-purple-500/30 mb-3">
+                      <ReadMoreLess 
+                        text={expandedMovieArticle} 
+                        initialVisibleLines={20} 
+                        className="text-slate-100 whitespace-pre-wrap leading-relaxed text-sm gb-content-area prose prose-invert max-w-none" 
+                      />
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={handleCopyExpandedMovieArticle}
+                        className="flex items-center px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                        title="Copy publication article"
+                      >
+                        <ClipboardIcon className="w-3 h-3 mr-1.5" />
+                        {copiedMovieArticle ? 'Copied!' : 'Copy Article'}
+                      </button>
+                      <button
+                        onClick={handleDownloadExpandedMovieArticle}
+                        className="flex items-center px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                        title="Download as Markdown"
+                      >
+                        <DownloadIcon className="w-3 h-3 mr-1.5" />
+                        Download Article
+                      </button>
+                      <div className="ml-auto text-xs text-slate-400 flex items-center">
+                        <FileText className="w-3 h-3 mr-1" />
+                        Ready for Medium, Film Journals, Newspapers
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
