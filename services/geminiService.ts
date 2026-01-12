@@ -1677,6 +1677,46 @@ ${morphokineticsInsight}` : ''}
 
 ---
 
+### 📊 Digital Biomarker & Publishing Guidelines
+
+**Biomarker ID:** GB-[YYYYMMDD]-[XXX]  
+*(Example: GB-20260112-001)*
+
+**Published:** [Date & Time]  
+**Topic:** [Film Title] - [Key Theme/Angle]  
+**Keywords:** #[MainKeyword] #[GenreTag] #[PlatformTag] #[TrendingTag]  
+**Biomarker Tag:** #GreybrainerPulse[YYYYMMDD]  
+**Medium URL:** [Paste after publishing]  
+
+---
+
+**📋 For Publishing Team:**
+
+When publishing this post to Medium (@GreyBrainer), please:
+
+1. **URL Slug Format:** Use greybrainer-pulse-YYYYMMDD-[topic-keyword]  
+   Example: greybrainer-pulse-20260112-akhanda-divine-action
+
+2. **Biomarker Hashtag:** Add the unique daily tag at the end (e.g., #GreybrainerPulse20260112)
+
+3. **Track Performance (24h after publish):**
+   - Views count
+   - Claps received
+   - Comments (note the top reaction/theme)
+   - Traffic sources (organic search vs social shares)
+
+4. **Update Biomarker Section:** After 24h, paste stats back into this section for research tracking
+
+5. **For Next Day's Research:** Use this biomarker + stats in the "Past Content Context" field to help AI identify what resonated and build narrative continuity
+
+**Why This Matters:** This biomarker system allows Greybrainer AI to analyze audience engagement patterns, suggest follow-up topics based on proven interest, and create a continuous narrative thread across all @GreyBrainer posts. Each post becomes a data point in understanding your audience's evolving preferences.
+
+---
+
+*Follow @GreyBrainer for continuous cinema narrative analysis.*
+
+---
+
 **Generate the Grey Editor essay now, following the template exactly.**`;
 
   try {
