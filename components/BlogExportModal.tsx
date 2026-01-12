@@ -5,7 +5,7 @@ import { DownloadIcon } from './icons/DownloadIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon';
 import { LayerAnalysisData, SummaryReportData, PersonnelData, ActualPerformanceData, FinancialAnalysisData } from '../types';
 import { LAYER_DEFINITIONS, LAYER_SHORT_NAMES } from '../constants';
-import { generateDirectorModeBlogPost, LogTokenUsageFn } from '../services/geminiService';
+import { generateGreyEditorBlogPost, LogTokenUsageFn } from '../services/geminiService';
 import { generateEnhancedBlogPost, formatBlogForPlatform } from '../services/blogImageService';
 import { LoadingSpinner } from './LoadingSpinner';
 
@@ -18,6 +18,7 @@ interface BlogExportModalProps {
   personnelData?: PersonnelData;
   actualPerformance?: ActualPerformanceData;
   financialAnalysisData?: FinancialAnalysisData;
+  morphokineticsAnalysis?: any; // Add morphokinetics
   maxScore: number;
   logTokenUsage?: LogTokenUsageFn;
 }
@@ -31,15 +32,16 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
   personnelData,
   actualPerformance,
   financialAnalysisData,
+  morphokineticsAnalysis, // Add to destructuring
   maxScore,
   logTokenUsage
 }) => {
   const [copiedBlog, setCopiedBlog] = useState(false);
   const [copiedSocial, setCopiedSocial] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState<'blog' | 'social'>('blog');
-  const [directorMode, setDirectorMode] = useState(false);
-  const [isGeneratingDirectorMode, setIsGeneratingDirectorMode] = useState(false);
-  const [directorModeContent, setDirectorModeContent] = useState<string | null>(null);
+  const [greyEditorMode, setGreyEditorMode] = useState(false);
+  const [isGeneratingGreyEditor, setIsGeneratingGreyEditor] = useState(false);
+  const [greyEditorContent, setGreyEditorContent] = useState<string | null>(null);
   
   // New state for enhanced blog with images
   const [enhancedMode, setEnhancedMode] = useState(false);
@@ -51,15 +53,25 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
 
   const overallScore = layerAnalyses.reduce((sum, layer) => sum + (layer.userScore || 0), 0);
 
-  const handleGenerateDirectorMode = async () => {
-    setIsGeneratingDirectorMode(true);
+  const handleGenerateGreyEditor = async () => {
+    setIsGeneratingGreyEditor(true);
     try {
-      const content = await generateDirectorModeBlogPost(title, summaryReportData.reportText);
-      setDirectorModeContent(content);
+      const pureAnalysis = summaryReportData.reportText;
+      const morphokineticsInsight = morphokineticsAnalysis?.narrative || morphokineticsAnalysis?.insight;
+      const content = await generateGreyEditorBlogPost(
+        title, 
+        pureAnalysis, 
+        overallScore, 
+        maxScore,
+        morphokineticsInsight,
+        logTokenUsage
+      );
+      setGreyEditorContent(content);
     } catch (error) {
-      console.error("Failed to generate director mode blog post:", error);
+      console.error("Failed to generate Grey Editor blog post:", error);
+      alert("Failed to generate Grey Editor blog post. Please try again.");
     } finally {
-      setIsGeneratingDirectorMode(false);
+      setIsGeneratingGreyEditor(false);
     }
   };
 
@@ -86,8 +98,9 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
       return formatBlogForPlatform(enhancedBlogData, selectedPlatform);
     }
 
-    if (directorMode && directorModeContent) {
-      return directorModeContent;
+    // If Grey Editor mode is active, return that content
+    if (greyEditorMode && greyEditorContent) {
+      return greyEditorContent;
     }
 
     let blog = `# 🎬 Greybrainer AI Movie Review: ${title}\n\n`;
@@ -257,7 +270,7 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
     const link = document.createElement('a');
     link.href = url;
     const safeTitle = title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const suffix = selectedFormat === 'blog' ? (directorMode ? 'director_cut' : 'blog_post') : 'social_post';
+    const suffix = selectedFormat === 'blog' ? (greyEditorMode ? 'grey_editor' : 'blog_post') : 'social_post';
     link.download = `${safeTitle}_${suffix}.md`;
     document.body.appendChild(link);
     link.click();
@@ -311,36 +324,36 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
 
             {selectedFormat === 'blog' && (
               <>
-                {/* Director Mode */}
+                {/* Grey Editor Mode */}
                 <div className="flex items-center space-x-3 bg-slate-700/30 p-3 rounded-lg border border-slate-600/50 mb-3">
                   <div className="flex items-center h-5">
                     <input
-                      id="director-mode"
+                      id="grey-editor-mode"
                       type="checkbox"
-                      checked={directorMode}
-                      onChange={(e) => setDirectorMode(e.target.checked)}
+                      checked={greyEditorMode}
+                      onChange={(e) => setGreyEditorMode(e.target.checked)}
                       className="w-4 h-4 text-indigo-600 bg-slate-700 border-slate-500 rounded focus:ring-indigo-500 focus:ring-2"
                     />
                   </div>
                   <div className="ml-2 text-sm flex-1">
-                    <label htmlFor="director-mode" className="font-medium text-slate-200">
-                      🎬 Director Mode (Cinematic Narrative)
+                    <label htmlFor="grey-editor-mode" className="font-medium text-slate-200">
+                      📝 Grey Editor Mode (Opinionated Essay)
                     </label>
                     <p className="text-slate-400 text-xs">
-                      Transforms the review into a cinematic story with visual moments and strategic content hooks.
+                      Transforms pure analysis into a compelling, nuanced essay for Medium/LinkedIn with strong hooks and scannable format.
                     </p>
                   </div>
-                  {directorMode && !directorModeContent && (
+                  {greyEditorMode && !greyEditorContent && (
                     <button
-                      onClick={handleGenerateDirectorMode}
-                      disabled={isGeneratingDirectorMode}
+                      onClick={handleGenerateGreyEditor}
+                      disabled={isGeneratingGreyEditor}
                       className={`ml-auto px-3 py-1.5 text-xs font-medium rounded-md text-white transition-colors ${
-                        isGeneratingDirectorMode 
+                        isGeneratingGreyEditor 
                           ? 'bg-indigo-500/50 cursor-not-allowed' 
                           : 'bg-indigo-600 hover:bg-indigo-500'
                       }`}
                     >
-                      {isGeneratingDirectorMode ? 'Generating...' : 'Generate Cinematic Cut'}
+                      {isGeneratingGreyEditor ? 'Generating...' : 'Generate Grey Essay'}
                     </button>
                   )}
                 </div>
@@ -418,13 +431,13 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
           {/* Preview */}
           <div className="bg-slate-900 rounded-lg p-4 mb-6 border border-slate-600">
             <h3 className="text-lg font-semibold text-slate-200 mb-3">
-              Preview: {enhancedMode && enhancedBlogData ? '✨ Enhanced with Images' : directorMode && selectedFormat === 'blog' ? '🎬 Director\'s Cut' : ''}
+              Preview: {enhancedMode && enhancedBlogData ? '✨ Enhanced with Images' : greyEditorMode && selectedFormat === 'blog' ? '📝 Grey Editor Essay' : ''}
             </h3>
             <div className="bg-slate-800 rounded p-4 max-h-96 overflow-y-auto">
               <pre className="text-sm text-slate-300 whitespace-pre-wrap font-mono">
                 {selectedFormat === 'blog' 
-                  ? (directorMode && !directorModeContent 
-                      ? (isGeneratingDirectorMode ? "Generating cinematic narrative... please wait..." : "Enable Director Mode and click 'Generate Cinematic Cut' to create a story-driven blog post.") 
+                  ? (greyEditorMode && !greyEditorContent 
+                      ? (isGeneratingGreyEditor ? "Generating Grey Editor essay... please wait..." : "Enable Grey Editor Mode and click 'Generate Grey Essay' to create an opinionated, compelling essay.") 
                       : (enhancedMode && !enhancedBlogData
                           ? (isGeneratingEnhanced ? "Generating enhanced version with images and SEO... please wait..." : "Enable Enhanced Mode and click 'Generate Enhanced Version' to add AI-generated images and SEO!")
                           : generateBlogPost()))
@@ -509,9 +522,9 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
           <div className="flex flex-wrap gap-3">
             <button
               onClick={() => handleCopy(selectedFormat)}
-              disabled={selectedFormat === 'blog' && directorMode && !directorModeContent}
+              disabled={selectedFormat === 'blog' && greyEditorMode && !greyEditorContent}
               className={`flex items-center px-4 py-2 font-medium rounded-lg transition-colors ${
-                selectedFormat === 'blog' && directorMode && !directorModeContent
+                selectedFormat === 'blog' && greyEditorMode && !greyEditorContent
                   ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
                   : 'bg-indigo-600 hover:bg-indigo-500 text-white'
               }`}
@@ -525,9 +538,9 @@ export const BlogExportModal: React.FC<BlogExportModalProps> = ({
             
             <button
               onClick={handleDownload}
-              disabled={selectedFormat === 'blog' && directorMode && !directorModeContent}
+              disabled={selectedFormat === 'blog' && greyEditorMode && !greyEditorContent}
               className={`flex items-center px-4 py-2 font-medium rounded-lg transition-colors ${
-                selectedFormat === 'blog' && directorMode && !directorModeContent
+                selectedFormat === 'blog' && greyEditorMode && !greyEditorContent
                   ? 'bg-slate-700 text-slate-500 cursor-not-allowed'
                   : 'bg-teal-600 hover:bg-teal-500 text-white'
               }`}

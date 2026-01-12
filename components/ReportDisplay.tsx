@@ -701,6 +701,7 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
         personnelData={personnelData}
         actualPerformance={localActualPerformance}
         financialAnalysisData={financialAnalysisData || undefined}
+        morphokineticsAnalysis={morphokineticsAnalysis}
         maxScore={maxScore}
       />
 
