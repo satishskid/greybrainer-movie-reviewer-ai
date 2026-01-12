@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
 import { LoadingSpinner } from './LoadingSpinner';
-import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, generateMovieAnchoredInsightWithGemini, generateExpandedPublicationInsight, LogTokenUsageFn } from '../services/geminiService';
+import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, generateMovieAnchoredInsightWithGemini, generateExpandedPublicationInsight, generateGreybrainerResearch, LogTokenUsageFn } from '../services/geminiService';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon'; // New Icon for detailed report
 import { ClipboardIcon } from './icons/ClipboardIcon';
@@ -15,7 +15,7 @@ interface GreybrainerInsightsProps {
   logTokenUsage?: LogTokenUsageFn;
 }
 
-type InsightMode = 'on-demand' | 'movie-anchored';
+type InsightMode = 'on-demand' | 'movie-anchored' | 'research-trending';
 type AnalysisLayer = 'story' | 'orchestration' | 'performance' | 'morphokinetics' | 'random';
 
 export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTokenUsage }) => {
@@ -51,6 +51,14 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
   const [isGeneratingMovieArticle, setIsGeneratingMovieArticle] = useState<boolean>(false);
   const [movieArticleError, setMovieArticleError] = useState<string | null>(null);
   const [copiedMovieArticle, setCopiedMovieArticle] = useState<boolean>(false);
+
+  // Research & Trending state (new)
+  const [trendingTopics, setTrendingTopics] = useState<string>('');
+  const [pastContentContext, setPastContentContext] = useState<string>('');
+  const [researchReport, setResearchReport] = useState<string | null>(null);
+  const [isGeneratingResearch, setIsGeneratingResearch] = useState<boolean>(false);
+  const [researchError, setResearchError] = useState<string | null>(null);
+  const [copiedResearch, setCopiedResearch] = useState<boolean>(false);
 
 
   const fetchDynamicInsight = useCallback(async () => {
@@ -232,6 +240,53 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
     }
   };
 
+  // Research & Trending handler
+  const handleGenerateResearch = async () => {
+    if (!trendingTopics.trim() || isGeneratingResearch) return;
+    
+    setIsGeneratingResearch(true);
+    setResearchError(null);
+    setResearchReport(null);
+    
+    try {
+      const report = await generateGreybrainerResearch(
+        trendingTopics,
+        pastContentContext || undefined,
+        logTokenUsage
+      );
+      setResearchReport(report);
+    } catch (err) {
+      console.error('Failed to generate research report:', err);
+      setResearchError(err instanceof Error ? err.message : 'An unknown error occurred while generating the research report.');
+    } finally {
+      setIsGeneratingResearch(false);
+    }
+  };
+
+  const handleCopyResearch = () => {
+    if (!researchReport) return;
+    navigator.clipboard.writeText(researchReport).then(() => {
+      setCopiedResearch(true);
+      setTimeout(() => setCopiedResearch(false), 2500);
+    }).catch(err => {
+      console.error('Failed to copy research report:', err);
+    });
+  };
+
+  const handleDownloadResearch = () => {
+    if (!researchReport) return;
+    const blob = new Blob([researchReport], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const today = new Date().toISOString().split('T')[0];
+    link.download = `greybrainer_research_${today}.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
 
   return (
     <div className="mt-12 p-6 bg-slate-800/70 rounded-xl shadow-2xl border border-slate-700">
@@ -268,6 +323,16 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
             }`}
           >
             🎬 Movie-Anchored Insight
+          </button>
+          <button
+            onClick={() => setInsightMode('research-trending')}
+            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+              insightMode === 'research-trending'
+                ? 'bg-amber-500 text-black'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            📊 Research & Trending
           </button>
         </div>
 
@@ -589,6 +654,99 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                 movieTitle={selectedMovie}
                 layerFocus={selectedLayer === 'random' ? undefined : selectedLayer}
               />
+            )}
+          </div>
+        )}
+
+        {/* Research & Trending Mode (NEW) */}
+        {insightMode === 'research-trending' && (
+          <div className="mt-4 space-y-4">
+            <div className="bg-slate-700/40 p-4 rounded-lg border border-amber-500/30">
+              <h3 className="text-amber-300 font-semibold mb-3 flex items-center">
+                📊 Research & Trending Engine
+              </h3>
+              <p className="text-slate-300 text-sm mb-4">
+                Analyze trending topics, box office numbers, and news headlines. Generate strategic research summations that interlink to your content ecosystem.
+              </p>
+              
+              <div className="space-y-3">
+                <div>
+                  <label htmlFor="trending-topics" className="block text-sm font-medium text-slate-200 mb-1">
+                    Trending Topics / News Headlines *
+                  </label>
+                  <textarea
+                    id="trending-topics"
+                    value={trendingTopics}
+                    onChange={(e) => setTrendingTopics(e.target.value)}
+                    placeholder="Enter trending topics, box office numbers, or news headlines...&#10;&#10;Example:&#10;- 'Stree 2' crosses ₹500 crore&#10;- 'The Family Man S3' trending on Netflix&#10;- Controversy over 'Movie X' portrayal of women"
+                    rows={6}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="past-content" className="block text-sm font-medium text-slate-200 mb-1">
+                    Past Content Context (Optional)
+                  </label>
+                  <textarea
+                    id="past-content"
+                    value={pastContentContext}
+                    onChange={(e) => setPastContentContext(e.target.value)}
+                    placeholder="List your past reviews/articles to help AI find thematic bridges...&#10;&#10;Example:&#10;- 'Angammal' review (women's rights)&#10;- 'Haq' analysis (courtroom drama)&#10;- Spy thriller comparison article"
+                    rows={4}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  />
+                </div>
+
+                <button
+                  onClick={handleGenerateResearch}
+                  disabled={!trendingTopics.trim() || isGeneratingResearch}
+                  className="w-full px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-medium rounded-md shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingResearch ? 'Generating Research Report...' : '🔮 Generate Research Summation'}
+                </button>
+              </div>
+            </div>
+
+            {researchError && (
+              <div className="p-4 bg-red-900/30 border border-red-500 rounded-lg text-red-200 text-sm">
+                <strong>Error:</strong> {researchError}
+              </div>
+            )}
+
+            {researchReport && (
+              <div className="bg-slate-800/60 p-4 rounded-lg border border-amber-500/40">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-amber-300 font-semibold flex items-center">
+                    📈 Research Summation Report
+                  </h3>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCopyResearch}
+                      className="flex items-center px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                      title="Copy research report"
+                    >
+                      <ClipboardIcon className="w-3 h-3 mr-1.5" />
+                      {copiedResearch ? 'Copied!' : 'Copy Report'}
+                    </button>
+                    <button
+                      onClick={handleDownloadResearch}
+                      className="flex items-center px-3 py-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                      title="Download as Markdown"
+                    >
+                      <DownloadIcon className="w-3 h-3 mr-1.5" />
+                      Download
+                    </button>
+                  </div>
+                </div>
+                <div className="p-4 bg-slate-900/60 rounded-lg border border-amber-500/30">
+                  <ReadMoreLess
+                    text={researchReport}
+                    initialVisibleLines={25}
+                    className="text-slate-100 whitespace-pre-wrap leading-relaxed text-sm gb-content-area prose prose-invert max-w-none"
+                  />
+                </div>
+              </div>
             )}
           </div>
         )}

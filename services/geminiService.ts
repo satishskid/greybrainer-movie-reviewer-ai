@@ -1709,6 +1709,100 @@ ${morphokineticsInsight}` : ''}
   }
 };
 
+/**
+ * Generate Greybrainer Research & Trending Engine report
+ * Analyzes trending topics and connects them to existing content ecosystem
+ */
+export const generateGreybrainerResearch = async (
+  trendingTopics: string,
+  pastContentContext?: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string> => {
+  const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  
+  const prompt = `**ROLE**
+You are the "Greybrainer Intelligence Unit." Your goal is not to report news, but to **contextualize** it. You analyze the *pulse* of the Indian audience—what they are watching (Popular), what they are debating (Discussed), and what critics are fighting over (Critiqued).
+
+**THE TASK**
+Analyze the provided trending topics/news and generate a "Research Summation" report.
+
+**THE PROCESS (Internal Logic)**
+1.  **Segment:** Categorize the trends into three buckets:
+    * *The Popular:* (High Box Office, #1 on Netflix, Mass Hype).
+    * *The Critiqued:* (Critical Darlings, Polarizing Films, "Hate-Watching").
+    * *The Social:* (Controversies, Twitter Debates, Political/Social angles).
+2.  **Synthesize:** For each item, explain *why* it is trending. Is it the star power? The controversy? The relatable theme?
+3.  **The "Grey" Link (Crucial):** You must actively look for "Thematic Bridges" to the user's past content ecosystem.
+    * *Example:* If "Spy Thriller X" is trending, link to "Spy Thriller Y" analysis.
+    * *Example:* If "Women's Rights" is the topic, link to "Angammal" or "Haq" reviews.
+
+**TRENDING TOPICS/NEWS:**
+${trendingTopics}
+
+${pastContentContext ? `**PAST CONTENT ECOSYSTEM (For Linking):**
+${pastContentContext}` : ''}
+
+**OUTPUT FORMAT**
+
+## 📊 Greybrainer Research: ${today}
+
+### 1. The Pulse (Most Popular)
+* **[Title] ([Platform]):** [Brief context on why it's winning].
+    * *Grey Analysis:* [1-sentence breakdown of the "Mass" appeal].
+    * *🔗 Connect:* Compare this to our review of **[Insert Related Movie Title]**—notice the similar use of [Theme/Trope].
+
+### 2. The Critical Lens (Most Critiqued)
+* **[Title]:** [Why are critics divided?].
+    * *Grey Analysis:* [Is the criticism fair? What is the nuance?].
+    * *🔗 Connect:* This reminds us of the flaw we analyzed in **[Insert Related Movie Title]**.
+
+### 3. The Watercooler (Social Topics)
+* **[Topic/Debate]:** [What is the specific controversy?].
+    * *The Grey Angle:* [Take a stance. Is this a PR stunt or a real social shift?].
+    * *🔗 Deep Dive:* Read our full editorial on **[Insert Related Article Title]** for more context on this theme.
+
+---
+
+### 🔮 Morphokinetic Trend Forecast
+*[Based on today's data, predict what will happen next week. Example: "Expect a rise in 'Courtroom Dramas' following the success of 'Haq'."]*
+
+**📹 Social Video Prompt:**
+[Generate a 1-sentence hook for a Reel/Short summarizing the biggest story above.]
+
+---
+
+**Generate the Research Summation report now, following the format exactly. Be specific with movie/show titles and make meaningful connections to past content.**`;
+
+  try {
+    const model = getGeminiAI().getGenerativeModel({ 
+      model: getSelectedGeminiModel(),
+      generationConfig: {
+        temperature: 0.85,
+        maxOutputTokens: 2048
+      }
+    });
+    const response = await model.generateContent(prompt);
+    const researchReport = response.response.text().trim();
+    
+    if (logTokenUsage) {
+      const usageMetadata = response.response.usageMetadata;
+      if (usageMetadata) {
+        logTokenUsage(
+          'Greybrainer Research Engine',
+          usageMetadata.promptTokenCount || 0,
+          usageMetadata.candidatesTokenCount || 0
+        );
+      }
+    }
+    
+    return researchReport;
+  } catch (error) {
+    console.error('Gemini API error generating Greybrainer Research:', error);
+    handleGeminiError(error as Error, 'Greybrainer Research Generation');
+    throw new Error('Failed to generate Greybrainer Research report');
+  }
+};
+
 // Personnel Analysis
 export const analyzeStakeholderMagicFactor = async (
   name: string,
