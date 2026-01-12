@@ -497,7 +497,10 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
 
         {/* Video Export Component - Show after on-demand insight is generated */}
         {insightMode === 'on-demand' && dynamicInsightText && !isFetchingDynamicInsight && (
-          <GeminiCanvasExport insightContent={dynamicInsightText} />
+          <GeminiCanvasExport 
+            insightContent={dynamicInsightText}
+            contentType="insight"
+          />
         )}
 
         {/* Movie-Anchored Mode (NEW) */}
@@ -653,6 +656,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                 insightContent={movieAnchoredInsight} 
                 movieTitle={selectedMovie}
                 layerFocus={selectedLayer === 'random' ? undefined : selectedLayer}
+                contentType="movie-anchored"
               />
             )}
           </div>
@@ -746,6 +750,13 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                     className="text-slate-100 whitespace-pre-wrap leading-relaxed text-sm gb-content-area prose prose-invert max-w-none"
                   />
                 </div>
+
+                {/* Video Export for Research & Trending */}
+                <GeminiCanvasExport 
+                  insightContent={researchReport}
+                  contentType="research-trending"
+                  trendingTopics={trendingTopics}
+                />
               </div>
             )}
           </div>

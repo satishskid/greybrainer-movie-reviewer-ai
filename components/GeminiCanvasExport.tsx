@@ -3,23 +3,33 @@ import { Copy, Video, FileText, CheckCircle, ExternalLink } from 'lucide-react';
 import { 
   generateGeminiCanvasPrompt, 
   generateQuickTeaserPrompt, 
-  generateDetailedAnalysisPrompt 
+  generateDetailedAnalysisPrompt,
+  generateResearchTrendingVideoPrompt
 } from '../services/geminiCanvasPromptService';
 
 interface GeminiCanvasExportProps {
   insightContent: string;
   movieTitle?: string;
   layerFocus?: string;
+  contentType?: 'insight' | 'movie-anchored' | 'research-trending';
+  trendingTopics?: string;
 }
 
 type VideoLength = 'short' | 'medium' | 'long';
 
-export default function GeminiCanvasExport({ insightContent, movieTitle, layerFocus }: GeminiCanvasExportProps) {
+export default function GeminiCanvasExport({ insightContent, movieTitle, layerFocus, contentType = 'insight', trendingTopics }: GeminiCanvasExportProps) {
   const [videoLength, setVideoLength] = useState<VideoLength>('medium');
   const [copied, setCopied] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
 
   const generatePrompt = () => {
+    // Research & Trending mode uses specialized template
+    if (contentType === 'research-trending') {
+      const duration = videoLength === 'short' ? 45 : videoLength === 'medium' ? 90 : 180;
+      return generateResearchTrendingVideoPrompt(insightContent, trendingTopics || '', duration);
+    }
+    
+    // Standard insight templates
     switch (videoLength) {
       case 'short':
         return generateQuickTeaserPrompt(insightContent, movieTitle);
@@ -52,21 +62,37 @@ export default function GeminiCanvasExport({ insightContent, movieTitle, layerFo
     window.open('https://gemini.google.com', '_blank');
   };
 
-  const videoLengthOptions = [
-    { value: 'short' as VideoLength, label: 'Short (30s)', description: 'Quick teaser for Reels/Shorts' },
-    { value: 'medium' as VideoLength, label: 'Medium (60s)', description: 'Balanced insight video' },
-    { value: 'long' as VideoLength, label: 'Long (2min)', description: 'Detailed analysis' }
-  ];
+  const getVideoLengthOptions = () => {
+    if (contentType === 'research-trending') {
+      return [
+        { value: 'short' as VideoLength, label: 'Quick Summary (45s)', description: 'Top 3 trends only' },
+        { value: 'medium' as VideoLength, label: 'Full Analysis (90s)', description: 'All categories + forecast' },
+        { value: 'long' as VideoLength, label: 'Deep Dive (3min)', description: 'Detailed with examples' }
+      ];
+    }
+    // Default options for insights and movie-anchored
+    return [
+      { value: 'short' as VideoLength, label: 'Short (30s)', description: 'Quick teaser for Reels/Shorts' },
+      { value: 'medium' as VideoLength, label: 'Medium (60s)', description: 'Balanced insight video' },
+      { value: 'long' as VideoLength, label: 'Long (2min)', description: 'Detailed analysis' }
+    ];
+  };
+
+  const videoLengthOptions = getVideoLengthOptions();
 
   return (
     <div className="mt-6 p-6 bg-gradient-to-br from-purple-50 to-blue-50 rounded-lg border-2 border-purple-200">
       <div className="flex items-center gap-3 mb-4">
         <Video className="w-6 h-6 text-purple-600" />
-        <h3 className="text-xl font-bold text-gray-900">Create Video Summary</h3>
+        <h3 className="text-xl font-bold text-gray-900">
+          {contentType === 'research-trending' ? 'Create Research Video' : 'Create Video Summary'}
+        </h3>
       </div>
 
       <p className="text-gray-700 mb-4">
-        Generate a video presentation of this insight for social media sharing using Google Gemini Canvas.
+        {contentType === 'research-trending' 
+          ? 'Generate a data-driven trend analysis video with AI-generated visuals using Google Gemini 2.0.'
+          : 'Generate a video presentation of this insight for social media sharing using Google Gemini 2.0 with native image generation.'}
       </p>
 
       {/* Video Length Selection */}
@@ -147,8 +173,8 @@ export default function GeminiCanvasExport({ insightContent, movieTitle, layerFo
         </h4>
         <ol className="list-decimal list-inside space-y-2 text-sm text-gray-700">
           <li>Click <strong>"Copy Prompt"</strong> to copy the presentation instructions</li>
-          <li>Click <strong>"Open Gemini Canvas"</strong> to launch Google Gemini in a new tab</li>
-          <li>Paste the prompt into Gemini and wait for it to generate your presentation</li>
+          <li>Click <strong>"Open Gemini Canvas"</strong> to launch Google Gemini 2.0 in a new tab</li>
+          <li>Paste the prompt into Gemini and wait for it to generate your presentation <strong>with AI-generated images</strong></li>
           <li>Review the slides and make any adjustments you'd like</li>
           <li>Export the presentation to <strong>Google Slides</strong> (option in Gemini Canvas)</li>
           <li>In Google Slides, go to <strong>File → Download → Microsoft PowerPoint (.pptx)</strong></li>
@@ -160,7 +186,7 @@ export default function GeminiCanvasExport({ insightContent, movieTitle, layerFo
       {/* Tips Section */}
       <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
         <p className="text-sm text-yellow-800">
-          <strong>💡 Pro Tip:</strong> After exporting to video, you can use free tools like{' '}
+          <strong>✨ Gemini 2.0 Upgrade:</strong> All images are now AI-generated directly by Gemini - no manual searching needed! You can also use free tools like{' '}
           <a 
             href="https://www.kapwing.com" 
             target="_blank" 
