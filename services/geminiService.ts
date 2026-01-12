@@ -1711,7 +1711,7 @@ ${morphokineticsInsight}` : ''}
 
 /**
  * Generate Greybrainer Research & Trending Engine report
- * Analyzes trending topics and connects them to existing content ecosystem
+ * Analyzes trending topics, understands Medium audience, and creates continuous narrative
  */
 export const generateGreybrainerResearch = async (
   trendingTopics: string,
@@ -1721,64 +1721,149 @@ export const generateGreybrainerResearch = async (
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   
   const prompt = `**ROLE**
-You are the "Greybrainer Intelligence Unit." Your goal is not to report news, but to **contextualize** it. You analyze the *pulse* of the Indian audience—what they are watching (Popular), what they are debating (Discussed), and what critics are fighting over (Critiqued).
+You are the "Greybrainer Intelligence Unit" for @GreyBrainer on Medium (https://medium.com/@GreyBrainer/greybrainer).
 
-**THE TASK**
-Analyze the provided trending topics/news and generate a "Research Summation" report.
+Your mission is NOT to write isolated reviews. You are building a **continuous live narrative** of Indian cinema's evolution. Each post is a chapter in an ongoing story that your audience follows religiously.
 
-**THE PROCESS (Internal Logic)**
-1.  **Segment:** Categorize the trends into three buckets:
-    * *The Popular:* (High Box Office, #1 on Netflix, Mass Hype).
-    * *The Critiqued:* (Critical Darlings, Polarizing Films, "Hate-Watching").
-    * *The Social:* (Controversies, Twitter Debates, Political/Social angles).
-2.  **Synthesize:** For each item, explain *why* it is trending. Is it the star power? The controversy? The relatable theme?
-3.  **The "Grey" Link (Crucial):** You must actively look for "Thematic Bridges" to the user's past content ecosystem.
-    * *Example:* If "Spy Thriller X" is trending, link to "Spy Thriller Y" analysis.
-    * *Example:* If "Women's Rights" is the topic, link to "Angammal" or "Haq" reviews.
+**WHO IS YOUR AUDIENCE?**
+* Medium readers who value **vulnerability over objectivity**
+* Cinephiles seeking the "grey area" between 1-star flops and 5-star masterpieces
+* Professionals aged 25-45 who want **skimmable analysis** with personal depth
+* Followers of Film Camp, The Cinema Scale (target publications for guest posting)
+* Mobile readers (70%) who need visual hooks and chunked headers
 
-**TRENDING TOPICS/NEWS:**
+**THE STRATEGIC GOAL**
+Position @GreyBrainer as the go-to source for:
+1. **Mass Spectacle Analysis** (Pan-Indian blockbusters, OTT trends)
+2. **Polarized Film Discourse** (critically divided big-budget releases)
+3. **Socially Charged Cinema** (historical dramas, #MeToo narratives, political films)
+
+**THE PROCESS (Scan → Segment → Synthesize → Link)**
+
+**STEP 1: SCAN THE LANDSCAPE**
+Identify what's dominating the cultural conversation RIGHT NOW (${today}).
+
+**STEP 2: SEGMENT INTO THREE BUCKETS**
+* **The Popular:** Mass hype, high box office, #1 trending on Netflix/Prime/Disney+
+* **The Critiqued:** Critical darlings, polarizing misfires, "hate-watching" phenomena
+* **The Social:** Twitter debates, political angles, #MeToo narratives, historical accuracy wars
+
+**STEP 3: SYNTHESIZE THE "WHY"**
+For each trending item:
+* What is the UNDERLYING audience need? (Escapism? Validation? Outrage?)
+* What NARRATIVE PATTERN is repeating? (Divine Action? Spy Thrillers? Anti-War Stories?)
+* How does this fit into the **larger story** of Indian cinema's evolution?
+
+**STEP 4: LINK TO CONTINUOUS NARRATIVE**
+* Connect current trends to @GreyBrainer's past analyses
+* Show how this week's trends are CHAPTERS in an ongoing story arc
+* Use phrases like: "Building on our analysis of...", "This continues the pattern we identified in...", "Remember when we called..."
+
+**TRENDING TOPICS/NEWS (${today}):**
 ${trendingTopics}
 
-${pastContentContext ? `**PAST CONTENT ECOSYSTEM (For Linking):**
-${pastContentContext}` : ''}
+${pastContentContext ? `**YOUR PAST CONTENT ECOSYSTEM (For Thematic Bridges):**
+${pastContentContext}
+
+Use these past posts to create narrative continuity. Show evolution, not repetition.` : ''}
 
 **OUTPUT FORMAT**
 
-## 📊 Greybrainer Research: ${today}
+# 🎬 The Greybrainer Pulse: ${today}
 
-### 1. The Pulse (Most Popular)
-* **[Title] ([Platform]):** [Brief context on why it's winning].
-    * *Grey Analysis:* [1-sentence breakdown of the "Mass" appeal].
-    * *🔗 Connect:* Compare this to our review of **[Insert Related Movie Title]**—notice the similar use of [Theme/Trope].
-
-### 2. The Critical Lens (Most Critiqued)
-* **[Title]:** [Why are critics divided?].
-    * *Grey Analysis:* [Is the criticism fair? What is the nuance?].
-    * *🔗 Connect:* This reminds us of the flaw we analyzed in **[Insert Related Movie Title]**.
-
-### 3. The Watercooler (Social Topics)
-* **[Topic/Debate]:** [What is the specific controversy?].
-    * *The Grey Angle:* [Take a stance. Is this a PR stunt or a real social shift?].
-    * *🔗 Deep Dive:* Read our full editorial on **[Insert Related Article Title]** for more context on this theme.
+*[Write a 2-sentence hook that positions this report as the latest chapter in your ongoing cinema narrative. Example: "For your second week of January 2026, the Indian audience is torn between divine action spectacles and polarizing big-budget misfires. Here's how this week's trends reveal deeper shifts in what we're willing to forgive—and what we're ready to abandon."]*
 
 ---
 
-### 🔮 Morphokinetic Trend Forecast
-*[Based on today's data, predict what will happen next week. Example: "Expect a rise in 'Courtroom Dramas' following the success of 'Haq'."]*
+## 1. 📈 The Popular (Mass Hype & High Engagement)
 
-**📹 Social Video Prompt:**
-[Generate a 1-sentence hook for a Reel/Short summarizing the biggest story above.]
+**[Title] ([Platform] - [Release Date])**
+* **The Hook:** [Why is everyone watching this? Star power? Genre novelty? Cultural moment?]
+* **The Numbers:** [Box office figures, trending position, social media buzz]
+* **Grey Analysis:** [What does this success reveal about audience needs? What narrative itch is it scratching?]
+* **🔗 Narrative Bridge:** [Connect to @GreyBrainer's past analysis. Example: "This builds on the 'Divine Action' genre we analyzed in [Past Post Title]. Notice how the mythology is now global, not just regional."]
+
+*[Repeat for 2-3 Popular items]*
 
 ---
 
-**Generate the Research Summation report now, following the format exactly. Be specific with movie/show titles and make meaningful connections to past content.**`;
+## 2. 🎭 The Critiqued (Critical Discourse & Polarization)
+
+**[Title] ([Platform])**
+* **The Split:** [Critics say X, audiences say Y. What's the disconnect?]
+* **The Nuance:** [Is the criticism fair? What's the grey area? What's being overlooked?]
+* **Grey Verdict:** *"[Insert a bold, quotable take that captures your perspective. Example: 'The Raja Saab isn't a misfire—it's Prabhas betting his career on the wrong horse.']"*
+* **🔗 Evolution Tracker:** [How does this fit into the PATTERN? Example: "This is the third Prabhas vehicle in 18 months that critics have savaged. Our analysis of [Past Film] predicted this exact trap."]
+
+*[Repeat for 2-3 Critiqued items]*
+
+---
+
+## 3. 💬 The Social (Debates, Controversies, Cultural Flashpoints)
+
+**[Topic/Film]**
+* **The Trigger:** [What sparked the debate? Historical accuracy? Representation? #MeToo angle?]
+* **The Stakes:** [Why does this matter beyond the film? What does it reveal about Indian society in 2026?]
+* **The Grey Stance:** [Take a clear position. Your audience expects vulnerability, not fence-sitting.]
+* **🔗 Thematic Thread:** [Connect to @GreyBrainer's broader social cinema analysis. Example: "This refugee crisis debate echoes our Freedom at Midnight essay, where we explored how historical trauma shapes current politics."]
+
+*[Repeat for 2-3 Social items]*
+
+---
+
+## 🔮 Morphokinetic Trend Forecast (What's Next)
+
+*[Based on this week's data, predict the NEXT wave. Be specific and bold.]*
+
+**Example Format:**
+* **Next Week:** Expect a surge in [Genre/Theme] following [Current Success].
+* **Next Month:** Watch for backlash against [Current Trend] as audiences crave [Opposite Trend].
+* **The Pattern:** Indian cinema is shifting from [Old Paradigm] to [New Paradigm]. @GreyBrainer called this in [Past Analysis Date].
+
+---
+
+## ✍️ Medium Strategy for @GreyBrainer
+
+### Immediate Action Plan:
+1. **This Week's Must-Write:** [Identify the ONE film/topic with the highest engagement potential]
+   * **Suggested Title:** *"[Provocative Personal Hook]: Why [Film] Made Me Question [Universal Theme]"*
+   * **Key Angle:** [The vulnerable perspective, not just the critical analysis]
+   * **Visual Hook:** [Describe the specific film still/poster to use as opening image]
+
+2. **Guest Post Opportunity:** [Which topic is perfect for submitting to The Cinema Scale or Film Camp?]
+   * **Pitch Angle:** [How to position it for their audience]
+
+3. **Skimmability Upgrade:** [Suggest 3-5 H2/H3 headers for your next post to maximize mobile readability]
+
+4. **The Continuity Thread:** [How does this week's analysis connect to NEXT week's likely trends? Plant narrative seeds.]
+
+---
+
+## 📹 Social Video Prompt Hook
+
+*[Generate a 15-second Reel/Short script that captures the MOST provocative story from this report. Include the hook, the tension, and the cliffhanger.]*
+
+**Example Format:**
+> "Everyone's obsessed with [Film], but here's what they're missing: [Provocative Insight]. The real story isn't [Obvious Thing]—it's [Hidden Pattern]. And if you look at @GreyBrainer's analysis from [Past Date], we saw this coming. Swipe for the full breakdown. 👆"
+
+---
+
+**CRITICAL REMINDERS:**
+* Use actual film/show titles, not placeholders
+* Reference real @GreyBrainer past posts when creating bridges (even if hypothetical, make them feel real)
+* Every insight must serve the CONTINUOUS NARRATIVE, not standalone analysis
+* Medium readers reward vulnerability—add personal stakes whenever possible
+* Include specific numbers (box office, trending rank, social media mentions)
+* End with a FORWARD-LOOKING hook that makes readers want to come back next week
+
+**Generate the Research Summation report now, following the format exactly.**`;
 
   try {
     const model = getGeminiAI().getGenerativeModel({ 
       model: getSelectedGeminiModel(),
       generationConfig: {
         temperature: 0.85,
-        maxOutputTokens: 2048
+        maxOutputTokens: 3072
       }
     });
     const response = await model.generateContent(prompt);

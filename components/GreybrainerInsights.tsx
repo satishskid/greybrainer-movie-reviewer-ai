@@ -19,8 +19,8 @@ type InsightMode = 'on-demand' | 'movie-anchored' | 'research-trending';
 type AnalysisLayer = 'story' | 'orchestration' | 'performance' | 'morphokinetics' | 'random';
 
 export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTokenUsage }) => {
-  // Mode selection
-  const [insightMode, setInsightMode] = useState<InsightMode>('on-demand');
+  // Mode selection - Default to Research & Trending
+  const [insightMode, setInsightMode] = useState<InsightMode>('research-trending');
   
   // On-demand insight state (existing)
   const [dynamicInsightText, setDynamicInsightText] = useState<string | null>(null);
@@ -670,7 +670,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                 📊 Research & Trending Engine
               </h3>
               <p className="text-slate-300 text-sm mb-4">
-                Analyze trending topics, box office numbers, and news headlines. Generate strategic research summations that interlink to your content ecosystem.
+                <strong>Build your continuous Medium narrative.</strong> Analyze trending topics and create strategic research that connects to your @GreyBrainer audience at https://medium.com/@GreyBrainer/greybrainer. Generate actionable insights that position each post as a chapter in an ongoing story.
               </p>
               
               <div className="space-y-3">
@@ -682,22 +682,22 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                     id="trending-topics"
                     value={trendingTopics}
                     onChange={(e) => setTrendingTopics(e.target.value)}
-                    placeholder="Enter trending topics, box office numbers, or news headlines...&#10;&#10;Example:&#10;- 'Stree 2' crosses ₹500 crore&#10;- 'The Family Man S3' trending on Netflix&#10;- Controversy over 'Movie X' portrayal of women"
-                    rows={6}
+                    placeholder="What's dominating Indian cinema conversations RIGHT NOW?&#10;&#10;Examples:&#10;• 'Akhanda 2: Thaandavam' #1 on Netflix - divine action sequel&#10;• 'The Raja Saab' massive opening but critic backlash&#10;• 'Freedom at Midnight S2' sparking Partition debates&#10;• 'Dhurandhar' trending pre-Netflix release Jan 30&#10;• Box office: Pan-Indian spectacles vs regional darlings&#10;&#10;Include: Platform, release dates, box office numbers, social media buzz"
+                    rows={8}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   />
                 </div>
 
                 <div>
                   <label htmlFor="past-content" className="block text-sm font-medium text-slate-200 mb-1">
-                    Past Content Context (Optional)
+                    Your Past @GreyBrainer Posts (For Narrative Continuity)
                   </label>
                   <textarea
                     id="past-content"
                     value={pastContentContext}
                     onChange={(e) => setPastContentContext(e.target.value)}
-                    placeholder="List your past reviews/articles to help AI find thematic bridges...&#10;&#10;Example:&#10;- 'Angammal' review (women's rights)&#10;- 'Haq' analysis (courtroom drama)&#10;- Spy thriller comparison article"
-                    rows={4}
+                    placeholder="List your recent Medium posts to create thematic bridges...&#10;&#10;Examples:&#10;• 'Angammal' review - women's rights in Tamil cinema&#10;• 'Haq' courtroom drama analysis&#10;• Spy thriller comparison: How 'Dhurandhar' changed the game&#10;• Divine Action genre deep dive (Feb 2025)&#10;• #MeToo narratives in regional cinema&#10;&#10;The AI will connect current trends to your past analyses, showing evolution."
+                    rows={6}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   />
                 </div>
@@ -707,7 +707,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                   disabled={!trendingTopics.trim() || isGeneratingResearch}
                   className="w-full px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-medium rounded-md shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isGeneratingResearch ? 'Generating Research Report...' : '🔮 Generate Research Summation'}
+                  {isGeneratingResearch ? '✨ Analyzing the Pulse of Indian Cinema...' : '🔮 Generate Strategic Research & Medium Action Plan'}
                 </button>
               </div>
             </div>
