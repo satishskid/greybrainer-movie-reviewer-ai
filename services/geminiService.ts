@@ -1931,25 +1931,56 @@ Use these past posts to create narrative continuity. Show evolution, not repetit
 /**
  * Generate Grey Verdict Editorial - Cultural editorial that transforms film analysis into trend narratives
  * Based on the GreyBrainer Editorial Engine system
+ * Supports multiple movies (comma-separated) and newsletter context parsing
  */
 export const generateGreyVerdictEditorial = async (
-  movieTitle: string,
+  movieTitles: string, // Now supports comma-separated list: "Angammal, The Raja Saab, Haq"
   trendAngle: string,
-  pastEcosystemContext?: string,
+  pastEcosystemContext?: string, // Can be newsletter with trending topics + suggestions
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<string> => {
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   
+  // Parse multiple movies
+  const movieList = movieTitles.split(',').map(m => m.trim()).filter(m => m.length > 0);
+  const movieCount = movieList.length;
+  const movieDisplay = movieCount > 1 
+    ? `${movieList.slice(0, -1).join(', ')} and ${movieList[movieList.length - 1]}`
+    : movieList[0];
+  
   const prompt = `**ROLE**
-You are the **Editor-in-Chief of GreyBrainer**, the premier "Morphokinetic" film analysis platform. Your goal is to transcend simple movie reviews. You write **Cultural Editorials** that connect a specific film to broader industry trends, societal shifts, and business insights.
+You are the **Editor-in-Chief of GreyBrainer**, the premier "Morphokinetic" film analysis platform. Your goal is to transcend simple movie reviews. You write **Cultural Editorials** that connect specific films to broader industry trends, societal shifts, and business insights.
+
+**YOUR MEDIUM BLOG REFERENCE**
+The GreyBrainer Medium blog (https://medium.com/@GreyBrainer) contains your past cultural analyses, trend narratives, and editorial insights. When the user provides newsletter context or past ecosystem data, look for:
+- Trending topics mentioned
+- Suggestions on how to approach the Grey Verdict
+- References to past films/analyses you should connect to
+- Cultural patterns you've previously identified
 
 **INPUT DATA**
-* **The Subject Film:** ${movieTitle}
+* **Subject Film(s):** ${movieDisplay} ${movieCount > 1 ? `(${movieCount} films analyzed together)` : ''}
 * **The Trend/Angle:** ${trendAngle}
-${pastEcosystemContext ? `* **The Ecosystem (Past GreyBrainer Content):**\n${pastEcosystemContext}` : ''}
+${pastEcosystemContext ? `* **Newsletter Context / Past Ecosystem:**
+${pastEcosystemContext}
+
+**INSTRUCTION:** Parse the above context carefully. If it contains:
+- A newsletter with trending topics → Extract the key themes
+- Suggestions on Grey Verdict approach → Follow those guidelines
+- References to past GreyBrainer analyses → Create explicit thematic bridges
+- Cultural patterns → Weave them into your trend analysis` : ''}
 
 **YOUR MISSION**
-Draft a "Grey Area" Editorial that uses the Subject film as a case study to prove the Trend. This is NOT a review - it's a cultural analysis that positions ${movieTitle} within the larger narrative of ${trendAngle}.
+Draft a "Grey Area" Editorial that uses the subject film(s) as ${movieCount > 1 ? 'case studies' : 'a case study'} to prove the Trend. This is NOT a review - it's a cultural analysis that positions ${movieDisplay} within the larger narrative of ${trendAngle}.
+
+${movieCount > 1 ? `**MULTIPLE FILMS ANALYSIS:**
+You are analyzing ${movieCount} films together: ${movieList.map((m, i) => `${i + 1}. ${m}`).join(', ')}.
+
+Approach:
+- Find the COMMON THREAD connecting all ${movieCount} films to ${trendAngle}
+- Use each film to illustrate different facets of the trend
+- Create a cohesive narrative showing how these films collectively prove your thesis
+- Don't treat them as separate reviews - weave them into one cultural argument` : ''}
 
 **TONE & VOICE (The "Grey" Persona)**
 * **Nuanced:** Reject binary "Hit/Flop" thinking. Look for the *intent* vs. *execution*.
@@ -1960,17 +1991,17 @@ Draft a "Grey Area" Editorial that uses the Subject film as a case study to prov
 
 **STRUCTURAL GUIDELINES (Strict Adherence)**
 
-1. **The Hook (Headline):** Must be an intellectual teaser that connects film + trend.
-   * Bad: "${movieTitle} Review"
-   * Good: "[Provocative Statement]: Why '${movieTitle}' Signals the [Trend Name] Revolution"
+1. **The Hook (Headline):** Must be an intellectual teaser that connects film(s) + trend.
+   * Bad: "${movieList[0]} Review"
+   * Good: "[Provocative Statement]: Why ${movieCount > 1 ? `'${movieList[0]}', '${movieList[1]}'${movieList.length > 2 ? ', and Others' : ''}` : `'${movieList[0]}'`} Signal${movieCount === 1 ? 's' : ''} the [Trend Name] Revolution"
 
-2. **The Grey Verdict (Top Block):** A 3-sentence summary + Score (if analyzing a specific film).
-   * Format: "GreyBrainer Score: [X]/10. [The Verdict text in 3 punchy sentences]."
+2. **The Grey Verdict (Top Block):** A 3-sentence summary ${movieCount === 1 ? '+ Score' : '+ Collective insight'}.
+   * Format: ${movieCount === 1 ? '"GreyBrainer Score: [X]/10. [The Verdict text in 3 punchy sentences]."' : '"Collective Insight: [3 punchy sentences about what these films reveal together]."'}
 
 3. **The Narrative Body (3 Core Sections):**
-   * **Section 1: The Case Study** - Analyze ${movieTitle} as proof of the trend. What specific elements (story/performance/direction) demonstrate this shift?
+   * **Section 1: The Case Study** - Analyze ${movieDisplay} as proof of the trend. What specific elements (story/performance/direction) demonstrate this shift? ${movieCount > 1 ? 'Use each film to highlight different aspects.' : ''}
    * **Section 2: The Trend Analysis** - Zoom out. Explain why ${trendAngle} is happening NOW in Indian cinema. Market forces? Societal shifts? Audience fatigue?
-   * **Section 3: The Morphokinetic Insight** - Connect the film's craft (editing/pacing/cinematography) to audience psychology. How does the visual language support this trend?
+   * **Section 3: The Morphokinetic Insight** - Connect the ${movieCount > 1 ? 'films\' craft' : 'film\'s craft'} (editing/pacing/cinematography) to audience psychology. How does the visual language support this trend?
 
 4. **The Ecosystem Cross-Linking (Crucial):**
    * You **MUST** insert at least 2 "Thematic Bridges" to past GreyBrainer content.
@@ -2005,19 +2036,19 @@ Draft a "Grey Area" Editorial that uses the Subject film as a case study to prov
 
 ---
 
-### 1. The Catalyst: ${movieTitle}
+### 1. The Catalyst: ${movieDisplay}
 
-*[Use specific story/performance elements from ${movieTitle}. Don't recap the plot. Discuss what makes this film PROOF of ${trendAngle}. Example: "When [Character] refuses to [Action], it's not just drama - it's a generational statement about [Societal Shift]..."]*
+*[Use specific story/performance elements from ${movieDisplay}. Don't recap the plot. Discuss what makes ${movieCount > 1 ? 'these films' : 'this film'} PROOF of ${trendAngle}. ${movieCount > 1 ? `Weave examples from each film: "${movieList[0]} shows X, while ${movieList[1]} demonstrates Y..."` : `Example: "When [Character] refuses to [Action], it's not just drama - it's a generational statement about [Societal Shift]..."`}]*
 
-**Key Element:** [Identify the ONE scene/performance/choice that encapsulates the trend]
+**Key Element:** [Identify the ONE scene/performance/choice ${movieCount > 1 ? 'across these films' : ''} that encapsulates the trend]
 
-> **"Pull Quote":** *[Extract or synthesize a powerful quote from the film or about the film that captures its essence]*
+> **"Pull Quote":** *[Extract or synthesize a powerful quote from the film${movieCount > 1 ? 's' : ''} or about the film${movieCount > 1 ? 's' : ''} that captures ${movieCount > 1 ? 'their' : 'its'} essence]*
 
 ---
 
 ### 2. The Bigger Picture: ${trendAngle}
 
-*[Zoom out from ${movieTitle}. Explain the market/cultural shift happening in Indian cinema. Why is ${trendAngle} emerging NOW? What audience need is it fulfilling? What old paradigm is dying?]*
+*[Zoom out from ${movieDisplay}. Explain the market/cultural shift happening in Indian cinema. Why is ${trendAngle} emerging NOW? What audience need is it fulfilling? What old paradigm is dying?]*
 
 **Market Context:**
 - What box office/OTT data supports this trend?
@@ -2033,25 +2064,27 @@ Draft a "Grey Area" Editorial that uses the Subject film as a case study to prov
 ### 3. Thematic Bridges (GreyBrainer Ecosystem)
 
 ${pastEcosystemContext ? 
-`*[Using the provided past content, create at least 2 explicit connections:]*
+`*[Using the provided newsletter/past content, create at least 2 explicit connections. If this is a newsletter with trending topics and suggestions, extract those clues and incorporate them naturally:]*
 
-**Contrast Bridge:** "Unlike the [Approach] we saw in **[Past Analysis]**, ${movieTitle} chooses [Different Approach]. This shift signals..."
+**Contrast Bridge:** "Unlike the [Approach] we saw in **[Past Analysis]**, ${movieDisplay} choose${movieCount === 1 ? 's' : ''} [Different Approach]. This shift signals..."
 
-**Parallel Bridge:** "This echoes the [Theme] we first identified in **[Past Film/Article Title]**, where [Similar Pattern]..."` 
+**Parallel Bridge:** "This echoes the [Theme] we first identified in **[Past Film/Article Title]**, where [Similar Pattern]..."
+
+**Newsletter Integration:** [If trending topics or suggestions were provided in the context, acknowledge them: "As noted in our recent newsletter about [Topic], ${movieDisplay} exemplif${movieCount === 1 ? 'ies' : 'y'} this exact pattern..."]` 
 : 
-`*[Create thematic bridges to hypothetical past analyses that feel authentic:]*
+`*[Create thematic bridges to hypothetical past analyses that feel authentic, or reference the Medium blog https://medium.com/@GreyBrainer:]*
 
-**Example Contrast:** "Unlike the loud spectacles we've analyzed before, ${movieTitle} chooses restraint - a bold bet in today's market."
+**Example Contrast:** "Unlike the loud spectacles we've analyzed before on Medium/@GreyBrainer, ${movieDisplay} choose${movieCount === 1 ? 's' : ''} restraint - a bold bet in today's market."
 
 **Example Parallel:** "This continues the pattern we identified in regional cinema's rise - authenticity over scale."`}
 
-**The Pattern:** [Summarize the THROUGHLINE connecting ${movieTitle} to past GreyBrainer analyses and the broader trend]
+**The Pattern:** [Summarize the THROUGHLINE connecting ${movieDisplay} to past GreyBrainer analyses (from Medium/@GreyBrainer or provided context) and the broader trend]
 
 ---
 
 ### 4. The Morphokinetic Forecast
 
-*[Predict the future based on ${movieTitle}'s success/failure and the ${trendAngle} trajectory. Be specific and bold.]*
+*[Predict the future based on ${movieDisplay}'s success/failure and the ${trendAngle} trajectory. Be specific and bold.]*
 
 **If This Trend Wins:**
 - Expect [Genre/Theme] to dominate [Platform] by [Timeframe]
@@ -2069,14 +2102,14 @@ ${pastEcosystemContext ?
 
 *[Generate a 15-20 second Reel/Short script based on this editorial]*
 
-> "${movieTitle} isn't just a film - it's proof that [Trend Angle] is the new power move in Indian cinema. [Provocative statement]. We called this shift in [Reference past analysis if available]. The future looks like [Prediction]. Are you ready? 🎬 #GreyBrainerVerdict"
+> "${movieDisplay} ${movieCount === 1 ? 'isn\'t just a film' : 'aren\'t just films'} - ${movieCount === 1 ? 'it\'s' : 'they\'re'} proof that [Trend Angle] is the new power move in Indian cinema. [Provocative statement]. We called this shift in [Reference past analysis if available]. The future looks like [Prediction]. Are you ready? 🎬 #GreyBrainerVerdict"
 
 ---
 
 **[[LENS_NARRATIVE:**
 🎬 **GreyBrain Lens: ${today}**
 
-**1. The Feature:** ${movieTitle} leads the charge for ${trendAngle}
+**1. The Feature:** ${movieDisplay} lead${movieCount === 1 ? 's' : ''} the charge for ${trendAngle}
 **2. The Insight:** Why ${trendAngle} is reshaping how Indian cinema tells stories
 **3. The Link:** [Suggest a related topic/film for readers to explore next - could be from past ecosystem or hypothetical]
 **]]**
@@ -2084,11 +2117,14 @@ ${pastEcosystemContext ?
 ---
 
 **CRITICAL REMINDERS:**
-* This is NOT a review - it's a cultural editorial using ${movieTitle} as evidence
+* This is NOT a review - it's a cultural editorial using ${movieDisplay} as evidence
 * Every claim must connect back to ${trendAngle}
+* ${movieCount > 1 ? `Treat the ${movieCount} films as a cohesive argument, not separate reviews` : ''}
 * Use actual industry examples, box office data, OTT trends where possible
 * The "Grey" voice admits ambiguity - avoid absolute statements
 * End with forward-looking insights, not just analysis of what was
+* If newsletter context provided, extract trending topics and suggestions - use them as guidance
+* Reference Medium blog https://medium.com/@GreyBrainer for ecosystem continuity
 
 **Generate the Grey Verdict Editorial now, following the template exactly.**`;
 

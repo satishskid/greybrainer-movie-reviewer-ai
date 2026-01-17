@@ -832,23 +832,25 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                 ⚖️ Grey Verdict: Cultural Editorial Engine
               </h3>
               <p className="text-slate-300 text-sm mb-4">
-                <strong>Transform film analysis into cultural narratives.</strong> The Grey Verdict isn't a review - it's an editorial that uses a specific film as proof of a broader industry trend, societal shift, or business insight. Perfect for thought leadership on Medium/@GreyBrainer, LinkedIn, or guest posts to Film Camp/The Cinema Scale.
+                <strong>Transform film analysis into cultural narratives.</strong> The Grey Verdict isn't a review - it's an editorial that uses specific films as proof of broader industry trends, societal shifts, or business insights. Perfect for thought leadership on <a href="https://medium.com/@GreyBrainer" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 underline">Medium/@GreyBrainer</a>, LinkedIn, or guest posts.
               </p>
               
               <div className="space-y-3">
                 <div>
                   <label htmlFor="verdict-movie" className="block text-sm font-medium text-slate-200 mb-1">
-                    Subject Film / Series *
+                    Subject Film(s) / Series * <span className="text-purple-400 text-xs">(comma-separated for multiple)</span>
                   </label>
                   <input
                     id="verdict-movie"
                     type="text"
                     value={greyVerdictMovieTitle}
                     onChange={(e) => setGreyVerdictMovieTitle(e.target.value)}
-                    placeholder="Enter the film/series you want to analyze..."
+                    placeholder="Enter film(s) you want to analyze - separate with commas for multiple..."
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-                  <p className="text-xs text-slate-400 mt-1">Example: "Angammal", "The Raja Saab", "Freedom at Midnight Season 2"</p>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Single: "Angammal" | Multiple: "Angammal, The Raja Saab, Haq" | Series: "Freedom at Midnight Season 2"
+                  </p>
                 </div>
 
                 <div>
@@ -860,7 +862,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                     type="text"
                     value={greyVerdictTrendAngle}
                     onChange={(e) => setGreyVerdictTrendAngle(e.target.value)}
-                    placeholder="What cultural/industry trend does this film represent?"
+                    placeholder="What cultural/industry trend do these films represent?"
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                   <p className="text-xs text-slate-400 mt-1">Examples: "The Silver Economy", "Anti-War Cinema Wave", "Grey Matriarch Rise", "Divine Action Evolution", "#MeToo Backlash"</p>
@@ -868,16 +870,19 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
 
                 <div>
                   <label htmlFor="verdict-ecosystem" className="block text-sm font-medium text-slate-200 mb-1">
-                    Past GreyBrainer Ecosystem (For Thematic Bridges)
+                    Newsletter Context / Past Ecosystem <span className="text-purple-400 text-xs">(AI will extract clues)</span>
                   </label>
                   <textarea
                     id="verdict-ecosystem"
                     value={greyVerdictPastContext}
                     onChange={(e) => setGreyVerdictPastContext(e.target.value)}
-                    placeholder="List past GreyBrainer analyses to create narrative bridges...&#10;&#10;Examples:&#10;• 'KD (A) Karuppudurai' - Joyful elderly rebellion&#10;• 'Haq' - Legal autonomy for women&#10;• 'Dhurandhar' spy thriller analysis - Changed genre paradigm&#10;• 'Pushpa' morphokinetic breakdown - Divine action roots&#10;&#10;AI will create explicit connections: 'Unlike X we analyzed, this film...' or 'This echoes the pattern in Y...'"
-                    rows={6}
+                    placeholder="Paste your newsletter with trending topics + suggestions, OR list past analyses for thematic bridges...&#10;&#10;📧 Newsletter Example:&#10;'This week's trend: Anti-war fatigue in Bollywood. Suggest Grey Verdict on how recent war films reveal audience backlash. Connect to our past analysis of jingoism in 2024...'&#10;&#10;📚 Past Analyses Example:&#10;• 'KD (A) Karuppudurai' - Joyful elderly rebellion&#10;• 'Haq' - Legal autonomy for women&#10;• 'Pushpa' morphokinetic breakdown - Divine action roots&#10;&#10;AI will parse suggestions and create explicit bridges to Medium/@GreyBrainer ecosystem."
+                    rows={8}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
+                  <p className="text-xs text-slate-400 mt-1">
+                    💡 Tip: Copy-paste your newsletter - AI will intelligently extract trending topics, writing suggestions, and create bridges to past GreyBrainer content!
+                  </p>
                 </div>
 
                 <button
