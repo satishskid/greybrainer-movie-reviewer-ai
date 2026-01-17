@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
 import { LoadingSpinner } from './LoadingSpinner';
-import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, generateMovieAnchoredInsightWithGemini, generateExpandedPublicationInsight, generateGreybrainerResearch, LogTokenUsageFn } from '../services/geminiService';
+import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, generateMovieAnchoredInsightWithGemini, generateExpandedPublicationInsight, generateGreybrainerResearch, generateGreyVerdictEditorial, LogTokenUsageFn } from '../services/geminiService';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon'; // New Icon for detailed report
 import { ClipboardIcon } from './icons/ClipboardIcon';
@@ -15,7 +15,7 @@ interface GreybrainerInsightsProps {
   logTokenUsage?: LogTokenUsageFn;
 }
 
-type InsightMode = 'on-demand' | 'movie-anchored' | 'research-trending';
+type InsightMode = 'on-demand' | 'movie-anchored' | 'research-trending' | 'grey-verdict';
 type AnalysisLayer = 'story' | 'orchestration' | 'performance' | 'morphokinetics' | 'random';
 
 export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTokenUsage }) => {
@@ -59,6 +59,15 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
   const [isGeneratingResearch, setIsGeneratingResearch] = useState<boolean>(false);
   const [researchError, setResearchError] = useState<string | null>(null);
   const [copiedResearch, setCopiedResearch] = useState<boolean>(false);
+
+  // Grey Verdict state (new)
+  const [greyVerdictMovieTitle, setGreyVerdictMovieTitle] = useState<string>('');
+  const [greyVerdictTrendAngle, setGreyVerdictTrendAngle] = useState<string>('');
+  const [greyVerdictPastContext, setGreyVerdictPastContext] = useState<string>('');
+  const [greyVerdictEditorial, setGreyVerdictEditorial] = useState<string | null>(null);
+  const [isGeneratingVerdict, setIsGeneratingVerdict] = useState<boolean>(false);
+  const [verdictError, setVerdictError] = useState<string | null>(null);
+  const [copiedVerdict, setCopiedVerdict] = useState<boolean>(false);
 
 
   const fetchDynamicInsight = useCallback(async () => {
@@ -287,6 +296,49 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
     URL.revokeObjectURL(url);
   };
 
+  // Grey Verdict handlers
+  const handleGenerateVerdict = async () => {
+    if (!greyVerdictMovieTitle.trim() || !greyVerdictTrendAngle.trim() || isGeneratingVerdict) return;
+    setIsGeneratingVerdict(true);
+    setVerdictError(null);
+    setGreyVerdictEditorial(null);
+    try {
+      const editorial = await generateGreyVerdictEditorial(
+        greyVerdictMovieTitle,
+        greyVerdictTrendAngle,
+        greyVerdictPastContext || undefined,
+        logTokenUsage
+      );
+      setGreyVerdictEditorial(editorial);
+    } catch (err) {
+      setVerdictError(err instanceof Error ? err.message : 'Failed to generate Grey Verdict editorial');
+    } finally {
+      setIsGeneratingVerdict(false);
+    }
+  };
+
+  const handleCopyVerdict = () => {
+    if (!greyVerdictEditorial) return;
+    navigator.clipboard.writeText(greyVerdictEditorial);
+    setCopiedVerdict(true);
+    setTimeout(() => setCopiedVerdict(false), 3000);
+  };
+
+  const handleDownloadVerdict = () => {
+    if (!greyVerdictEditorial) return;
+    const blob = new Blob([greyVerdictEditorial], { type: 'text/markdown;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const today = new Date().toISOString().split('T')[0];
+    const filename = greyVerdictMovieTitle.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    link.download = `grey-verdict_${filename}_${today}.md`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
 
   return (
     <div className="mt-12 p-6 bg-slate-800/70 rounded-xl shadow-2xl border border-slate-700">
@@ -333,6 +385,16 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
             }`}
           >
             📊 Research & Trending
+          </button>
+          <button
+            onClick={() => setInsightMode('grey-verdict')}
+            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+              insightMode === 'grey-verdict'
+                ? 'bg-purple-500 text-white'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            ⚖️ Grey Verdict
           </button>
         </div>
 
@@ -757,6 +819,115 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                   contentType="research-trending"
                   trendingTopics={trendingTopics}
                 />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Grey Verdict Mode (NEW - Editorial Engine) */}
+        {insightMode === 'grey-verdict' && (
+          <div className="mt-4 space-y-4">
+            <div className="bg-purple-900/30 p-4 rounded-lg border border-purple-500/30">
+              <h3 className="text-purple-300 font-semibold mb-3 flex items-center">
+                ⚖️ Grey Verdict: Cultural Editorial Engine
+              </h3>
+              <p className="text-slate-300 text-sm mb-4">
+                <strong>Transform film analysis into cultural narratives.</strong> The Grey Verdict isn't a review - it's an editorial that uses a specific film as proof of a broader industry trend, societal shift, or business insight. Perfect for thought leadership on Medium/@GreyBrainer, LinkedIn, or guest posts to Film Camp/The Cinema Scale.
+              </p>
+              
+              <div className="space-y-3">
+                <div>
+                  <label htmlFor="verdict-movie" className="block text-sm font-medium text-slate-200 mb-1">
+                    Subject Film / Series *
+                  </label>
+                  <input
+                    id="verdict-movie"
+                    type="text"
+                    value={greyVerdictMovieTitle}
+                    onChange={(e) => setGreyVerdictMovieTitle(e.target.value)}
+                    placeholder="Enter the film/series you want to analyze..."
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Example: "Angammal", "The Raja Saab", "Freedom at Midnight Season 2"</p>
+                </div>
+
+                <div>
+                  <label htmlFor="verdict-trend" className="block text-sm font-medium text-slate-200 mb-1">
+                    Trend / Angle *
+                  </label>
+                  <input
+                    id="verdict-trend"
+                    type="text"
+                    value={greyVerdictTrendAngle}
+                    onChange={(e) => setGreyVerdictTrendAngle(e.target.value)}
+                    placeholder="What cultural/industry trend does this film represent?"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">Examples: "The Silver Economy", "Anti-War Cinema Wave", "Grey Matriarch Rise", "Divine Action Evolution", "#MeToo Backlash"</p>
+                </div>
+
+                <div>
+                  <label htmlFor="verdict-ecosystem" className="block text-sm font-medium text-slate-200 mb-1">
+                    Past GreyBrainer Ecosystem (For Thematic Bridges)
+                  </label>
+                  <textarea
+                    id="verdict-ecosystem"
+                    value={greyVerdictPastContext}
+                    onChange={(e) => setGreyVerdictPastContext(e.target.value)}
+                    placeholder="List past GreyBrainer analyses to create narrative bridges...&#10;&#10;Examples:&#10;• 'KD (A) Karuppudurai' - Joyful elderly rebellion&#10;• 'Haq' - Legal autonomy for women&#10;• 'Dhurandhar' spy thriller analysis - Changed genre paradigm&#10;• 'Pushpa' morphokinetic breakdown - Divine action roots&#10;&#10;AI will create explicit connections: 'Unlike X we analyzed, this film...' or 'This echoes the pattern in Y...'"
+                    rows={6}
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                </div>
+
+                <button
+                  onClick={handleGenerateVerdict}
+                  disabled={!greyVerdictMovieTitle.trim() || !greyVerdictTrendAngle.trim() || isGeneratingVerdict}
+                  className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium rounded-md shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingVerdict ? '✨ Crafting Editorial Analysis...' : '⚖️ Generate Grey Verdict Editorial'}
+                </button>
+              </div>
+            </div>
+
+            {verdictError && (
+              <div className="p-4 bg-red-900/30 border border-red-500 rounded-lg text-red-200 text-sm">
+                <strong>Error:</strong> {verdictError}
+              </div>
+            )}
+
+            {greyVerdictEditorial && (
+              <div className="bg-slate-800/60 p-4 rounded-lg border border-purple-500/40">
+                <div className="flex justify-between items-center mb-3">
+                  <h3 className="text-purple-300 font-semibold flex items-center">
+                    📰 Grey Verdict: Cultural Editorial
+                  </h3>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={handleCopyVerdict}
+                      className="flex items-center px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                      title="Copy editorial"
+                    >
+                      <ClipboardIcon className="w-3 h-3 mr-1.5" />
+                      {copiedVerdict ? 'Copied!' : 'Copy Editorial'}
+                    </button>
+                    <button
+                      onClick={handleDownloadVerdict}
+                      className="flex items-center px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                      title="Download as Markdown"
+                    >
+                      <DownloadIcon className="w-3 h-3 mr-1.5" />
+                      Download
+                    </button>
+                  </div>
+                </div>
+                <div className="p-4 bg-slate-900/60 rounded-lg border border-purple-500/30">
+                  <ReadMoreLess
+                    text={greyVerdictEditorial}
+                    initialVisibleLines={30}
+                    className="text-slate-100 whitespace-pre-wrap leading-relaxed text-sm gb-content-area prose prose-invert max-w-none"
+                  />
+                </div>
               </div>
             )}
           </div>
