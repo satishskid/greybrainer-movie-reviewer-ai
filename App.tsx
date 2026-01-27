@@ -15,7 +15,7 @@ import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnaly
 import { AdminService } from './services/adminService';
 import { PersonnelDisplay } from './components/PersonnelDisplay';
 import { CreativeSparkGenerator } from './components/CreativeSparkGenerator';
-import { TokenBudgetDashboard } from './components/TokenBudgetDashboard'; 
+import { TokenBudgetDashboard } from './components/TokenBudgetDashboard';
 import { ScriptMagicQuotientAnalyzer } from './components/ScriptMagicQuotientAnalyzer';
 import { InformationCircleIcon } from './components/icons/InformationCircleIcon';
 import { MotionIcon } from './components/icons/MotionIcon';
@@ -41,11 +41,11 @@ const App: React.FC = () => {
 
   const [layerAnalyses, setLayerAnalyses] = useState<LayerAnalysisData[]>(initialLayerAnalyses());
   const [summaryReport, setSummaryReport] = useState<SummaryReportData | null>(null);
-  
+
   const [personnelData, setPersonnelData] = useState<PersonnelData>({ sources: [] });
   const [actualPerformance, setActualPerformance] = useState<ActualPerformanceData | null>(null);
   const [financialAnalysisData, setFinancialAnalysisData] = useState<FinancialAnalysisData | null>(null);
-  
+
   const [isAnalyzingLayers, setIsAnalyzingLayers] = useState<boolean>(false);
   const [isGeneratingReport, setIsGeneratingReport] = useState<boolean>(false);
   const [overallError, setOverallError] = useState<string | null>(null);
@@ -80,15 +80,15 @@ const App: React.FC = () => {
   useEffect(() => {
     const storedTokenConfig = localStorage.getItem('tokenBudgetConfig');
     if (storedTokenConfig) {
-      try { setTokenBudgetConfig(JSON.parse(storedTokenConfig)); } 
+      try { setTokenBudgetConfig(JSON.parse(storedTokenConfig)); }
       catch (e) { console.error("Failed to parse tokenBudgetConfig", e); localStorage.removeItem('tokenBudgetConfig'); }
     }
     const storedTokenLog = localStorage.getItem('tokenUsageLog');
     if (storedTokenLog) {
-       try { setTokenUsageLog(JSON.parse(storedTokenLog)); } 
-       catch (e) { console.error("Failed to parse tokenUsageLog", e); localStorage.removeItem('tokenUsageLog'); }
+      try { setTokenUsageLog(JSON.parse(storedTokenLog)); }
+      catch (e) { console.error("Failed to parse tokenUsageLog", e); localStorage.removeItem('tokenUsageLog'); }
     }
-    
+
     const sortedScoreboardData = MOCK_MONTHLY_SCOREBOARD_DATA
       .sort((a, b) => b.greybrainerScore - a.greybrainerScore)
       .map((item, index) => ({ ...item, ranking: index + 1 }));
@@ -105,7 +105,7 @@ const App: React.FC = () => {
   const logTokenUsage: LogTokenUsageFn = useCallback((operation, inputChars, outputChars) => {
     if (!tokenBudgetConfig.isEnabled) return;
     const newEntry: TokenUsageEntry = {
-      id: Date.now().toString() + Math.random().toString(36).substring(2,7), 
+      id: Date.now().toString() + Math.random().toString(36).substring(2, 7),
       timestamp: Date.now(), operation, estimatedInputChars: inputChars, estimatedOutputChars: outputChars,
       estimatedTokens: Math.ceil((inputChars + outputChars) / CHARS_PER_TOKEN_ESTIMATE),
     };
@@ -122,37 +122,32 @@ const App: React.FC = () => {
     setCreativeSparkError(null); setActualPerformance(null); setFinancialAnalysisData(null);
     setMorphokineticsAnalysis(null); setMorphokineticsError(null);
   };
-  
+
   const analyzeMovieFlowInternal = useCallback(async (confirmedMovieTitle: string) => {
     setIsAnalyzingLayers(true);
-    setFinancialAnalysisData(prev => ({...(prev || {}), userProvidedBudget: movieInput.productionBudget}));
+    setFinancialAnalysisData(prev => ({ ...(prev || {}), userProvidedBudget: movieInput.productionBudget }));
     setMovieInput(prev => ({ ...prev, movieTitle: confirmedMovieTitle }));
     let collectedPersonnelData: PersonnelData = { sources: [] };
 
-    // SERIAL EXECUTION TO AVOID 429 RATE LIMITS
-    // We execute layers one by one with a delay to respect the free tier RPM limits
-    for (const layerDef of LAYER_DEFINITIONS) {
+    const analysesPromises = LAYER_DEFINITIONS.map(async (layerDef) => {
       setLayerAnalyses(prev => prev.map(l => l.id === layerDef.id ? { ...l, isLoading: true, error: null, aiGeneratedText: '', editedText: '', userScore: undefined, aiSuggestedScore: undefined, groundingSources: [], improvementSuggestions: undefined, vonnegutShape: undefined } : l));
-      
       try {
         const result: ParsedLayerAnalysis = await analyzeLayerWithGemini(
-          confirmedMovieTitle, 
-          movieInput.reviewStage, 
-          layerDef.id, 
-          layerDef.title, 
-          layerDef.description, 
+          confirmedMovieTitle,
+          movieInput.reviewStage,
+          layerDef.id,
+          layerDef.title,
+          layerDef.description,
           logTokenUsage,
           movieInput.year,
           movieInput.director
         );
-        
-        setLayerAnalyses(prev => prev.map(l => l.id === layerDef.id ? { 
+        setLayerAnalyses(prev => prev.map(l => l.id === layerDef.id ? {
           ...l, aiGeneratedText: result.analysisText, editedText: result.analysisText, isLoading: false,
-          aiSuggestedScore: result.aiSuggestedScore, userScore: result.aiSuggestedScore !== undefined ? result.aiSuggestedScore : undefined, 
+          aiSuggestedScore: result.aiSuggestedScore, userScore: result.aiSuggestedScore !== undefined ? result.aiSuggestedScore : undefined,
           groundingSources: result.groundingSources || [], improvementSuggestions: result.improvementSuggestions,
           vonnegutShape: result.vonnegutShape, isFallbackResult: result.isFallbackResult
         } : l));
-
         if (result.director) collectedPersonnelData.director = result.director;
         if (result.mainCast && result.mainCast.length > 0) collectedPersonnelData.mainCast = result.mainCast;
         if (result.groundingSources) {
@@ -161,18 +156,13 @@ const App: React.FC = () => {
             if (!collectedPersonnelData.sources.find(s => s.uri === source.uri)) collectedPersonnelData.sources.push(source);
           });
         }
-
-        // Add a small delay between requests to be safe (1.5 seconds)
-        // This helps avoid the "Requests per minute" limit
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
       } catch (error) {
         console.error(`Error analyzing ${layerDef.title}:`, error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error analyzing layer.';
         setLayerAnalyses(prev => prev.map(l => l.id === layerDef.id ? { ...l, isLoading: false, error: errorMessage } : l));
       }
-    }
-    
+    });
+    await Promise.all(analysesPromises);
     setPersonnelData(collectedPersonnelData); setIsAnalyzingLayers(false);
 
     // Only fetch financial data if ROI analysis is enabled
@@ -208,7 +198,7 @@ const App: React.FC = () => {
       return [];
     }
   }, [logTokenUsage]);
-  
+
 
 
   const handleEditLayerText = (layerId: ReviewLayer, newText: string) => setLayerAnalyses(prev => prev.map(l => l.id === layerId ? { ...l, editedText: newText } : l));
@@ -230,7 +220,7 @@ const App: React.FC = () => {
           setFinancialAnalysisData(currentFinancialData); budgetForROI = financials.budget;
         } catch (error) {
           console.error('Error fetching movie financials during report generation:', error);
-          currentFinancialData = { ...currentFinancialData, isLoadingBudget: false, errorBudget: error instanceof Error ? error.message : 'Failed to fetch budget info for report.'};
+          currentFinancialData = { ...currentFinancialData, isLoadingBudget: false, errorBudget: error instanceof Error ? error.message : 'Failed to fetch budget info for report.' };
           setFinancialAnalysisData(currentFinancialData);
         }
       } else if (budgetForROI === undefined && currentFinancialData.fetchedBudget !== undefined) { budgetForROI = currentFinancialData.fetchedBudget; }
@@ -244,7 +234,7 @@ const App: React.FC = () => {
           setFinancialAnalysisData(currentFinancialData);
         } catch (error) {
           console.error('Error generating qualitative ROI analysis:', error);
-          currentFinancialData = { ...currentFinancialData, isLoadingROI: false, errorROI: error instanceof Error ? error.message : 'Failed to generate ROI analysis.'};
+          currentFinancialData = { ...currentFinancialData, isLoadingROI: false, errorROI: error instanceof Error ? error.message : 'Failed to generate ROI analysis.' };
           setFinancialAnalysisData(currentFinancialData);
         }
       }
@@ -263,11 +253,11 @@ const App: React.FC = () => {
 
     try {
       const reportData = await generateFinalReportWithGemini(
-        movieInput.movieTitle, 
-        movieInput.reviewStage, 
-        layerAnalyses, 
-        personnelData, 
-        currentFinancialData, 
+        movieInput.movieTitle,
+        movieInput.reviewStage,
+        layerAnalyses,
+        personnelData,
+        currentFinancialData,
         logTokenUsage,
         movieInput.year,
         movieInput.director
@@ -296,7 +286,7 @@ const App: React.FC = () => {
     setIsGeneratingCreativeSpark(true); setCreativeSparkError(null); setCreativeSparkResults(null); setSelectedSparkForUI(null);
     try {
       const results = await generateCreativeSpark(genre, inspiration, logTokenUsage);
-      setCreativeSparkResults(results.map(r => ({...r, isFallbackResult: r.isFallbackResult || false })));
+      setCreativeSparkResults(results.map(r => ({ ...r, isFallbackResult: r.isFallbackResult || false })));
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error generating creative sparks.';
       setCreativeSparkError(errorMessage);
@@ -315,7 +305,7 @@ const App: React.FC = () => {
     try {
       const { id, mindMapMarkdown, ...baseIdeaForEnhancement } = selectedSparkForUI;
       const enhancedResult = await enhanceCreativeSpark(baseIdeaForEnhancement, enhancementPrompt, logTokenUsage);
-      setSelectedSparkForUI(enhancedResult); 
+      setSelectedSparkForUI(enhancedResult);
       setCreativeSparkResults(prevResults => prevResults?.map(idea => idea.id === id ? enhancedResult : idea) || [enhancedResult]);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error enhancing creative spark.';
@@ -328,7 +318,7 @@ const App: React.FC = () => {
     try {
       const result = await analyzeIdeaMagicQuotient(idea, logTokenUsage);
       setMagicQuotientResult(result);
-    } catch (err) { 
+    } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error analyzing script idea.';
       setMagicQuotientError(errorMessage);
     } finally { setIsAnalyzingMagicQuotient(false); }
@@ -337,7 +327,7 @@ const App: React.FC = () => {
   const handleUpdateActualPerformance = useCallback((data: ActualPerformanceData) => {
     setActualPerformance(data);
     if (summaryReport) setSummaryReport(prev => prev ? { ...prev, actualPerformance: data } : null);
-  }, [summaryReport]); 
+  }, [summaryReport]);
 
   const handleAnalyzeMorphokinetics = useCallback(async () => {
     if (!movieInput.movieTitle) { setMorphokineticsError("Movie title is required for Morphokinetics analysis."); return; }
@@ -349,12 +339,12 @@ const App: React.FC = () => {
     try {
       const result = await analyzeMovieMorphokinetics(movieInput.movieTitle, logTokenUsage);
       setMorphokineticsAnalysis(result);
-    } catch (error) { 
+    } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error analyzing movie motion.';
       setMorphokineticsError(errorMessage);
     } finally { setIsAnalyzingMorphokinetics(false); }
-  }, [movieInput, layerAnalyses, logTokenUsage]); 
-  
+  }, [movieInput, layerAnalyses, logTokenUsage]);
+
   const allLayersAnalyzedOrError = layerAnalyses.every(l => (l.aiGeneratedText !== '' || l.error !== null) && !l.isLoading);
   const analysisAttempted = layerAnalyses.some(l => l.isLoading || l.aiGeneratedText || l.error);
   const showPersonnelAnalysis = allLayersAnalyzedOrError && !isAnalyzingLayers && analysisAttempted && (personnelData.director || (personnelData.mainCast && personnelData.mainCast.length > 0));
@@ -364,72 +354,72 @@ const App: React.FC = () => {
   return (
     <AuthWrapper>
       {(authUser) => (
-      <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-slate-100">
-        <Header
-          onToggleTokenDashboard={() => setShowTokenDashboard(prev => !prev)}
-        />
-        <main className="flex-grow container mx-auto px-4 py-8 max-w-5xl">
-        <>
-          {showTokenDashboard && (
-            <TokenBudgetDashboard config={tokenBudgetConfig} setConfig={saveTokenBudgetConfig} usageLog={tokenUsageLog} clearLog={() => { setTokenUsageLog([]); localStorage.removeItem('tokenUsageLog'); }} onClose={() => setShowTokenDashboard(false)} />
-          )}
-
-
-          <div className="flex justify-end mb-6">
-            <button
-              onClick={() => setShowSettings(true)}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2"
-              title="Settings & Configuration"
-            >
-              ⚙️ Settings
-            </button>
-          </div>
-          
-          <EnhancedMovieInputForm
-            movieInput={movieInput}
-            setMovieInput={setMovieInput}
-            reviewStages={REVIEW_STAGES_OPTIONS}
-            onAnalyze={handleAnalyzeMovie}
-            isAnalyzing={isAnalyzingLayers}
-            onGetSuggestions={handleGetSuggestions}
+        <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-slate-100">
+          <Header
+            onToggleTokenDashboard={() => setShowTokenDashboard(prev => !prev)}
           />
+          <main className="flex-grow container mx-auto px-4 py-8 max-w-5xl">
+            <>
+              {showTokenDashboard && (
+                <TokenBudgetDashboard config={tokenBudgetConfig} setConfig={saveTokenBudgetConfig} usageLog={tokenUsageLog} clearLog={() => { setTokenUsageLog([]); localStorage.removeItem('tokenUsageLog'); }} onClose={() => setShowTokenDashboard(false)} />
+              )}
 
-          {overallError && (<div className={`my-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}>{overallError}</div>)}
-          {((isAnalyzingLayers && !analysisAttempted) || financialAnalysisData?.isLoadingBudget) && (<div className="flex justify-center items-center my-10"><LoadingSpinner /><span className="ml-3 text-xl">{financialAnalysisData?.isLoadingBudget ? "Fetching financial estimates..." : "Initializing analysis..."}</span></div>)}
-          
-          <div className="mt-8 space-y-6"> {layerAnalyses.map((layer) => (<LayerAnalysisCard key={layer.id} layerData={layer} onEdit={handleEditLayerText} onScoreChange={handleLayerScoreChange} isOverallAnalyzing={isAnalyzingLayers} maxScore={MAX_SCORE}/>))} </div>
 
-          {showPersonnelAnalysis && (
-              <PersonnelDisplay personnelData={personnelData} magicFactorAnalyses={magicFactorAnalyses} onAnalyzeMagicFactor={handleAnalyzeMagicFactor} analyzingMagicFactorFor={analyzingMagicFactorFor} />
-          )}
+              <div className="flex justify-end mb-6">
+                <button
+                  onClick={() => setShowSettings(true)}
+                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2"
+                  title="Settings & Configuration"
+                >
+                  ⚙️ Settings
+                </button>
+              </div>
 
-          {canGenerateReport && !isCurrentlyProcessing && (
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-              <button onClick={handleGenerateReport} disabled={isGeneratingReport || isCurrentlyProcessing} className="w-full sm:w-auto px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" title={`Generate Greybrainer Report${movieInput.enableROIAnalysis ? ' with ROI Analysis' : ''}`}>
-                {isGeneratingReport || financialAnalysisData?.isLoadingROI ? (<> <LoadingSpinner size="sm" /> {financialAnalysisData?.isLoadingROI ? 'Analyzing ROI...':'Generating Complete Report...'}</>) : (<> <SparklesIcon className="w-5 h-5 mr-2" /> Generate Complete Report{movieInput.enableROIAnalysis ? ' + ROI' : ''}</>)}
-              </button>
-              
+              <EnhancedMovieInputForm
+                movieInput={movieInput}
+                setMovieInput={setMovieInput}
+                reviewStages={REVIEW_STAGES_OPTIONS}
+                onAnalyze={handleAnalyzeMovie}
+                isAnalyzing={isAnalyzingLayers}
+                onGetSuggestions={handleGetSuggestions}
+              />
 
-            </div>
-          )}
-          
-          {morphokineticsError && (<div className={`mt-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}><strong>Morphokinetics Error:</strong> {morphokineticsError}</div>)}
-          {isGeneratingReport && (
-            <div className="mt-8 p-8 bg-slate-800/50 rounded-xl border border-slate-700 text-center">
-              <LoadingSpinner size="lg" />
-              <p className="mt-4 text-lg text-slate-300">Generating complete report...</p>
-              <p className="text-sm text-slate-400">Including summary, morphokinetics, and all visualizations</p>
-            </div>
-          )}
-          
-          {summaryReport && !isGeneratingReport && (<ReportDisplay summaryReportData={summaryReport} title={movieInput.movieTitle} layerAnalyses={layerAnalyses} personnelData={personnelData} maxScore={MAX_SCORE} initialActualPerformance={actualPerformance} onActualPerformanceChange={handleUpdateActualPerformance} financialAnalysisData={financialAnalysisData} morphokineticsAnalysis={morphokineticsAnalysis} />)}
-          
-          {morphokineticsAnalysis && !isAnalyzingMorphokinetics && (<MorphokineticsDisplay analysis={morphokineticsAnalysis} />)}
-          
-          <GreybrainerInsights logTokenUsage={logTokenUsage} />
-          <GreybrainerComparison logTokenUsage={logTokenUsage} />
-          {/* Monthly Scoreboard temporarily disabled due to network issues */}
-          {/* <MonthlyMagicScoreboard 
+              {overallError && (<div className={`my-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}>{overallError}</div>)}
+              {((isAnalyzingLayers && !analysisAttempted) || financialAnalysisData?.isLoadingBudget) && (<div className="flex justify-center items-center my-10"><LoadingSpinner /><span className="ml-3 text-xl">{financialAnalysisData?.isLoadingBudget ? "Fetching financial estimates..." : "Initializing analysis..."}</span></div>)}
+
+              <div className="mt-8 space-y-6"> {layerAnalyses.map((layer) => (<LayerAnalysisCard key={layer.id} layerData={layer} onEdit={handleEditLayerText} onScoreChange={handleLayerScoreChange} isOverallAnalyzing={isAnalyzingLayers} maxScore={MAX_SCORE} />))} </div>
+
+              {showPersonnelAnalysis && (
+                <PersonnelDisplay personnelData={personnelData} magicFactorAnalyses={magicFactorAnalyses} onAnalyzeMagicFactor={handleAnalyzeMagicFactor} analyzingMagicFactorFor={analyzingMagicFactorFor} />
+              )}
+
+              {canGenerateReport && !isCurrentlyProcessing && (
+                <div className="mt-10 flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
+                  <button onClick={handleGenerateReport} disabled={isGeneratingReport || isCurrentlyProcessing} className="w-full sm:w-auto px-8 py-3 bg-indigo-600 hover:bg-indigo-500 text-white font-semibold rounded-lg shadow-md transition-colors duration-150 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center" title={`Generate Greybrainer Report${movieInput.enableROIAnalysis ? ' with ROI Analysis' : ''}`}>
+                    {isGeneratingReport || financialAnalysisData?.isLoadingROI ? (<> <LoadingSpinner size="sm" /> {financialAnalysisData?.isLoadingROI ? 'Analyzing ROI...' : 'Generating Complete Report...'}</>) : (<> <SparklesIcon className="w-5 h-5 mr-2" /> Generate Complete Report{movieInput.enableROIAnalysis ? ' + ROI' : ''}</>)}
+                  </button>
+
+
+                </div>
+              )}
+
+              {morphokineticsError && (<div className={`mt-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}><strong>Morphokinetics Error:</strong> {morphokineticsError}</div>)}
+              {isGeneratingReport && (
+                <div className="mt-8 p-8 bg-slate-800/50 rounded-xl border border-slate-700 text-center">
+                  <LoadingSpinner size="lg" />
+                  <p className="mt-4 text-lg text-slate-300">Generating complete report...</p>
+                  <p className="text-sm text-slate-400">Including summary, morphokinetics, and all visualizations</p>
+                </div>
+              )}
+
+              {summaryReport && !isGeneratingReport && (<ReportDisplay summaryReportData={summaryReport} title={movieInput.movieTitle} layerAnalyses={layerAnalyses} personnelData={personnelData} maxScore={MAX_SCORE} initialActualPerformance={actualPerformance} onActualPerformanceChange={handleUpdateActualPerformance} financialAnalysisData={financialAnalysisData} morphokineticsAnalysis={morphokineticsAnalysis} />)}
+
+              {morphokineticsAnalysis && !isAnalyzingMorphokinetics && (<MorphokineticsDisplay analysis={morphokineticsAnalysis} />)}
+
+              <GreybrainerInsights logTokenUsage={logTokenUsage} />
+              <GreybrainerComparison logTokenUsage={logTokenUsage} />
+              {/* Monthly Scoreboard temporarily disabled due to network issues */}
+              {/* <MonthlyMagicScoreboard 
             scoreboardData={monthlyScoreboardData} 
             currentUser={authUser}
             isAdmin={AdminService.isAdminSync(authUser)} // Firebase-based admin check
@@ -441,22 +431,22 @@ const App: React.FC = () => {
             }}
           /> */}
 
-          {/* Admin Dashboard moved to Settings modal */}
+              {/* Admin Dashboard moved to Settings modal */}
 
-          <CreativeSparkGenerator genres={COMMON_GENRES} onGenerate={handleGenerateCreativeSpark} isLoading={isGeneratingCreativeSpark || isCurrentlyProcessing} error={creativeSparkError} results={creativeSparkResults} selectedIdea={selectedSparkForUI} onSelectIdea={handleSelectSparkIdea} onEnhanceIdea={handleEnhanceSparkIdea} isEnhancing={isEnhancingSpark || isCurrentlyProcessing} />
-          
-          <ScriptMagicQuotientAnalyzer genres={COMMON_GENRES} onAnalyze={handleAnalyzeScriptMagicQuotient} isLoading={isAnalyzingMagicQuotient || isCurrentlyProcessing} error={magicQuotientError} analysisResult={magicQuotientResult} />
-        </>
-        </main>
-        <Footer />
-        
-        {/* Admin Settings Modal */}
-        <AdminSettings 
-          isOpen={showSettings} 
-          onClose={() => setShowSettings(false)}
-          currentUser={authUser}
-        />
-      </div>
+              <CreativeSparkGenerator genres={COMMON_GENRES} onGenerate={handleGenerateCreativeSpark} isLoading={isGeneratingCreativeSpark || isCurrentlyProcessing} error={creativeSparkError} results={creativeSparkResults} selectedIdea={selectedSparkForUI} onSelectIdea={handleSelectSparkIdea} onEnhanceIdea={handleEnhanceSparkIdea} isEnhancing={isEnhancingSpark || isCurrentlyProcessing} />
+
+              <ScriptMagicQuotientAnalyzer genres={COMMON_GENRES} onAnalyze={handleAnalyzeScriptMagicQuotient} isLoading={isAnalyzingMagicQuotient || isCurrentlyProcessing} error={magicQuotientError} analysisResult={magicQuotientResult} />
+            </>
+          </main>
+          <Footer />
+
+          {/* Admin Settings Modal */}
+          <AdminSettings
+            isOpen={showSettings}
+            onClose={() => setShowSettings(false)}
+            currentUser={authUser}
+          />
+        </div>
       )}
     </AuthWrapper>
   );

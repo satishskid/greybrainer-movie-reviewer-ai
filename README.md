@@ -202,7 +202,7 @@ If you want to expand the AI capabilities, consider these top-tier alternatives:
     *   Another state-of-the-art model with excellent performance across a wide range of tasks. It's a reliable and powerful option, particularly if you are already in the OpenAI ecosystem.
 
 *   **Google Gemini 2.5 Flash**
-    *   **Note:** Updated Jan 2026. The application defaults to `gemini-2.5-flash`, using serialized requests to respect Free Tier limits and avoid 429 errors.
+    *   **Note:** Updated Jan 2026. The application defaults to `gemini-2.5-flash` for optimal performance and availability.
     *   A powerful, fast, and multi-modal model that offers excellent balance of performance and intelligence for analytical and creative tasks.
 
 **Conclusion:** The current Groq setup provides excellent speed and reliability. For future expansion, **Anthropic's Claude 3.5 Sonnet is highly recommended** as the next integration to offer an alternative high-quality voice for analysis.
