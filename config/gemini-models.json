@@ -5,7 +5,7 @@
     "description": "Verified Gemini model configuration - using REAL available models from Google API"
   },
   "defaultModels": {
-    "preferred": "gemini-2.0-flash",
+    "preferred": "gemini-2.5-flash",
     "fallback": "gemini-2.5-pro",
     "experimental": "gemini-2.0-flash-exp",
     "legacy": "gemini-2.0-flash"
@@ -23,7 +23,12 @@
       "lastVerified": "2025-12-24",
       "useCase": "All Greybrainer features - primary model",
       "apiVersion": "v1beta",
-      "supportedMethods": ["generateContent", "countTokens", "createCachedContent", "batchGenerateContent"]
+      "supportedMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ]
     },
     {
       "id": "gemini-2.5-pro",
@@ -37,7 +42,12 @@
       "lastVerified": "2025-12-24",
       "useCase": "Complex analysis requiring deep reasoning",
       "apiVersion": "v1beta",
-      "supportedMethods": ["generateContent", "countTokens", "createCachedContent", "batchGenerateContent"]
+      "supportedMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ]
     },
     {
       "id": "gemini-flash-latest",
@@ -52,7 +62,12 @@
       "useCase": "Auto-updating to latest Flash version",
       "apiVersion": "v1beta",
       "isAlias": true,
-      "supportedMethods": ["generateContent", "countTokens", "createCachedContent", "batchGenerateContent"]
+      "supportedMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ]
     },
     {
       "id": "gemini-pro-latest",
@@ -67,7 +82,12 @@
       "useCase": "Auto-updating to latest Pro version",
       "apiVersion": "v1beta",
       "isAlias": true,
-      "supportedMethods": ["generateContent", "countTokens", "createCachedContent", "batchGenerateContent"]
+      "supportedMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ]
     },
     {
       "id": "gemini-2.5-flash-lite",
@@ -81,7 +101,12 @@
       "lastVerified": "2025-12-24",
       "useCase": "Quick queries when speed is critical",
       "apiVersion": "v1beta",
-      "supportedMethods": ["generateContent", "countTokens", "createCachedContent", "batchGenerateContent"]
+      "supportedMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ]
     },
     {
       "id": "gemini-2.0-flash",
@@ -95,7 +120,12 @@
       "lastVerified": "2025-12-24",
       "useCase": "Previous generation stable model",
       "apiVersion": "v1beta",
-      "supportedMethods": ["generateContent", "countTokens", "createCachedContent", "batchGenerateContent"]
+      "supportedMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ]
     },
     {
       "id": "gemini-2.0-flash-exp",
@@ -110,7 +140,11 @@
       "useCase": "Testing experimental features",
       "apiVersion": "v1beta",
       "isExperimental": true,
-      "supportedMethods": ["generateContent", "countTokens", "bidiGenerateContent"]
+      "supportedMethods": [
+        "generateContent",
+        "countTokens",
+        "bidiGenerateContent"
+      ]
     },
     {
       "id": "gemini-3-flash-preview",
@@ -125,7 +159,12 @@
       "useCase": "Testing future Gemini 3 capabilities",
       "apiVersion": "v1beta",
       "isExperimental": true,
-      "supportedMethods": ["generateContent", "countTokens", "createCachedContent", "batchGenerateContent"]
+      "supportedMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ]
     }
   ],
   "modelPriority": [

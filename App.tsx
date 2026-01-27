@@ -129,8 +129,11 @@ const App: React.FC = () => {
     setMovieInput(prev => ({ ...prev, movieTitle: confirmedMovieTitle }));
     let collectedPersonnelData: PersonnelData = { sources: [] };
 
-    const analysesPromises = LAYER_DEFINITIONS.map(async (layerDef) => {
+    // SERIAL EXECUTION TO AVOID 429 RATE LIMITS
+    // We execute layers one by one with a delay to respect the free tier RPM limits
+    for (const layerDef of LAYER_DEFINITIONS) {
       setLayerAnalyses(prev => prev.map(l => l.id === layerDef.id ? { ...l, isLoading: true, error: null, aiGeneratedText: '', editedText: '', userScore: undefined, aiSuggestedScore: undefined, groundingSources: [], improvementSuggestions: undefined, vonnegutShape: undefined } : l));
+      
       try {
         const result: ParsedLayerAnalysis = await analyzeLayerWithGemini(
           confirmedMovieTitle, 
@@ -142,12 +145,14 @@ const App: React.FC = () => {
           movieInput.year,
           movieInput.director
         );
+        
         setLayerAnalyses(prev => prev.map(l => l.id === layerDef.id ? { 
           ...l, aiGeneratedText: result.analysisText, editedText: result.analysisText, isLoading: false,
           aiSuggestedScore: result.aiSuggestedScore, userScore: result.aiSuggestedScore !== undefined ? result.aiSuggestedScore : undefined, 
           groundingSources: result.groundingSources || [], improvementSuggestions: result.improvementSuggestions,
           vonnegutShape: result.vonnegutShape, isFallbackResult: result.isFallbackResult
         } : l));
+
         if (result.director) collectedPersonnelData.director = result.director;
         if (result.mainCast && result.mainCast.length > 0) collectedPersonnelData.mainCast = result.mainCast;
         if (result.groundingSources) {
@@ -156,13 +161,18 @@ const App: React.FC = () => {
             if (!collectedPersonnelData.sources.find(s => s.uri === source.uri)) collectedPersonnelData.sources.push(source);
           });
         }
+
+        // Add a small delay between requests to be safe (1.5 seconds)
+        // This helps avoid the "Requests per minute" limit
+        await new Promise(resolve => setTimeout(resolve, 1500));
+
       } catch (error) {
         console.error(`Error analyzing ${layerDef.title}:`, error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown error analyzing layer.';
         setLayerAnalyses(prev => prev.map(l => l.id === layerDef.id ? { ...l, isLoading: false, error: errorMessage } : l));
       }
-    });
-    await Promise.all(analysesPromises);
+    }
+    
     setPersonnelData(collectedPersonnelData); setIsAnalyzingLayers(false);
 
     // Only fetch financial data if ROI analysis is enabled
