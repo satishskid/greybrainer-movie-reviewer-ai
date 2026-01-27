@@ -5,7 +5,7 @@
     "description": "Verified Gemini model configuration - using REAL available models from Google API"
   },
   "defaultModels": {
-    "preferred": "gemini-2.5-flash",
+    "preferred": "gemini-2.0-flash",
     "fallback": "gemini-2.5-pro",
     "experimental": "gemini-2.0-flash-exp",
     "legacy": "gemini-2.0-flash"
