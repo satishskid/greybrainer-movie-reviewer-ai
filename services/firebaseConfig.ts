@@ -45,7 +45,8 @@ export interface GreybrainerUser {
 const ADMIN_EMAILS = [
   'satish@skids.health',
   'satish.rath@gmail.com',
-  'dr.satish@greybrain.ai'
+  'dr.satish@greybrain.ai',
+  'digi.social@greybrain.ai'
 ];
 
 // Editor emails

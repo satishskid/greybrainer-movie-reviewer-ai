@@ -6,10 +6,22 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "tsc",
-    "preview": "vite preview"
+    "lint": "tsc && tsc -p tsconfig.worker.json",
+    "preview": "vite preview",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy",
+    "cf:typegen": "wrangler types",
+    "db:migrate:turso": "node scripts/migrate-turso.mjs",
+    "db:migrate:social-channels": "node scripts/migrate-sql.mjs db/social_channels_phase2.sql",
+    "db:migrate:social-auth": "node scripts/migrate-sql.mjs db/social_native_auth_phase3.sql",
+    "db:migrate:knowledge": "node scripts/migrate-sql.mjs db/knowledge_medium_phase4.sql",
+    "db:migrate:knowledge-r2": "node scripts/migrate-sql.mjs db/knowledge_r2_phase5.sql",
+    "db:migrate:knowledge-backfill": "node scripts/migrate-sql.mjs db/knowledge_backfill_phase6.sql",
+    "db:migrate:draft-r2": "node scripts/migrate-sql.mjs db/draft_r2_phase7.sql",
+    "db:migrate:ai-keys": "node scripts/migrate-sql.mjs db/ai_keys_phase8.sql"
   },
   "dependencies": {
+    "@libsql/client": "^0.15.15",
     "@google/generative-ai": "^0.24.1",
     "firebase": "^12.5.0",
     "lucide-react": "^0.562.0",
@@ -17,6 +29,7 @@
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260303.0",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
@@ -24,6 +37,7 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.2.2",
-    "vite": "^5.3.1"
+    "vite": "^5.3.1",
+    "wrangler": "^4.6.0"
   }
 }

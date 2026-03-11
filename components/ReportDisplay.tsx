@@ -18,11 +18,14 @@ import { LinkedInIcon } from './icons/LinkedInIcon';
 import { PublishableAnalysisReport } from './PublishableAnalysisReport';
 import { ShareIcon } from './icons/ShareIcon';
 import { SparklesIcon } from './icons/SparklesIcon'; // Added import
+import { saveDraft, saveDraftVersion } from '../services/omnichannelDraftService';
 
 
 interface ReportDisplayProps {
   summaryReportData: SummaryReportData;
   title: string;
+  reviewStage?: string;
+  currentUserEmail?: string | null;
   layerAnalyses: LayerAnalysisData[];
   personnelData: PersonnelData; 
   maxScore: number;
@@ -35,6 +38,8 @@ interface ReportDisplayProps {
 export const ReportDisplay: React.FC<ReportDisplayProps> = ({ 
   summaryReportData, 
   title, 
+  reviewStage,
+  currentUserEmail,
   layerAnalyses, 
   personnelData, 
   maxScore,
@@ -50,6 +55,9 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
   const [showActualsInput, setShowActualsInput] = useState(false);
   const [showBlogExportModal, setShowBlogExportModal] = useState(false);
   const [showPublishableReport, setShowPublishableReport] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [saveDraftError, setSaveDraftError] = useState<string | null>(null);
+  const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
 
   useEffect(() => {
     setLocalActualPerformance(initialActualPerformance || {});
@@ -307,6 +315,47 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  const handleSaveDraft = async () => {
+    setIsSavingDraft(true);
+    setSaveDraftError(null);
+
+    try {
+      const payload = {
+        analysis: {
+          actualPerformance: localActualPerformance,
+          financialAnalysisData,
+          morphokineticsAnalysis,
+          overallImprovementSuggestions,
+          personnelData,
+          pixarStyleScenes: summaryReportData.pixarStyleScenes,
+          reportText,
+        },
+        blogMarkdown: generateMarkdownReport(),
+        createdBy: currentUserEmail ?? null,
+        reviewStage: reviewStage ?? undefined,
+        socials: socialSnippets ?? null,
+        sourcePayload: {
+          actualPerformance: localActualPerformance,
+          financialAnalysisData,
+          layerAnalyses,
+          morphokineticsAnalysis,
+          personnelData,
+          summaryReportData,
+          title,
+        },
+        subjectTitle: title,
+      };
+      const savedDraft = savedDraftId
+        ? await saveDraftVersion(savedDraftId, payload)
+        : await saveDraft(payload);
+      setSavedDraftId(savedDraft.id);
+    } catch (error) {
+      setSaveDraftError(error instanceof Error ? error.message : 'Failed to save draft.');
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
   const renderSuggestions = (suggestions: string | string[] | undefined, baseClasses: string, areaClass: string) => {
     if (!suggestions) return null;
     if (typeof suggestions === 'string') {
@@ -329,6 +378,15 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
           Greybrainer Report: <span className="italic">{title}</span>
         </h2>
         <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+            <button
+              onClick={handleSaveDraft}
+              disabled={isSavingDraft}
+              className="flex items-center justify-center px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white text-sm font-medium rounded-lg shadow-md transition-colors duration-150 w-full sm:w-auto"
+              title="Save this report as a durable draft in the Cloudflare/Turso backend"
+            >
+              <CheckCircleIcon className="w-4 h-4 mr-2" />
+              {isSavingDraft ? 'Saving Draft...' : 'Save Draft'}
+            </button>
             <button
               onClick={() => setShowBlogExportModal(true)}
               className="flex items-center justify-center px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg shadow-md transition-colors duration-150 w-full sm:w-auto"
@@ -363,6 +421,18 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
             </button>
         </div>
       </div>
+
+      {(savedDraftId || saveDraftError) && (
+        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+          saveDraftError ? 'border-red-500/60 bg-red-500/10 text-red-200' : 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200'
+        }`}>
+          {saveDraftError ? (
+            <span>{saveDraftError}</span>
+          ) : (
+            <span>Draft saved in omnichannel backend with ID `{savedDraftId}`.</span>
+          )}
+        </div>
+      )}
       
       {/* Score and Actuals Comparison Display */}
       <div className="mb-6 p-4 bg-gradient-to-r from-indigo-700 via-purple-700 to-pink-700 rounded-lg shadow-lg">

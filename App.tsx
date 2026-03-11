@@ -412,7 +412,21 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {summaryReport && !isGeneratingReport && (<ReportDisplay summaryReportData={summaryReport} title={movieInput.movieTitle} layerAnalyses={layerAnalyses} personnelData={personnelData} maxScore={MAX_SCORE} initialActualPerformance={actualPerformance} onActualPerformanceChange={handleUpdateActualPerformance} financialAnalysisData={financialAnalysisData} morphokineticsAnalysis={morphokineticsAnalysis} />)}
+              {summaryReport && !isGeneratingReport && (
+                <ReportDisplay
+                  summaryReportData={summaryReport}
+                  title={movieInput.movieTitle}
+                  reviewStage={movieInput.reviewStage}
+                  currentUserEmail={authUser?.email}
+                  layerAnalyses={layerAnalyses}
+                  personnelData={personnelData}
+                  maxScore={MAX_SCORE}
+                  initialActualPerformance={actualPerformance}
+                  onActualPerformanceChange={handleUpdateActualPerformance}
+                  financialAnalysisData={financialAnalysisData}
+                  morphokineticsAnalysis={morphokineticsAnalysis}
+                />
+              )}
 
               {morphokineticsAnalysis && !isAnalyzingMorphokinetics && (<MorphokineticsDisplay analysis={morphokineticsAnalysis} />)}
 

@@ -19,7 +19,9 @@ export class AdminService {
       // First check the hardcoded admin emails for immediate response
       const ADMIN_EMAILS = [
         'satish@skids.health',
-        'satish.rath@gmail.com'
+        'satish.rath@gmail.com',
+        'dr.satish@greybrain.ai',
+        'digi.social@greybrain.ai'
       ];
       
       if (ADMIN_EMAILS.includes(user.email)) {
@@ -80,7 +82,9 @@ export class AdminService {
     
     const ADMIN_EMAILS = [
       'satish@skids.health',
-      'satish.rath@gmail.com'
+      'satish.rath@gmail.com',
+      'dr.satish@greybrain.ai',
+      'digi.social@greybrain.ai'
     ];
     
     return ADMIN_EMAILS.includes(user.email);

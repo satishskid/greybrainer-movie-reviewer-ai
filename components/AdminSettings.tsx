@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import GeminiDebugTest from './GeminiDebugTest';
 import { FeatureVerificationTest } from './FeatureVerificationTest';
 import { FirebaseAdminDashboard } from './FirebaseAdminDashboard';
+import { CloudflareByokManager } from './CloudflareByokManager';
 import { GeminiKeyManager } from './GeminiKeyManager';
 import { GoogleSearchKeyManager } from './GoogleSearchKeyManager';
 import { getSelectedGeminiModel, getModelInfo } from '../utils/geminiModelStorage';
 import { getGeminiApiKeyString, hasGeminiApiKey } from '../utils/geminiKeyStorage';
 import { LoadingSpinner } from './LoadingSpinner';
 import { MonthlyScoreboardAdmin } from './MonthlyScoreboardAdmin';
+import { OmnichannelDraftsPanel } from './OmnichannelDraftsPanel';
 
 interface AdminSettingsProps {
   isOpen: boolean;
@@ -16,7 +18,7 @@ interface AdminSettingsProps {
 }
 
 export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'keys' | 'admin' | 'debug' | 'health' | 'scoreboard'>('keys');
+  const [activeTab, setActiveTab] = useState<'keys' | 'admin' | 'omnichannel' | 'debug' | 'health' | 'scoreboard'>('keys');
   const [systemHealth, setSystemHealth] = useState<any>(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
 
@@ -90,6 +92,16 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
             👑 Admin Dashboard
           </button>
           <button
+            onClick={() => setActiveTab('omnichannel')}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'omnichannel'
+                ? 'text-indigo-400 border-b-2 border-indigo-400'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            🌐 Omnichannel
+          </button>
+          <button
             onClick={() => setActiveTab('health')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'health'
@@ -135,6 +147,12 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
                   <GeminiKeyManager />
                 </div>
 
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                  <h4 className="text-md font-medium text-slate-200 mb-3">☁️ Cloudflare Daily Brief BYOK</h4>
+                  <p className="text-sm text-slate-400 mb-4">Used by the scheduled daily newsletter brief generator in the Worker.</p>
+                  <CloudflareByokManager ownerEmail={currentUser?.email ?? null} />
+                </div>
+
                 {/* Google Search API Key */}
                 <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
                   <h4 className="text-md font-medium text-slate-200 mb-3">🔍 Google Search API Key</h4>
@@ -163,6 +181,10 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
                 </div>
               )}
             </div>
+          )}
+
+          {activeTab === 'omnichannel' && (
+            <OmnichannelDraftsPanel currentUserEmail={currentUser?.email} />
           )}
 
           {activeTab === 'health' && (

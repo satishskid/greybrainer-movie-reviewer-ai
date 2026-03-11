@@ -16,6 +16,9 @@ dist-ssr
 .env
 .env.local
 .env.production
+.dev.vars
+.dev.vars.*
+!.dev.vars.example
 
 # Editor directories and files
 .vscode/*
@@ -30,6 +33,7 @@ dist-ssr
 
 # Local Netlify folder
 .netlify
+.wrangler
 .clinerules/byterover-rules.md
 .kilocode/rules/byterover-rules.md
 .roo/rules/byterover-rules.md
