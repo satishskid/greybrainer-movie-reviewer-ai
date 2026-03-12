@@ -1,5 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { listAiKeys, saveAiKey, type AiKeyRecord } from '../services/omnichannelDraftService';
+import {
+  getCloudflareSystemStatus,
+  listAiKeys,
+  saveAiKey,
+  type AiKeyRecord,
+  type CloudflareSystemStatus,
+} from '../services/omnichannelDraftService';
 import { LoadingSpinner } from './LoadingSpinner';
 
 interface CloudflareByokManagerProps {
@@ -14,15 +20,24 @@ export const CloudflareByokManager: React.FC<CloudflareByokManagerProps> = ({ ow
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [modelInput, setModelInput] = useState('gemini-2.5-flash');
   const [keys, setKeys] = useState<AiKeyRecord[]>([]);
+  const [systemStatus, setSystemStatus] = useState<CloudflareSystemStatus | null>(null);
+
+  const loadSystemStatus = async () => {
+    const status = await getCloudflareSystemStatus();
+    setSystemStatus(status);
+  };
 
   const loadKeys = async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const records = await listAiKeys('gemini');
+      const [records] = await Promise.all([
+        listAiKeys('gemini'),
+        loadSystemStatus(),
+      ]);
       setKeys(records);
     } catch (loadError) {
-      setError(loadError instanceof Error ? loadError.message : 'Failed to load BYOK records.');
+      setError(loadError instanceof Error ? loadError.message : 'Failed to load Cloudflare BYOK settings.');
     } finally {
       setIsLoading(false);
     }
@@ -51,6 +66,7 @@ export const CloudflareByokManager: React.FC<CloudflareByokManagerProps> = ({ ow
       setKeys((current) => [record, ...current]);
       setApiKeyInput('');
       setSuccess('Stored the default Gemini key for daily briefs.');
+      await loadSystemStatus();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Failed to store BYOK key.');
     } finally {
@@ -62,6 +78,31 @@ export const CloudflareByokManager: React.FC<CloudflareByokManagerProps> = ({ ow
     <div className="space-y-4">
       {error && <div className="rounded-lg border border-red-600/50 bg-red-900/20 px-4 py-3 text-sm text-red-200">{error}</div>}
       {success && <div className="rounded-lg border border-emerald-600/50 bg-emerald-900/20 px-4 py-3 text-sm text-emerald-200">{success}</div>}
+
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4">
+          <div className="text-[11px] uppercase tracking-wide text-slate-500">Worker API</div>
+          <div className="mt-2 text-sm font-medium text-slate-100">{systemStatus?.ok ? 'Connected' : 'Unavailable'}</div>
+        </div>
+        <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4">
+          <div className="text-[11px] uppercase tracking-wide text-slate-500">Daily Schedule</div>
+          <div className="mt-2 text-sm font-medium text-slate-100">
+            {systemStatus?.dailyBrief.scheduleEnabled ? `Enabled • ${systemStatus.dailyBrief.timezone}` : 'Disabled'}
+          </div>
+        </div>
+        <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4">
+          <div className="text-[11px] uppercase tracking-wide text-slate-500">AI Gateway</div>
+          <div className="mt-2 text-sm font-medium text-slate-100">
+            {systemStatus?.gateway.enabled ? `Enabled • ${systemStatus.gateway.gatewayName}` : 'Not configured'}
+          </div>
+        </div>
+        <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4">
+          <div className="text-[11px] uppercase tracking-wide text-slate-500">Fallback Model</div>
+          <div className="mt-2 text-sm font-medium text-slate-100">
+            {systemStatus?.dailyBrief.fallbackModel ?? modelInput}
+          </div>
+        </div>
+      </div>
 
       <div className="space-y-3">
         <label className="text-sm text-slate-300">
@@ -128,6 +169,15 @@ export const CloudflareByokManager: React.FC<CloudflareByokManagerProps> = ({ ow
             ))}
           </div>
         )}
+      </div>
+
+      <div className="rounded-lg border border-sky-600/30 bg-sky-950/20 p-4 text-xs text-sky-100">
+        <div className="font-semibold uppercase tracking-wide text-sky-300">How this works now</div>
+        <div className="mt-2 space-y-1 text-sky-100/90">
+          <div>Deep Research uses the browser-side Gemini key.</div>
+          <div>Daily Brief uses the Cloudflare Worker key vault.</div>
+          <div>If AI Gateway is configured, the Worker routes Gemini through Cloudflare while still honoring editor BYOK.</div>
+        </div>
       </div>
     </div>
   );

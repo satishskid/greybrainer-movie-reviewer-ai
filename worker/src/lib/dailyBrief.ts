@@ -33,6 +33,36 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function getGeminiRequestConfig(env: Env, model: string, apiKey: string) {
+  const gatewayAccountId = env.CF_AI_GATEWAY_ACCOUNT_ID?.trim();
+  const gatewayName = env.CF_AI_GATEWAY_GATEWAY_NAME?.trim();
+
+  if (gatewayAccountId && gatewayName) {
+    const headers: Record<string, string> = {
+      "content-type": "application/json",
+      "x-goog-api-key": apiKey,
+    };
+
+    if (env.CF_AI_GATEWAY_TOKEN?.trim()) {
+      headers["cf-aig-authorization"] = `Bearer ${env.CF_AI_GATEWAY_TOKEN.trim()}`;
+    }
+
+    return {
+      headers,
+      url: `https://gateway.ai.cloudflare.com/v1/${gatewayAccountId}/${gatewayName}/google-ai-studio/v1beta/models/${model}:generateContent`,
+      via: "cloudflare-ai-gateway",
+    };
+  }
+
+  return {
+    headers: {
+      "content-type": "application/json",
+    },
+    url: `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+    via: "google-ai-studio",
+  };
+}
+
 function formatDateKey(date: Date, timeZone: string) {
   return new Intl.DateTimeFormat("en-CA", {
     timeZone,
@@ -133,31 +163,28 @@ async function callGemini(env: Env, prompt: string) {
     throw new Error("Gemini API key is not configured. Store GEMINI_API_KEY or save a BYOK key in the daily brief vault.");
   }
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${selectedModel}:generateContent?key=${apiKey}`,
-    {
-      method: "POST",
-      headers: {
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: prompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          responseMimeType: "application/json",
+  const requestConfig = getGeminiRequestConfig(env, selectedModel, apiKey);
+
+  const response = await fetch(requestConfig.url, {
+    method: "POST",
+    headers: requestConfig.headers,
+    body: JSON.stringify({
+      contents: [
+        {
+          role: "user",
+          parts: [{ text: prompt }],
         },
-      }),
-    },
-  );
+      ],
+      generationConfig: {
+        temperature: 0.7,
+        responseMimeType: "application/json",
+      },
+    }),
+  });
 
   if (!response.ok) {
     const errorText = await response.text();
-    throw new Error(`Gemini daily brief failed: ${response.status} ${errorText}`);
+    throw new Error(`Gemini daily brief failed via ${requestConfig.via}: ${response.status} ${errorText}`);
   }
 
   const payload = (await response.json()) as {

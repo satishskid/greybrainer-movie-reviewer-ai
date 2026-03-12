@@ -1,6 +1,9 @@
 import { createClient } from "@libsql/client/web";
 
 export interface Env {
+  CF_AI_GATEWAY_ACCOUNT_ID?: string;
+  CF_AI_GATEWAY_GATEWAY_NAME?: string;
+  CF_AI_GATEWAY_TOKEN?: string;
   CONTENT_R2?: R2Bucket;
   KNOWLEDGE_R2?: R2Bucket;
   DRAFT_STORAGE_MODE?: string;

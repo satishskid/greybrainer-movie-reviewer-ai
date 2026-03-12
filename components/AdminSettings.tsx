@@ -149,14 +149,14 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
               <div className="space-y-6">
                 {/* Gemini API Key */}
                 <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-                  <h4 className="text-md font-medium text-slate-200 mb-3">🤖 Gemini AI API Key</h4>
-                  <p className="text-sm text-slate-400 mb-4">Required for film analysis and AI-powered insights</p>
+                  <h4 className="text-md font-medium text-slate-200 mb-3">🤖 Deep Research Gemini BYOK</h4>
+                  <p className="text-sm text-slate-400 mb-4">Used in the browser for human-initiated deep research and movie analysis.</p>
                   <GeminiKeyManager />
                 </div>
 
                 <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-                  <h4 className="text-md font-medium text-slate-200 mb-3">☁️ Cloudflare Daily Brief BYOK</h4>
-                  <p className="text-sm text-slate-400 mb-4">Used by the scheduled daily newsletter brief generator in the Worker.</p>
+                  <h4 className="text-md font-medium text-slate-200 mb-3">☁️ Cloudflare Daily Brief & AI Gateway</h4>
+                  <p className="text-sm text-slate-400 mb-4">Worker-side key vault, daily brief generation, and Cloudflare AI Gateway routing status.</p>
                   <CloudflareByokManager ownerEmail={currentUser?.email ?? null} />
                 </div>
 

@@ -179,6 +179,32 @@ export interface AiKeyRecord {
   updatedAt: string;
 }
 
+export interface CloudflareSystemStatus {
+  backend: {
+    apiVersion: string;
+    draftStorageMode: string;
+    knowledgeStorageMode: string;
+    websiteBaseUrl: string | null;
+  };
+  dailyBrief: {
+    byokKeyCount: number;
+    fallbackModel: string;
+    scheduleEnabled: boolean;
+    timezone: string;
+  };
+  gateway: {
+    accountIdConfigured: boolean;
+    enabled: boolean;
+    gatewayName: string | null;
+    tokenConfigured: boolean;
+  };
+  gemini: {
+    serverKeyConfigured: boolean;
+  };
+  ok: boolean;
+  timestamp: string;
+}
+
 export interface SocialAccountTestResult {
   checkedAt: string;
   details: string;
@@ -258,7 +284,12 @@ function getApiBaseUrl() {
 }
 
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${getApiBaseUrl()}${path}`, init);
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, init);
+  } catch (error) {
+    throw new Error(`Unable to reach the Cloudflare backend at ${getApiBaseUrl()}.`);
+  }
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => null)) as { error?: string } | null;
     throw new Error(errorBody?.error ?? `Request failed for ${path}.`);
@@ -430,6 +461,10 @@ export async function connectSocialAccountRecord(socialAccountId: string): Promi
 export async function listAiKeys(provider = "gemini"): Promise<AiKeyRecord[]> {
   const data = await requestJson<{ keys: AiKeyRecord[] }>(`/ai-keys?provider=${provider}`);
   return data.keys;
+}
+
+export async function getCloudflareSystemStatus(): Promise<CloudflareSystemStatus> {
+  return requestJson<CloudflareSystemStatus>("/system/status");
 }
 
 export async function saveAiKey(

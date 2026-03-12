@@ -31,10 +31,20 @@ import {
 } from "./lib/repository";
 import { discoverSocialAccount } from "./lib/socialAccounts";
 
+function corsHeaders() {
+  return {
+    "access-control-allow-headers": "content-type, authorization",
+    "access-control-allow-methods": "GET, POST, PATCH, OPTIONS",
+    "access-control-allow-origin": "*",
+    "access-control-max-age": "86400",
+  };
+}
+
 function json(data: unknown, status = 200) {
   return new Response(JSON.stringify(data, null, 2), {
     status,
     headers: {
+      ...corsHeaders(),
       "content-type": "application/json; charset=utf-8",
     },
   });
@@ -64,6 +74,13 @@ export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
+    if (url.pathname.startsWith("/api/") && request.method === "OPTIONS") {
+      return new Response(null, {
+        status: 204,
+        headers: corsHeaders(),
+      });
+    }
+
     if (url.pathname === "/preview" || url.pathname === "/preview/" || url.pathname.startsWith("/preview/lens/")) {
       const client = createDbClient(env);
       try {
@@ -77,6 +94,13 @@ export default {
     if (url.pathname === "/api/health" && request.method === "GET") {
       return json({
         ok: true,
+        cloudflare: {
+          aiGatewayEnabled: Boolean(env.CF_AI_GATEWAY_ACCOUNT_ID?.trim() && env.CF_AI_GATEWAY_GATEWAY_NAME?.trim()),
+          dailyBriefEnabled: env.DAILY_BRIEF_ENABLED === "true",
+          draftStorageMode: env.DRAFT_STORAGE_MODE ?? "turso",
+          fallbackGeminiModel: env.GEMINI_MODEL ?? "gemini-2.5-flash",
+          knowledgeStorageMode: env.KNOWLEDGE_STORAGE_MODE ?? "turso",
+        },
         service: "greybrainer-omnichannel-api",
         version: env.OMNICHANNEL_API_VERSION ?? "unknown",
         timestamp: new Date().toISOString(),
@@ -158,6 +182,35 @@ export default {
           timezone: body?.timezone ?? null,
         });
         return json(result, result.status === "generated" ? 201 : 200);
+      }
+
+      if (segments[1] === "system" && segments[2] === "status" && request.method === "GET") {
+        const geminiKeys = await listAiKeysForProvider(client, "gemini");
+        return json({
+          backend: {
+            apiVersion: env.OMNICHANNEL_API_VERSION ?? "unknown",
+            draftStorageMode: env.DRAFT_STORAGE_MODE ?? "turso",
+            knowledgeStorageMode: env.KNOWLEDGE_STORAGE_MODE ?? "turso",
+            websiteBaseUrl: env.WEBSITE_BASE_URL ?? null,
+          },
+          dailyBrief: {
+            byokKeyCount: geminiKeys.length,
+            fallbackModel: env.GEMINI_MODEL ?? "gemini-2.5-flash",
+            scheduleEnabled: env.DAILY_BRIEF_ENABLED === "true",
+            timezone: env.DAILY_BRIEF_TIMEZONE ?? "Asia/Kolkata",
+          },
+          gateway: {
+            accountIdConfigured: Boolean(env.CF_AI_GATEWAY_ACCOUNT_ID?.trim()),
+            enabled: Boolean(env.CF_AI_GATEWAY_ACCOUNT_ID?.trim() && env.CF_AI_GATEWAY_GATEWAY_NAME?.trim()),
+            gatewayName: env.CF_AI_GATEWAY_GATEWAY_NAME ?? null,
+            tokenConfigured: Boolean(env.CF_AI_GATEWAY_TOKEN?.trim()),
+          },
+          gemini: {
+            serverKeyConfigured: Boolean(env.GEMINI_API_KEY?.trim()),
+          },
+          ok: true,
+          timestamp: new Date().toISOString(),
+        });
       }
 
       if (segments[1] === "ai-keys") {

@@ -65,8 +65,19 @@ There are two options:
 2. BYOK stored from UI (preferred for editors):
 - Admin Settings -> API Keys -> Cloudflare Daily Brief BYOK
 - Stores encrypted key in Turso under ai_keys with model name.
+- The Admin screen now also shows Cloudflare backend health and AI Gateway status.
 
 If both exist, the Worker uses the BYOK default first, then falls back to GEMINI_API_KEY.
+
+## Cloudflare AI Gateway
+
+Optional Worker-side routing is supported for the daily brief:
+
+- `CF_AI_GATEWAY_ACCOUNT_ID`
+- `CF_AI_GATEWAY_GATEWAY_NAME`
+- `CF_AI_GATEWAY_TOKEN` (optional, if your gateway requires it)
+
+When configured, the Worker sends Gemini requests through Cloudflare AI Gateway while still passing the editor's Gemini BYOK key to Google AI Studio.
 
 ## Required Migrations
 
