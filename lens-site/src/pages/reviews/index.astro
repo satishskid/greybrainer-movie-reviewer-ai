@@ -1,0 +1,23 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Footer from '../../components/Footer.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import EditorialShelf from '../../components/EditorialShelf.astro';
+import { featuredEditorials } from '../../data/editorials';
+---
+
+<BaseLayout
+  title="Greybrainer Lens | Reviews and Studies"
+  description="Browse premium movie intelligence essays, audience studies, and editorial dossiers from Greybrainer Lens."
+>
+  <SiteHeader />
+  <section class="shell archive-hero">
+    <span class="section-kicker">Archive</span>
+    <h1>Reviews, essays, and screen studies.</h1>
+    <p>
+      A curated shelf for editorial movie intelligence. This public surface is designed for future Cloudflare-native publishing from the Greybrainer engine.
+    </p>
+  </section>
+  <EditorialShelf items={featuredEditorials} title="Current Archive" />
+  <Footer />
+</BaseLayout>

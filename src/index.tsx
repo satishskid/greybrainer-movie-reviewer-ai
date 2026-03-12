@@ -4,6 +4,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from '../App';
 import { LensPreviewApp } from './LensPreviewApp';
+import { DraftReviewApp } from './DraftReviewApp';
 import './index.css'; // Import Tailwind CSS
 
 const rootElement = document.getElementById('root');
@@ -18,6 +19,8 @@ root.render(
   <React.StrictMode>
     {window.location.pathname === '/lens' || window.location.pathname.startsWith('/lens/')
       ? <LensPreviewApp />
-      : <App />}
+      : window.location.pathname.startsWith('/studio/drafts/')
+        ? <DraftReviewApp />
+        : <App />}
   </React.StrictMode>
 );

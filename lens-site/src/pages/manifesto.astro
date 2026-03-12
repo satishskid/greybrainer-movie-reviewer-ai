@@ -1,0 +1,35 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Footer from '../components/Footer.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+---
+
+<BaseLayout
+  title="Greybrainer Lens | Manifesto"
+  description="The editorial thesis behind Greybrainer Lens: a serious movie intelligence publication built for the streaming era."
+>
+  <SiteHeader />
+  <section class="shell archive-hero">
+    <span class="section-kicker">Manifesto</span>
+    <h1>A movie intelligence publication, not a content farm.</h1>
+    <p>
+      Lens is meant to sit closer to a cultural magazine than a generic review blog. It should publish with the confidence of a critic,
+      the curiosity of a researcher, and the editorial discipline of a serious newsroom.
+    </p>
+  </section>
+  <section class="shell manifesto-longform">
+    <div>
+      <h2>What we publish</h2>
+      <p>Daily briefings, deep research, screen politics, audience studies, OTT behaviour, and film criticism that names the social pattern underneath the plot.</p>
+    </div>
+    <div>
+      <h2>What we avoid</h2>
+      <p>Thin SEO sludge, generic celebrity chatter, and interchangeable entertainment copy that could belong to any site on the internet.</p>
+    </div>
+    <div>
+      <h2>Why Astro</h2>
+      <p>Because the public site should be fast, crawlable, elegant, and structurally editorial from day one, while Greybrainer remains the internal creation engine behind it.</p>
+    </div>
+  </section>
+  <Footer />
+</BaseLayout>

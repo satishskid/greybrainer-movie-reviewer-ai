@@ -1,0 +1,35 @@
+---
+import type { LensEditorial } from '../data/editorials';
+
+interface Props {
+  items: LensEditorial[];
+  title?: string;
+}
+
+const { items, title = 'From the Shelf' } = Astro.props;
+---
+
+<section class="shelf-section shell">
+  <div class="section-heading">
+    <div>
+      <span class="section-kicker">Editorial Shelf</span>
+      <h2>{title}</h2>
+    </div>
+  </div>
+  <div class="shelf-grid">
+    {items.map((item) => (
+      <article class="shelf-card">
+        <div class="shelf-card__meta">
+          <span>{item.category}</span>
+          <span>{item.runTime}</span>
+        </div>
+        <h3><a href={`/reviews/${item.slug}`}>{item.title}</a></h3>
+        <p>{item.dek}</p>
+        <div class="shelf-card__footer">
+          <span>{item.releaseFocus}</span>
+          <a href={`/reviews/${item.slug}`}>Open</a>
+        </div>
+      </article>
+    ))}
+  </div>
+</section>

@@ -1,0 +1,55 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Footer from '../../components/Footer.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import { featuredEditorials } from '../../data/editorials';
+
+export function getStaticPaths() {
+  return featuredEditorials.map((entry) => ({
+    params: { slug: entry.slug },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+---
+
+<BaseLayout title={`${entry.title} | Greybrainer Lens`} description={entry.dek}>
+  <SiteHeader />
+  <article class="article-shell">
+    <section class="article-hero" style={`--hero-gradient: ${entry.heroGradient};`}>
+      <div class="shell article-hero__grid">
+        <div>
+          <div class="eyebrow">{entry.category}</div>
+          <h1>{entry.title}</h1>
+          <p class="hero-dek">{entry.dek}</p>
+        </div>
+        <aside class="article-aside">
+          <div><span>Published</span><strong>{entry.publishedAt}</strong></div>
+          <div><span>Read time</span><strong>{entry.runTime}</strong></div>
+          <div><span>Editorial angle</span><strong>{entry.criticAngle}</strong></div>
+        </aside>
+      </div>
+    </section>
+
+    <section class="shell article-body">
+      <div class="article-main">
+        {entry.sections.map((section) => (
+          <section class="article-section">
+            <h2>{section.heading}</h2>
+            {section.body.map((paragraph) => (
+              <p>{paragraph}</p>
+            ))}
+          </section>
+        ))}
+      </div>
+      <aside class="article-rail">
+        <div class="rail-card">
+          <span class="section-kicker">Lens Position</span>
+          <blockquote>{entry.pullQuote}</blockquote>
+        </div>
+      </aside>
+    </section>
+  </article>
+  <Footer />
+</BaseLayout>

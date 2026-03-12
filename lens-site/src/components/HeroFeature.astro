@@ -1,0 +1,44 @@
+---
+import type { LensEditorial } from '../data/editorials';
+
+interface Props {
+  feature: LensEditorial;
+}
+
+const { feature } = Astro.props;
+---
+
+<section class="hero-feature" style={`--hero-gradient: ${feature.heroGradient};`}>
+  <div class="shell hero-grid">
+    <div class="hero-copy">
+      <div class="eyebrow">{feature.category}</div>
+      <h1>{feature.title}</h1>
+      <p class="hero-dek">{feature.dek}</p>
+      <div class="hero-meta">
+        <span>{feature.publishedAt}</span>
+        <span>{feature.runTime}</span>
+        <span>{feature.releaseFocus}</span>
+      </div>
+      <div class="hero-actions">
+        <a class="primary-button" href={`/reviews/${feature.slug}`}>Read the Study</a>
+        <a class="secondary-button" href="/manifesto">See the Lens Thesis</a>
+      </div>
+    </div>
+    <div class="hero-panel">
+      <div class="signal-card">
+        <div class="signal-label">Lead Thesis</div>
+        <blockquote>{feature.pullQuote}</blockquote>
+      </div>
+      <div class="signal-grid">
+        <div>
+          <span class="signal-label">Angle</span>
+          <strong>{feature.criticAngle}</strong>
+        </div>
+        <div>
+          <span class="signal-label">Mood</span>
+          <strong>{feature.mood}</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>

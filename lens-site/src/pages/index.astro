@@ -1,0 +1,54 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import HeroFeature from '../components/HeroFeature.astro';
+import EditorialShelf from '../components/EditorialShelf.astro';
+import Footer from '../components/Footer.astro';
+import { editorialShelf, featuredEditorials } from '../data/editorials';
+
+const lead = featuredEditorials[0];
+const rest = featuredEditorials.slice(1);
+---
+
+<BaseLayout
+  title="Greybrainer Lens | Editorial Movie Intelligence"
+  description="A fresh editorial surface for movie review, OTT intelligence, and cultural analysis built for Greybrainer on Cloudflare."
+>
+  <SiteHeader />
+  <HeroFeature feature={lead} />
+
+  <section class="shell manifesto-band">
+    <div class="manifesto-copy">
+      <span class="section-kicker">What Lens Is Becoming</span>
+      <h2>Not another review blog. A movie intelligence magazine with newsroom authority and streaming-era pace.</h2>
+      <p>
+        Lens should feel like a hybrid of cultural criticism, audience intelligence, and industry reporting. The writing has to carry
+        the interpretive force of a serious publication while still feeling alive to internet speed, platform politics, and OTT-era
+        emotional behaviour.
+      </p>
+    </div>
+    <div class="manifesto-grid">
+      {editorialShelf.map((item) => (
+        <div class="manifesto-card">
+          <strong>{item.label}</strong>
+          <p>{item.note}</p>
+        </div>
+      ))}
+    </div>
+  </section>
+
+  <EditorialShelf items={rest} title="Signature Studies" />
+
+  <section class="shell newsroom-strip">
+    <div class="newsroom-card">
+      <span class="section-kicker">Editor Workflow</span>
+      <h2>Daily briefs for momentum. Deep studies for authority.</h2>
+      <p>
+        The public site is meant to publish the best of two systems: a once-a-day adaptive intelligence brief and editor-driven deep
+        research on films, stars, fandom, and screen politics.
+      </p>
+    </div>
+  </section>
+
+  <Footer />
+</BaseLayout>

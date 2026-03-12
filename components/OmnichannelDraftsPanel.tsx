@@ -426,8 +426,16 @@ export const OmnichannelDraftsPanel: React.FC<OmnichannelDraftsPanelProps> = ({ 
                     {selectedDraft.id} • current version {selectedDraft.currentVersion?.versionNo ?? selectedDraft.latestVersionNo}
                   </div>
                 </div>
-                <div className="rounded-full bg-emerald-900/30 px-3 py-1 text-xs uppercase tracking-wide text-emerald-300">
-                  {selectedDraft.status}
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={() => window.open(`/studio/drafts/${selectedDraft.id}`, '_blank', 'noopener,noreferrer')}
+                    className="rounded-full border border-sky-500/40 bg-sky-500/10 px-4 py-2 text-xs font-medium uppercase tracking-wide text-sky-200 transition hover:border-sky-400 hover:bg-sky-500/15"
+                  >
+                    Open Full Review
+                  </button>
+                  <div className="rounded-full bg-emerald-900/30 px-3 py-1 text-xs uppercase tracking-wide text-emerald-300">
+                    {selectedDraft.status}
+                  </div>
                 </div>
               </div>
 

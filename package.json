@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "lens:dev": "astro dev --root lens-site",
+    "lens:build": "astro build --root lens-site",
+    "lens:preview": "astro preview --root lens-site",
     "lint": "tsc && tsc -p tsconfig.worker.json",
     "preview": "vite preview",
     "cf:dev": "wrangler dev",
@@ -22,8 +25,10 @@
     "db:migrate:ai-key-status": "node scripts/migrate-sql.mjs db/ai_key_status_phase9.sql"
   },
   "dependencies": {
-    "@libsql/client": "^0.15.15",
+    "@astrojs/sitemap": "^3.7.1",
     "@google/generative-ai": "^0.24.1",
+    "@libsql/client": "^0.15.15",
+    "astro": "^6.0.3",
     "firebase": "^12.5.0",
     "lucide-react": "^0.562.0",
     "react": "^18.3.1",
