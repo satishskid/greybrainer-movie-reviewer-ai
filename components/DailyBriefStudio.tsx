@@ -174,6 +174,7 @@ export const DailyBriefStudio: React.FC<DailyBriefStudioProps> = ({ currentUserE
           </div>
           <div className="mt-1 text-xs text-emerald-200/80">
             Draft ID: {generationResult.draftId ?? 'not returned'} • Date key: {generationResult.dateKey}
+            {generationResult.generationMode ? ` • Mode: ${generationResult.generationMode}` : ''}
           </div>
         </div>
       )}

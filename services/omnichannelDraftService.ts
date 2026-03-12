@@ -87,6 +87,7 @@ export interface DailyBriefGenerationResult {
   dateKey: string;
   dateLabel: string;
   draftId?: string;
+  generationMode?: "gemini" | "workers-ai-fallback";
   message?: string;
   status: "generated" | "skipped" | "failed";
 }
@@ -173,13 +174,34 @@ export interface AiKeyRecord {
   id: string;
   isDefault: boolean;
   keyHint: string | null;
+  lastFailureAt?: string | null;
+  lastFailureCode?: string | null;
+  lastFailureReason?: string | null;
+  lastQuotaExhaustedAt?: string | null;
+  lastSuccessAt?: string | null;
+  lastUsedAt?: string | null;
   model: string | null;
   ownerEmail: string | null;
   provider: string;
+  runtimeStatus?: string | null;
   updatedAt: string;
 }
 
 export interface CloudflareSystemStatus {
+  activeKey: {
+    id: string;
+    isDefault: boolean;
+    keyHint: string | null;
+    lastFailureAt: string | null;
+    lastFailureCode: string | null;
+    lastFailureReason: string | null;
+    lastQuotaExhaustedAt: string | null;
+    lastSuccessAt: string | null;
+    lastUsedAt: string | null;
+    model: string | null;
+    ownerEmail: string | null;
+    runtimeStatus: string | null;
+  } | null;
   backend: {
     apiVersion: string;
     draftStorageMode: string;
@@ -200,6 +222,10 @@ export interface CloudflareSystemStatus {
   };
   gemini: {
     serverKeyConfigured: boolean;
+  };
+  workersAi: {
+    enabled: boolean;
+    fallbackModel: string;
   };
   ok: boolean;
   timestamp: string;

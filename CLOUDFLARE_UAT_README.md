@@ -85,6 +85,7 @@ Run once:
 
 ```
 npm run db:migrate:ai-keys
+npm run db:migrate:ai-key-status
 ```
 
 ## Required Secrets and Vars
@@ -100,6 +101,7 @@ Worker vars (already in wrangler.jsonc):
 - DAILY_BRIEF_TIMEZONE=Asia/Kolkata
 - GEMINI_MODEL=gemini-2.5-flash (default fallback)
 - WEBSITE_BASE_URL=https://greybrainer-dev.pages.dev/lens
+- WORKERS_AI_FALLBACK_MODEL=@cf/meta/llama-3.1-8b-instruct
 
 ## Firebase Auth
 
@@ -123,4 +125,5 @@ HOME=/tmp node ./node_modules/wrangler/bin/wrangler.js pages deploy dist --proje
 ## Known Limitations
 
 - Gemini free-tier quota can return 429. The daily generator will fail until quota resets or the key is upgraded.
+- If a Gemini BYOK key hits quota, the Worker records the failure time and can fall back to Workers AI to scaffold a usable daily draft for editor review.
 - The Lens preview is for UAT only and does not affect the live Netlify site.

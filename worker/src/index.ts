@@ -186,7 +186,24 @@ export default {
 
       if (segments[1] === "system" && segments[2] === "status" && request.method === "GET") {
         const geminiKeys = await listAiKeysForProvider(client, "gemini");
+        const activeKey = geminiKeys.find((key) => key.isDefault) ?? geminiKeys[0] ?? null;
         return json({
+          activeKey: activeKey
+            ? {
+                id: activeKey.id,
+                isDefault: activeKey.isDefault,
+                keyHint: activeKey.keyHint,
+                lastFailureAt: activeKey.lastFailureAt ?? null,
+                lastFailureCode: activeKey.lastFailureCode ?? null,
+                lastFailureReason: activeKey.lastFailureReason ?? null,
+                lastQuotaExhaustedAt: activeKey.lastQuotaExhaustedAt ?? null,
+                lastSuccessAt: activeKey.lastSuccessAt ?? null,
+                lastUsedAt: activeKey.lastUsedAt ?? null,
+                model: activeKey.model ?? env.GEMINI_MODEL ?? "gemini-2.5-flash",
+                ownerEmail: activeKey.ownerEmail ?? null,
+                runtimeStatus: activeKey.runtimeStatus ?? "unknown",
+              }
+            : null,
           backend: {
             apiVersion: env.OMNICHANNEL_API_VERSION ?? "unknown",
             draftStorageMode: env.DRAFT_STORAGE_MODE ?? "turso",
@@ -207,6 +224,10 @@ export default {
           },
           gemini: {
             serverKeyConfigured: Boolean(env.GEMINI_API_KEY?.trim()),
+          },
+          workersAi: {
+            enabled: Boolean(env.AI),
+            fallbackModel: env.WORKERS_AI_FALLBACK_MODEL ?? "@cf/meta/llama-3.1-8b-instruct",
           },
           ok: true,
           timestamp: new Date().toISOString(),

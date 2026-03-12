@@ -1,6 +1,7 @@
 import { createClient } from "@libsql/client/web";
 
 export interface Env {
+  AI?: Ai;
   CF_AI_GATEWAY_ACCOUNT_ID?: string;
   CF_AI_GATEWAY_GATEWAY_NAME?: string;
   CF_AI_GATEWAY_TOKEN?: string;
@@ -26,6 +27,7 @@ export interface Env {
   SOCIAL_CONNECT_SUCCESS_URL?: string;
   SOCIAL_TOKEN_ENCRYPTION_KEY?: string;
   WEBSITE_BASE_URL?: string;
+  WORKERS_AI_FALLBACK_MODEL?: string;
   TURSO_AUTH_TOKEN: string;
   TURSO_DATABASE_URL: string;
 }

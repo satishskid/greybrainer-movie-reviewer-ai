@@ -18,7 +18,8 @@
     "db:migrate:knowledge-r2": "node scripts/migrate-sql.mjs db/knowledge_r2_phase5.sql",
     "db:migrate:knowledge-backfill": "node scripts/migrate-sql.mjs db/knowledge_backfill_phase6.sql",
     "db:migrate:draft-r2": "node scripts/migrate-sql.mjs db/draft_r2_phase7.sql",
-    "db:migrate:ai-keys": "node scripts/migrate-sql.mjs db/ai_keys_phase8.sql"
+    "db:migrate:ai-keys": "node scripts/migrate-sql.mjs db/ai_keys_phase8.sql",
+    "db:migrate:ai-key-status": "node scripts/migrate-sql.mjs db/ai_key_status_phase9.sql"
   },
   "dependencies": {
     "@libsql/client": "^0.15.15",

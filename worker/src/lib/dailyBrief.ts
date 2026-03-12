@@ -1,5 +1,5 @@
 import type { Client } from "@libsql/client";
-import { createDbClient, type Env } from "./db";
+import type { Env } from "./db";
 import { persistDraftArtifacts } from "./draftStorage";
 import { listKnowledgeBriefs } from "./knowledgeRepository";
 import {
@@ -8,11 +8,13 @@ import {
   getAiKeyEncrypted,
   getDefaultAiKey,
   getDraftBySubjectTypeAndReviewStage,
+  recordAiKeyRuntimeStatus,
   updateDraft,
 } from "./repository";
 import { decryptSecret } from "./tokenCrypto";
 
 interface DailyBriefResult {
+  generationMode?: "gemini" | "workers-ai-fallback";
   status: "generated" | "skipped" | "failed";
   dateKey: string;
   dateLabel: string;
@@ -28,6 +30,7 @@ interface DailyBriefOptions {
 
 const DEFAULT_TIMEZONE = "Asia/Kolkata";
 const DEFAULT_MODEL = "gemini-2.5-flash";
+const DEFAULT_WORKERS_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
 function nowIso() {
   return new Date().toISOString();
@@ -80,6 +83,62 @@ function formatDateLabel(date: Date, timeZone: string) {
     month: "long",
     day: "numeric",
   }).format(date);
+}
+
+function isGeminiQuotaError(status: number, text: string) {
+  const lower = text.toLowerCase();
+  return status === 429 || lower.includes("resource_exhausted") || lower.includes("quota");
+}
+
+async function callWorkersAiFallback(env: Env, prompt: string) {
+  if (!env.AI) {
+    throw new Error("Workers AI fallback is not configured.");
+  }
+
+  const model = env.WORKERS_AI_FALLBACK_MODEL ?? DEFAULT_WORKERS_AI_MODEL;
+  const fallbackPrompt = `
+You are supporting the Greybrainer editorial desk during a premium-model quota outage.
+
+Produce a useful fallback draft for editors. Be careful, structured, and concise.
+Do not fabricate certainty. Use phrases like "signals", "appears", and "editor should verify" where necessary.
+
+Return valid JSON only using this schema:
+{
+  "blog_markdown": "...full markdown including the LENS_NARRATIVE block and an editor note that this is a fallback draft...",
+  "seo_title": "...",
+  "seo_description": "...",
+  "socials": {
+    "x_thread": ["...","..."],
+    "linkedin_post": "..."
+  }
+}
+
+Source prompt:
+${prompt}
+`.trim();
+
+  const response = (await env.AI.run(model as keyof AiModels, {
+    prompt: fallbackPrompt,
+  })) as { response?: string } | string;
+
+  const text = typeof response === "string" ? response : response.response ?? "";
+  if (!text) {
+    throw new Error("Workers AI fallback returned an empty response.");
+  }
+
+  const cleaned = text.trim().replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
+  const parsed = JSON.parse(cleaned) as {
+    blog_markdown: string;
+    seo_title?: string;
+    seo_description?: string;
+    socials?: { x_thread?: string[]; linkedin_post?: string };
+  };
+
+  if (!parsed.blog_markdown) {
+    throw new Error("Workers AI fallback response missing blog_markdown.");
+  }
+
+  return parsed;
 }
 
 function buildPrompt(input: {
@@ -136,24 +195,21 @@ Output must be valid JSON with this schema:
 `.trim();
 }
 
-async function callGemini(env: Env, prompt: string) {
+async function callGemini(client: Client, env: Env, prompt: string) {
   let apiKey = null;
+  let activeKeyId: string | null = null;
   let selectedModel = env.GEMINI_MODEL ?? DEFAULT_MODEL;
   if (env.SOCIAL_TOKEN_ENCRYPTION_KEY) {
-    const client = createDbClient(env);
-    try {
-      const defaultKey = await getDefaultAiKey(client, "gemini");
-      if (defaultKey) {
-        const encrypted = await getAiKeyEncrypted(client, defaultKey.id);
-        if (encrypted) {
-          apiKey = await decryptSecret(encrypted, env.SOCIAL_TOKEN_ENCRYPTION_KEY);
-        }
-        if (defaultKey.model) {
-          selectedModel = defaultKey.model;
-        }
+    const defaultKey = await getDefaultAiKey(client, "gemini");
+    if (defaultKey) {
+      activeKeyId = defaultKey.id;
+      const encrypted = await getAiKeyEncrypted(client, defaultKey.id);
+      if (encrypted) {
+        apiKey = await decryptSecret(encrypted, env.SOCIAL_TOKEN_ENCRYPTION_KEY);
       }
-    } finally {
-      client.close();
+      if (defaultKey.model) {
+        selectedModel = defaultKey.model;
+      }
     }
   }
   if (!apiKey) {
@@ -164,6 +220,7 @@ async function callGemini(env: Env, prompt: string) {
   }
 
   const requestConfig = getGeminiRequestConfig(env, selectedModel, apiKey);
+  const usedAt = nowIso();
 
   const response = await fetch(requestConfig.url, {
     method: "POST",
@@ -184,6 +241,27 @@ async function callGemini(env: Env, prompt: string) {
 
   if (!response.ok) {
     const errorText = await response.text();
+    const quotaExhausted = isGeminiQuotaError(response.status, errorText);
+    if (activeKeyId) {
+      await recordAiKeyRuntimeStatus(client, {
+        keyId: activeKeyId,
+        lastFailureAt: usedAt,
+        lastFailureCode: String(response.status),
+        lastFailureReason: errorText.slice(0, 1000),
+        lastQuotaExhaustedAt: quotaExhausted ? usedAt : null,
+        lastUsedAt: usedAt,
+        status: quotaExhausted ? "quota_exhausted" : "failed",
+      });
+    }
+
+    if (quotaExhausted && env.AI) {
+      const fallback = await callWorkersAiFallback(env, prompt);
+      return {
+        ...fallback,
+        generationMode: "workers-ai-fallback" as const,
+      };
+    }
+
     throw new Error(`Gemini daily brief failed via ${requestConfig.via}: ${response.status} ${errorText}`);
   }
 
@@ -211,7 +289,19 @@ async function callGemini(env: Env, prompt: string) {
     throw new Error("Gemini response missing blog_markdown.");
   }
 
-  return parsed;
+  if (activeKeyId) {
+    await recordAiKeyRuntimeStatus(client, {
+      keyId: activeKeyId,
+      lastSuccessAt: usedAt,
+      lastUsedAt: usedAt,
+      status: "healthy",
+    });
+  }
+
+  return {
+    ...parsed,
+    generationMode: "gemini" as const,
+  };
 }
 
 export async function generateDailyBrief(
@@ -238,10 +328,13 @@ export async function generateDailyBrief(
 
   const pastArticles = await listKnowledgeBriefs(client, 6);
   const prompt = buildPrompt({ dateLabel, pastArticles });
-  const generated = await callGemini(env, prompt);
+  const generated = await callGemini(client, env, prompt);
   if (!generated.blog_markdown.includes("[[LENS_NARRATIVE:")) {
     const tagBlock = `[[LENS_NARRATIVE:\n🎬 Today's Morning Brief: ${dateLabel}\n\nTrending Now\n- TBD (Platform): Brief summary.\n\nCritical View\n- TBD (Platform): Why it matters.\n\nThe Social Spark\n- TBD: One or two lines.\n]]\n\n`;
     generated.blog_markdown = `${tagBlock}${generated.blog_markdown}`;
+  }
+  if (generated.generationMode === "workers-ai-fallback" && !generated.blog_markdown.includes("Fallback note for editor")) {
+    generated.blog_markdown = `${generated.blog_markdown}\n\n> Fallback note for editor: This draft was scaffolded with Workers AI because the current Gemini key hit quota limits. Please run a premium pass when a fresh Gemini key is available.\n`;
   }
   const subjectTitle = `GreyBrain Intelligence Brief — ${dateLabel}`;
 
@@ -250,7 +343,7 @@ export async function generateDailyBrief(
   const versionNo = existing ? existing.latestVersionNo + 1 : 1;
 
   const artifacts = await persistDraftArtifacts(env, {
-    analysis: { type: "daily-brief", generatedAt: nowIso(), promptVersion: "v1" },
+    analysis: { type: "daily-brief", generatedAt: nowIso(), promptVersion: "v1", generationMode: generated.generationMode },
     blogMarkdown: generated.blog_markdown,
     draftId,
     socials: generated.socials ?? null,
@@ -275,7 +368,7 @@ export async function generateDailyBrief(
           subjectTitle,
         });
         return createDraftVersion(client, existing.id, {
-          analysis: { type: "daily-brief", generatedAt: nowIso(), refreshed: true },
+          analysis: { type: "daily-brief", generatedAt: nowIso(), refreshed: true, generationMode: generated.generationMode },
           analysisObjectKey: artifacts.analysisObjectKey,
           blogMarkdown: generated.blog_markdown,
           createdBy: options?.requestedBy ?? "system:daily-brief",
@@ -312,7 +405,7 @@ export async function generateDailyBrief(
         subjectTitle,
         subjectType,
         version: {
-          analysis: { type: "daily-brief", generatedAt: nowIso() },
+          analysis: { type: "daily-brief", generatedAt: nowIso(), generationMode: generated.generationMode },
           analysisObjectKey: artifacts.analysisObjectKey,
           blogMarkdown: generated.blog_markdown,
           createdBy: options?.requestedBy ?? "system:daily-brief",
@@ -344,6 +437,7 @@ export async function generateDailyBrief(
   }
 
   return {
+    generationMode: generated.generationMode,
     status: "generated",
     dateKey,
     dateLabel,

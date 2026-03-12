@@ -12,6 +12,20 @@ interface CloudflareByokManagerProps {
   ownerEmail?: string | null;
 }
 
+function formatTimestamp(value?: string | null) {
+  if (!value) {
+    return 'Not yet';
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString('en-IN', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  });
+}
+
 export const CloudflareByokManager: React.FC<CloudflareByokManagerProps> = ({ ownerEmail }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -97,12 +111,46 @@ export const CloudflareByokManager: React.FC<CloudflareByokManagerProps> = ({ ow
           </div>
         </div>
         <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4">
-          <div className="text-[11px] uppercase tracking-wide text-slate-500">Fallback Model</div>
+          <div className="text-[11px] uppercase tracking-wide text-slate-500">Workers AI Fallback</div>
           <div className="mt-2 text-sm font-medium text-slate-100">
-            {systemStatus?.dailyBrief.fallbackModel ?? modelInput}
+            {systemStatus?.workersAi.enabled
+              ? systemStatus.workersAi.fallbackModel
+              : 'Not configured'}
           </div>
         </div>
       </div>
+
+      {systemStatus?.activeKey && (
+        <div className="rounded-lg border border-amber-600/30 bg-amber-950/20 p-4">
+          <div className="mb-3 text-sm font-medium text-amber-100">Active Gemini Key Runtime</div>
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4 text-xs text-amber-50/90">
+            <div>
+              <div className="uppercase tracking-wide text-amber-300/70">Owner</div>
+              <div className="mt-1">{systemStatus.activeKey.ownerEmail ?? 'unknown'}</div>
+            </div>
+            <div>
+              <div className="uppercase tracking-wide text-amber-300/70">Status</div>
+              <div className="mt-1">{systemStatus.activeKey.runtimeStatus ?? 'unknown'}</div>
+            </div>
+            <div>
+              <div className="uppercase tracking-wide text-amber-300/70">Last Success</div>
+              <div className="mt-1">{formatTimestamp(systemStatus.activeKey.lastSuccessAt)}</div>
+            </div>
+            <div>
+              <div className="uppercase tracking-wide text-amber-300/70">Last Quota Exhausted</div>
+              <div className="mt-1">{formatTimestamp(systemStatus.activeKey.lastQuotaExhaustedAt)}</div>
+            </div>
+          </div>
+          {systemStatus.activeKey.lastFailureReason && (
+            <div className="mt-3 rounded-md border border-amber-700/30 bg-slate-950/40 px-3 py-2 text-xs text-amber-100/90">
+              Last failure: {systemStatus.activeKey.lastFailureReason}
+            </div>
+          )}
+          <div className="mt-3 text-[11px] text-amber-100/70">
+            If this key is exhausted, save a fresh AI Studio key here. The Worker will use it on the next run. Google’s exact free-tier refresh window is not guaranteed, so this screen shows the last known success/failure timestamps instead of a fake reset timer.
+          </div>
+        </div>
+      )}
 
       <div className="space-y-3">
         <label className="text-sm text-slate-300">
@@ -161,6 +209,9 @@ export const CloudflareByokManager: React.FC<CloudflareByokManagerProps> = ({ ow
                   <div className="text-[11px] text-slate-500">
                     {key.ownerEmail ?? 'unknown owner'} {key.model ? `• ${key.model}` : ''}
                   </div>
+                  <div className="text-[11px] text-slate-600">
+                    {key.runtimeStatus ?? 'unknown'} • last success {formatTimestamp(key.lastSuccessAt)}
+                  </div>
                 </div>
                 <div className="text-[11px] text-slate-400">
                   {key.isDefault ? 'default' : 'secondary'} • hint {key.keyHint ?? 'hidden'}
@@ -177,6 +228,7 @@ export const CloudflareByokManager: React.FC<CloudflareByokManagerProps> = ({ ow
           <div>Deep Research uses the browser-side Gemini key.</div>
           <div>Daily Brief uses the Cloudflare Worker key vault.</div>
           <div>If AI Gateway is configured, the Worker routes Gemini through Cloudflare while still honoring editor BYOK.</div>
+          <div>If Gemini quota is exhausted, the Worker can fall back to Workers AI to scaffold a usable editor draft.</div>
         </div>
       </div>
     </div>

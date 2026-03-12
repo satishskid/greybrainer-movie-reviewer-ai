@@ -102,9 +102,16 @@ export interface AiKeyRecord {
   id: string;
   isDefault: boolean;
   keyHint: string | null;
+  lastFailureAt?: string | null;
+  lastFailureCode?: string | null;
+  lastFailureReason?: string | null;
+  lastQuotaExhaustedAt?: string | null;
+  lastSuccessAt?: string | null;
+  lastUsedAt?: string | null;
   model: string | null;
   ownerEmail: string | null;
   provider: string;
+  runtimeStatus?: string | null;
   updatedAt: string;
 }
 
@@ -232,9 +239,16 @@ function mapAiKeyRow(row: Row): AiKeyRecord {
     id: String(rowValue(row, "id")),
     isDefault: Number(rowValue(row, "is_default") ?? 0) === 1,
     keyHint: rowValue(row, "key_hint") ? String(rowValue(row, "key_hint")) : null,
+    lastFailureAt: rowValue(row, "last_failure_at") ? String(rowValue(row, "last_failure_at")) : null,
+    lastFailureCode: rowValue(row, "last_failure_code") ? String(rowValue(row, "last_failure_code")) : null,
+    lastFailureReason: rowValue(row, "last_failure_reason") ? String(rowValue(row, "last_failure_reason")) : null,
+    lastQuotaExhaustedAt: rowValue(row, "last_quota_exhausted_at") ? String(rowValue(row, "last_quota_exhausted_at")) : null,
+    lastSuccessAt: rowValue(row, "last_success_at") ? String(rowValue(row, "last_success_at")) : null,
+    lastUsedAt: rowValue(row, "last_used_at") ? String(rowValue(row, "last_used_at")) : null,
     model: rowValue(row, "model") ? String(rowValue(row, "model")) : null,
     ownerEmail: rowValue(row, "owner_email") ? String(rowValue(row, "owner_email")) : null,
     provider: String(rowValue(row, "provider")),
+    runtimeStatus: rowValue(row, "runtime_status") ? String(rowValue(row, "runtime_status")) : null,
     updatedAt: String(rowValue(row, "updated_at")),
   };
 }
@@ -538,7 +552,21 @@ export async function listSocialAccounts(client: Client) {
 
 export async function listAiKeys(client: Client, provider = "gemini") {
   const result = await client.execute({
-    sql: "SELECT * FROM ai_keys WHERE provider = ? ORDER BY updated_at DESC",
+    sql: `
+      SELECT
+        ai_keys.*,
+        ai_key_runtime_status.status AS runtime_status,
+        ai_key_runtime_status.last_used_at,
+        ai_key_runtime_status.last_success_at,
+        ai_key_runtime_status.last_failure_at,
+        ai_key_runtime_status.last_failure_code,
+        ai_key_runtime_status.last_failure_reason,
+        ai_key_runtime_status.last_quota_exhausted_at
+      FROM ai_keys
+      LEFT JOIN ai_key_runtime_status ON ai_key_runtime_status.ai_key_id = ai_keys.id
+      WHERE ai_keys.provider = ?
+      ORDER BY ai_keys.updated_at DESC
+    `,
     args: [provider],
   });
 
@@ -547,7 +575,22 @@ export async function listAiKeys(client: Client, provider = "gemini") {
 
 export async function getDefaultAiKey(client: Client, provider = "gemini") {
   const result = await client.execute({
-    sql: "SELECT * FROM ai_keys WHERE provider = ? AND is_default = 1 ORDER BY updated_at DESC LIMIT 1",
+    sql: `
+      SELECT
+        ai_keys.*,
+        ai_key_runtime_status.status AS runtime_status,
+        ai_key_runtime_status.last_used_at,
+        ai_key_runtime_status.last_success_at,
+        ai_key_runtime_status.last_failure_at,
+        ai_key_runtime_status.last_failure_code,
+        ai_key_runtime_status.last_failure_reason,
+        ai_key_runtime_status.last_quota_exhausted_at
+      FROM ai_keys
+      LEFT JOIN ai_key_runtime_status ON ai_key_runtime_status.ai_key_id = ai_keys.id
+      WHERE ai_keys.provider = ? AND ai_keys.is_default = 1
+      ORDER BY ai_keys.updated_at DESC
+      LIMIT 1
+    `,
     args: [provider],
   });
 
@@ -562,6 +605,70 @@ export async function getAiKeyEncrypted(client: Client, keyId: string) {
   });
 
   return result.rows[0]?.encrypted_key ? String(result.rows[0].encrypted_key) : null;
+}
+
+export async function recordAiKeyRuntimeStatus(
+  client: Client,
+  input: {
+    keyId: string;
+    lastFailureAt?: string | null;
+    lastFailureCode?: string | null;
+    lastFailureReason?: string | null;
+    lastQuotaExhaustedAt?: string | null;
+    lastSuccessAt?: string | null;
+    lastUsedAt?: string | null;
+    status: string;
+  },
+) {
+  const existing = await client.execute({
+    sql: "SELECT ai_key_id FROM ai_key_runtime_status WHERE ai_key_id = ?",
+    args: [input.keyId],
+  });
+
+  const updatedAt = nowIso();
+
+  if (existing.rows[0]) {
+    await client.execute({
+      sql: `
+        UPDATE ai_key_runtime_status
+        SET status = ?, last_used_at = ?, last_success_at = ?, last_failure_at = ?,
+            last_failure_code = ?, last_failure_reason = ?, last_quota_exhausted_at = ?, updated_at = ?
+        WHERE ai_key_id = ?
+      `,
+      args: [
+        input.status,
+        input.lastUsedAt ?? null,
+        input.lastSuccessAt ?? null,
+        input.lastFailureAt ?? null,
+        input.lastFailureCode ?? null,
+        input.lastFailureReason ?? null,
+        input.lastQuotaExhaustedAt ?? null,
+        updatedAt,
+        input.keyId,
+      ],
+    });
+    return;
+  }
+
+  await client.execute({
+    sql: `
+      INSERT INTO ai_key_runtime_status (
+        ai_key_id, status, last_used_at, last_success_at, last_failure_at,
+        last_failure_code, last_failure_reason, last_quota_exhausted_at, updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `,
+    args: [
+      input.keyId,
+      input.status,
+      input.lastUsedAt ?? null,
+      input.lastSuccessAt ?? null,
+      input.lastFailureAt ?? null,
+      input.lastFailureCode ?? null,
+      input.lastFailureReason ?? null,
+      input.lastQuotaExhaustedAt ?? null,
+      updatedAt,
+    ],
+  });
 }
 
 export async function upsertAiKey(client: Client, input: UpsertAiKeyInput) {
