@@ -83,6 +83,14 @@ export interface WebsitePublishResult {
   };
 }
 
+export interface DailyBriefGenerationResult {
+  dateKey: string;
+  dateLabel: string;
+  draftId?: string;
+  message?: string;
+  status: "generated" | "skipped" | "failed";
+}
+
 export interface DraftRecord {
   createdAt: string;
   createdBy: string | null;
@@ -435,6 +443,26 @@ export async function saveAiKey(
     body: JSON.stringify(input),
   });
   return data.key;
+}
+
+export async function generateDailyBrief(
+  payload?: {
+    force?: boolean;
+    requestedBy?: string | null;
+    timezone?: string | null;
+  },
+): Promise<DailyBriefGenerationResult> {
+  return requestJson<DailyBriefGenerationResult>("/daily-brief/generate", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      force: payload?.force ?? false,
+      requestedBy: payload?.requestedBy ?? null,
+      timezone: payload?.timezone ?? null,
+    }),
+  });
 }
 
 export async function publishDraftToSocialAccounts(draftId: string, socialAccountIds: string[]): Promise<DraftPublishResult> {

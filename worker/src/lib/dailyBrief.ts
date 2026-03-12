@@ -2,7 +2,14 @@ import type { Client } from "@libsql/client";
 import { createDbClient, type Env } from "./db";
 import { persistDraftArtifacts } from "./draftStorage";
 import { listKnowledgeBriefs } from "./knowledgeRepository";
-import { createDraft, getDraftBySubjectTypeAndReviewStage, getAiKeyEncrypted, getDefaultAiKey } from "./repository";
+import {
+  createDraft,
+  createDraftVersion,
+  getAiKeyEncrypted,
+  getDefaultAiKey,
+  getDraftBySubjectTypeAndReviewStage,
+  updateDraft,
+} from "./repository";
 import { decryptSecret } from "./tokenCrypto";
 
 interface DailyBriefResult {
@@ -20,7 +27,7 @@ interface DailyBriefOptions {
 }
 
 const DEFAULT_TIMEZONE = "Asia/Kolkata";
-const DEFAULT_MODEL = "gemini-2.0-flash";
+const DEFAULT_MODEL = "gemini-2.5-flash";
 
 function nowIso() {
   return new Date().toISOString();
@@ -213,7 +220,7 @@ export async function generateDailyBrief(
 
   const draftId = `draft_daily_${dateKey.replace(/-/g, "")}`;
   const versionId = `version_daily_${dateKey.replace(/-/g, "")}_${crypto.randomUUID().replace(/-/g, "")}`;
-  const versionNo = 1;
+  const versionNo = existing ? existing.latestVersionNo + 1 : 1;
 
   const artifacts = await persistDraftArtifacts(env, {
     analysis: { type: "daily-brief", generatedAt: nowIso(), promptVersion: "v1" },
@@ -231,43 +238,74 @@ export async function generateDailyBrief(
     video: null,
   });
 
-  const draft = await createDraft(client, {
-    createdBy: options?.requestedBy ?? "system:daily-brief",
-    draftId,
-    reviewStage: dateKey,
-    seoDescription: generated.seo_description ?? null,
-    seoTitle: generated.seo_title ?? subjectTitle,
-    sourcePayload: {
-      dateKey,
-      dateLabel,
-      type: "daily-brief",
-      timezone: timeZone,
-    },
-    status: "generated",
-    subjectTitle,
-    subjectType,
-    version: {
-      analysis: { type: "daily-brief", generatedAt: nowIso() },
-      analysisObjectKey: artifacts.analysisObjectKey,
-      blogMarkdown: generated.blog_markdown,
-      createdBy: options?.requestedBy ?? "system:daily-brief",
-      id: versionId,
-      markdownObjectKey: artifacts.markdownObjectKey,
-      socials: generated.socials ?? null,
-      socialsObjectKey: artifacts.socialsObjectKey,
-      sourcePayload: {
-        dateKey,
-        dateLabel,
-        type: "daily-brief",
-        timezone: timeZone,
-      },
-      sourcePayloadObjectKey: artifacts.sourcePayloadObjectKey,
-      storageBackend: artifacts.storageBackend,
-      versionNo,
-      video: null,
-      videoObjectKey: artifacts.videoObjectKey,
-    },
-  });
+  const draft = existing
+    ? await (async () => {
+        await updateDraft(client, existing.id, {
+          reviewStage: dateKey,
+          seoDescription: generated.seo_description ?? null,
+          seoTitle: generated.seo_title ?? subjectTitle,
+          status: "editing",
+          subjectTitle,
+        });
+        return createDraftVersion(client, existing.id, {
+          analysis: { type: "daily-brief", generatedAt: nowIso(), refreshed: true },
+          analysisObjectKey: artifacts.analysisObjectKey,
+          blogMarkdown: generated.blog_markdown,
+          createdBy: options?.requestedBy ?? "system:daily-brief",
+          id: versionId,
+          markdownObjectKey: artifacts.markdownObjectKey,
+          socials: generated.socials ?? null,
+          socialsObjectKey: artifacts.socialsObjectKey,
+          sourcePayload: {
+            dateKey,
+            dateLabel,
+            type: "daily-brief",
+            timezone: timeZone,
+          },
+          sourcePayloadObjectKey: artifacts.sourcePayloadObjectKey,
+          storageBackend: artifacts.storageBackend,
+          versionNo,
+          video: null,
+          videoObjectKey: artifacts.videoObjectKey,
+        });
+      })()
+    : await createDraft(client, {
+        createdBy: options?.requestedBy ?? "system:daily-brief",
+        draftId,
+        reviewStage: dateKey,
+        seoDescription: generated.seo_description ?? null,
+        seoTitle: generated.seo_title ?? subjectTitle,
+        sourcePayload: {
+          dateKey,
+          dateLabel,
+          type: "daily-brief",
+          timezone: timeZone,
+        },
+        status: "generated",
+        subjectTitle,
+        subjectType,
+        version: {
+          analysis: { type: "daily-brief", generatedAt: nowIso() },
+          analysisObjectKey: artifacts.analysisObjectKey,
+          blogMarkdown: generated.blog_markdown,
+          createdBy: options?.requestedBy ?? "system:daily-brief",
+          id: versionId,
+          markdownObjectKey: artifacts.markdownObjectKey,
+          socials: generated.socials ?? null,
+          socialsObjectKey: artifacts.socialsObjectKey,
+          sourcePayload: {
+            dateKey,
+            dateLabel,
+            type: "daily-brief",
+            timezone: timeZone,
+          },
+          sourcePayloadObjectKey: artifacts.sourcePayloadObjectKey,
+          storageBackend: artifacts.storageBackend,
+          versionNo,
+          video: null,
+          videoObjectKey: artifacts.videoObjectKey,
+        },
+      });
 
   if (!draft) {
     return {

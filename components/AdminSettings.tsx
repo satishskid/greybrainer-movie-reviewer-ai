@@ -13,14 +13,21 @@ import { OmnichannelDraftsPanel } from './OmnichannelDraftsPanel';
 
 interface AdminSettingsProps {
   isOpen: boolean;
+  initialTab?: 'keys' | 'admin' | 'omnichannel' | 'debug' | 'health' | 'scoreboard';
   onClose: () => void;
   currentUser?: any;
 }
 
-export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, currentUser }) => {
+export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab = 'keys', onClose, currentUser }) => {
   const [activeTab, setActiveTab] = useState<'keys' | 'admin' | 'omnichannel' | 'debug' | 'health' | 'scoreboard'>('keys');
   const [systemHealth, setSystemHealth] = useState<any>(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+
+  React.useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab, isOpen]);
 
   const checkSystemHealth = async () => {
     setIsCheckingHealth(true);

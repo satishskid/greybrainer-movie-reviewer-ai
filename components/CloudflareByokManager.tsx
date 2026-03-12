@@ -72,6 +72,9 @@ export const CloudflareByokManager: React.FC<CloudflareByokManagerProps> = ({ ow
             placeholder="gemini-2.5-flash"
             className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100"
           />
+          <div className="mt-2 text-[11px] text-slate-500">
+            Recommended: <span className="text-slate-300">gemini-2.5-flash</span>. You can also enter a newer preview model if your key supports it.
+          </div>
         </label>
         <label className="text-sm text-slate-300">
           <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">Daily Brief Gemini BYOK</div>

@@ -10,16 +10,25 @@ import { DownloadIcon } from './icons/DownloadIcon';
 import { ReadMoreLess } from './ReadMoreLess'; // For potentially long detailed reports
 import GeminiCanvasExport from './GeminiCanvasExport';
 import { FileText, Newspaper } from 'lucide-react';
+import { DailyBriefStudio } from './DailyBriefStudio';
 
 interface GreybrainerInsightsProps {
+  currentUserEmail?: string | null;
   logTokenUsage?: LogTokenUsageFn;
+  onOpenPublishingWorkspace?: () => void;
 }
 
+type WorkflowMode = 'daily-adaptive' | 'deep-research';
 type InsightMode = 'on-demand' | 'movie-anchored' | 'research-trending' | 'grey-verdict';
 type AnalysisLayer = 'story' | 'orchestration' | 'performance' | 'morphokinetics' | 'random';
 
-export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTokenUsage }) => {
-  // Mode selection - Default to Research & Trending
+export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
+  currentUserEmail,
+  logTokenUsage,
+  onOpenPublishingWorkspace,
+}) => {
+  const [workflowMode, setWorkflowMode] = useState<WorkflowMode>('daily-adaptive');
+  // Deep research mode selection
   const [insightMode, setInsightMode] = useState<InsightMode>('research-trending');
   
   // On-demand insight state (existing)
@@ -351,55 +360,99 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
       
       <div className="text-slate-300 text-sm space-y-2 gb-content-area">
         <p>
-          Explore patterns and evolution in Indian cinema and OTT content across Story, Orchestration, Performance, and Morphokinetics layers.
+          Greybrainer now runs two clear workflows: one adaptive daily editorial draft that is generated automatically,
+          and one human-initiated deep research studio for movie-led analysis and publication development.
         </p>
-        
-        {/* Mode Tabs */}
-        <div className="flex gap-2 my-4 border-b border-slate-700 pb-2">
+
+        <div className="my-5 grid gap-3 md:grid-cols-2">
           <button
-            onClick={() => setInsightMode('on-demand')}
-            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
-              insightMode === 'on-demand'
-                ? 'bg-amber-500 text-black'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            onClick={() => setWorkflowMode('daily-adaptive')}
+            className={`rounded-2xl border px-5 py-4 text-left transition ${
+              workflowMode === 'daily-adaptive'
+                ? 'border-sky-400/60 bg-sky-500/10 shadow-lg shadow-sky-950/30'
+                : 'border-slate-700 bg-slate-900/60 hover:border-slate-500'
             }`}
           >
-            On-Demand Insight
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-300">Flow 1</div>
+            <div className="mt-2 text-lg font-semibold text-slate-100">Daily Adaptive Brief</div>
+            <div className="mt-2 text-sm leading-6 text-slate-400">
+              One automated newsletter-style draft per day, reviewed by editor, then published to website and social.
+            </div>
           </button>
           <button
-            onClick={() => setInsightMode('movie-anchored')}
-            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
-              insightMode === 'movie-anchored'
-                ? 'bg-amber-500 text-black'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            onClick={() => setWorkflowMode('deep-research')}
+            className={`rounded-2xl border px-5 py-4 text-left transition ${
+              workflowMode === 'deep-research'
+                ? 'border-amber-400/60 bg-amber-500/10 shadow-lg shadow-amber-950/30'
+                : 'border-slate-700 bg-slate-900/60 hover:border-slate-500'
             }`}
           >
-            🎬 Movie-Anchored Insight
-          </button>
-          <button
-            onClick={() => setInsightMode('research-trending')}
-            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
-              insightMode === 'research-trending'
-                ? 'bg-amber-500 text-black'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            📊 Research & Trending
-          </button>
-          <button
-            onClick={() => setInsightMode('grey-verdict')}
-            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
-              insightMode === 'grey-verdict'
-                ? 'bg-purple-500 text-white'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            ⚖️ Grey Verdict
+            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">Flow 2</div>
+            <div className="mt-2 text-lg font-semibold text-slate-100">Deep Research Studio</div>
+            <div className="mt-2 text-sm leading-6 text-slate-400">
+              Human-driven movie and culture analysis. The editor enters a title, angle, or prompt, generates output,
+              refines it, and then publishes.
+            </div>
           </button>
         </div>
 
-        {/* On-Demand Mode (Existing) */}
-        {insightMode === 'on-demand' && (
+        {workflowMode === 'daily-adaptive' && (
+          <DailyBriefStudio
+            currentUserEmail={currentUserEmail}
+            onOpenPublishingWorkspace={onOpenPublishingWorkspace}
+          />
+        )}
+
+        {workflowMode === 'deep-research' && (
+          <>
+            <div className="mb-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-100">
+              Everything below is editor-initiated. Nothing here runs on an automatic schedule.
+            </div>
+
+            <div className="flex flex-wrap gap-2 my-4 border-b border-slate-700 pb-2">
+              <button
+                onClick={() => setInsightMode('on-demand')}
+                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+                  insightMode === 'on-demand'
+                    ? 'bg-amber-500 text-black'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                Rapid Insight
+              </button>
+              <button
+                onClick={() => setInsightMode('movie-anchored')}
+                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+                  insightMode === 'movie-anchored'
+                    ? 'bg-amber-500 text-black'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                🎬 Movie-Anchored Insight
+              </button>
+              <button
+                onClick={() => setInsightMode('research-trending')}
+                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+                  insightMode === 'research-trending'
+                    ? 'bg-amber-500 text-black'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                📊 Research & Trending
+              </button>
+              <button
+                onClick={() => setInsightMode('grey-verdict')}
+                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+                  insightMode === 'grey-verdict'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                ⚖️ Grey Verdict
+              </button>
+            </div>
+
+            {insightMode === 'on-demand' && (
           <>
             <div className="mt-3 mb-3">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-1">
@@ -938,9 +991,12 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
           </div>
         )}
 
-        <p className="mt-4 pt-4 border-t border-slate-700">
-          Stay tuned for more curated research and articles. Learn more about our <a href="mailto:consultancy@greybrainer.ai" className="text-indigo-400 hover:underline">consultancy services</a>.
-        </p>
+            <p className="mt-4 pt-4 border-t border-slate-700">
+              These research outputs can now stay inside Greybrainer instead of being copied around manually. Drafts,
+              versions, and publication state can move through the Cloudflare workflow after the editor is satisfied.
+            </p>
+          </>
+        )}
       </div>
     </div>
   );

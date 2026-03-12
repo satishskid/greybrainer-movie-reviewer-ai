@@ -68,6 +68,7 @@ const App: React.FC = () => {
   const [tokenBudgetConfig, setTokenBudgetConfig] = useState<TokenBudgetConfig>(INITIAL_TOKEN_BUDGET_CONFIG);
   const [showTokenDashboard, setShowTokenDashboard] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [settingsInitialTab, setSettingsInitialTab] = useState<'keys' | 'admin' | 'omnichannel' | 'debug' | 'health' | 'scoreboard'>('keys');
 
   const [morphokineticsAnalysis, setMorphokineticsAnalysis] = useState<MorphokineticsAnalysis | null>(null);
   const [isAnalyzingMorphokinetics, setIsAnalyzingMorphokinetics] = useState<boolean>(false);
@@ -430,7 +431,14 @@ const App: React.FC = () => {
 
               {morphokineticsAnalysis && !isAnalyzingMorphokinetics && (<MorphokineticsDisplay analysis={morphokineticsAnalysis} />)}
 
-              <GreybrainerInsights logTokenUsage={logTokenUsage} />
+              <GreybrainerInsights
+                currentUserEmail={authUser?.email}
+                logTokenUsage={logTokenUsage}
+                onOpenPublishingWorkspace={() => {
+                  setSettingsInitialTab('omnichannel');
+                  setShowSettings(true);
+                }}
+              />
               <GreybrainerComparison logTokenUsage={logTokenUsage} />
               {/* Monthly Scoreboard temporarily disabled due to network issues */}
               {/* <MonthlyMagicScoreboard 
@@ -457,6 +465,7 @@ const App: React.FC = () => {
           {/* Admin Settings Modal */}
           <AdminSettings
             isOpen={showSettings}
+            initialTab={settingsInitialTab}
             onClose={() => setShowSettings(false)}
             currentUser={authUser}
           />

@@ -21,6 +21,21 @@ Backend API (Cloudflare Worker):
 - Daily Lens brief is auto-generated once per day.
 - All other analysis remains manual, editor-driven.
 
+## Product Flows
+
+Greybrainer now exposes two explicit editorial workflows:
+
+1. Daily Adaptive Brief
+- One scheduled draft per day.
+- Uses the Lens newsletter format and `[[LENS_NARRATIVE: ...]]` tag.
+- Draft is reviewed by editor in the Omnichannel workspace before publishing.
+
+2. Deep Research Studio
+- Human-initiated only.
+- Editor enters a movie title, angle, or research prompt.
+- Generates movie-anchored insight, research/trending output, or Grey Verdict editorial.
+- Output can then be refined and published from the same platform.
+
 Cron schedule (UTC):
 - 30 3 * * * (09:00 IST)
 
@@ -72,7 +87,7 @@ Worker secrets:
 Worker vars (already in wrangler.jsonc):
 - DAILY_BRIEF_ENABLED=true
 - DAILY_BRIEF_TIMEZONE=Asia/Kolkata
-- GEMINI_MODEL=gemini-2.0-flash (default fallback)
+- GEMINI_MODEL=gemini-2.5-flash (default fallback)
 - WEBSITE_BASE_URL=https://greybrainer-dev.pages.dev/lens
 
 ## Firebase Auth
