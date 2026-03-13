@@ -4,6 +4,59 @@ import type { DraftRecord } from '../services/omnichannelDraftService';
 
 type StatusFilter = 'all' | 'generated' | 'approved' | 'published';
 
+/* ── Editor guide banner (collapsible) ── */
+function EditorGuide() {
+  const [open, setOpen] = useState(() => {
+    try { return localStorage.getItem('gb_editor_guide_dismissed') !== '1'; } catch { return true; }
+  });
+  const dismiss = () => { setOpen(false); try { localStorage.setItem('gb_editor_guide_dismissed', '1'); } catch {} };
+  if (!open) return (
+    <button onClick={() => setOpen(true)} style={{ background: 'none', border: 'none', color: '#38bdf8', fontSize: '0.75rem', cursor: 'pointer', padding: '0 0 12px', fontFamily: 'inherit' }}>
+      📖 Show Editor Guide
+    </button>
+  );
+  return (
+    <div style={{ background: '#0c1a2e', border: '1px solid #1e3a5f', borderRadius: 16, padding: '20px 24px', marginBottom: 20, position: 'relative' }}>
+      <button onClick={dismiss} style={{ position: 'absolute', top: 12, right: 16, background: 'none', border: 'none', color: '#64748b', fontSize: '1rem', cursor: 'pointer' }} title="Dismiss">✕</button>
+      <div style={{ fontSize: '0.65rem', fontWeight: 700, letterSpacing: '0.2em', textTransform: 'uppercase' as const, color: '#38bdf8', marginBottom: 8 }}>Editor Workflow Guide</div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+        <div style={{ background: '#111827', borderRadius: 12, padding: '14px 16px' }}>
+          <div style={{ fontSize: '0.9rem', marginBottom: 4 }}>① Review Draft</div>
+          <p style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+            Click any draft below to open the full editor. Read through the AI-generated content, edit the markdown, and refine the title.
+          </p>
+        </div>
+        <div style={{ background: '#111827', borderRadius: 12, padding: '14px 16px' }}>
+          <div style={{ fontSize: '0.9rem', marginBottom: 4 }}>② Upload Images</div>
+          <p style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+            <strong style={{ color: '#fbbf24' }}>Hero image is required.</strong> This is the main banner shown on the article page and homepage carousel. Upload in the Images section of the sidebar. Poster and thumbnail are optional.
+          </p>
+        </div>
+        <div style={{ background: '#111827', borderRadius: 12, padding: '14px 16px' }}>
+          <div style={{ fontSize: '0.9rem', marginBottom: 4 }}>③ Save & Approve</div>
+          <p style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+            Click <strong>Save Version</strong> to persist edits + images, then <strong>Approve</strong> to mark ready. Or use the one-click <strong>Approve & Publish</strong> button here.
+          </p>
+        </div>
+        <div style={{ background: '#111827', borderRadius: 12, padding: '14px 16px' }}>
+          <div style={{ fontSize: '0.9rem', marginBottom: 4 }}>④ Publish to Lens</div>
+          <p style={{ fontSize: '0.78rem', color: '#94a3b8', lineHeight: 1.5, margin: 0 }}>
+            Hit <strong>Publish Web</strong> in the editor. The article goes live on cinema.greybrain.ai and the site auto-rebuilds within 1-2 minutes.
+          </p>
+        </div>
+      </div>
+      <div style={{ marginTop: 14, padding: '10px 14px', background: '#1c1917', borderRadius: 10, border: '1px solid #92400e44' }}>
+        <div style={{ fontSize: '0.72rem', fontWeight: 700, color: '#fbbf24', marginBottom: 4 }}>📸 Image Quick Reference</div>
+        <div style={{ fontSize: '0.75rem', color: '#a8a29e', lineHeight: 1.6 }}>
+          <strong style={{ color: '#e2e8f0' }}>Hero</strong> — Full-width banner on article page + homepage carousel. Landscape, min 1200×630px. <strong style={{ color: '#ef4444' }}>Required before publish.</strong><br />
+          <strong style={{ color: '#e2e8f0' }}>Poster</strong> — Vertical movie poster for the sidebar. Portrait ~600×900px. Optional, falls back to hero.<br />
+          <strong style={{ color: '#e2e8f0' }}>Thumbnail</strong> — Small card image for listings and social cards. Square or 16:9 ~400×225px. Optional, falls back to poster → hero.
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function statusBadge(status: string) {
   const colors: Record<string, string> = {
     generated: '#eab308',
@@ -148,6 +201,8 @@ export const DraftsListApp: React.FC = () => {
           Content pipeline — review AI output, add images, and publish to Lens.
         </p>
       </header>
+
+      <EditorGuide />
 
       {message && (
         <div style={{ padding: '0.75rem 1rem', background: '#22c55e18', border: '1px solid #22c55e44', borderRadius: 8, marginBottom: '1rem', color: '#22c55e', fontSize: '0.85rem' }}>

@@ -687,14 +687,20 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
             badge={
               [heroImageUrl, posterImageUrl, thumbnailImageUrl].filter(Boolean).length > 0
                 ? <span className="rounded bg-emerald-500/10 px-1.5 py-0.5 text-[9px] text-emerald-300">{[heroImageUrl, posterImageUrl, thumbnailImageUrl].filter(Boolean).length}/3</span>
-                : <span className="rounded bg-slate-700/60 px-1.5 py-0.5 text-[9px] text-slate-400">0/3</span>
+                : <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[9px] text-amber-300 animate-pulse">⚠ Required</span>
             }
           >
             <div className="space-y-3">
+              {!heroImageUrl && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-950/20 px-3 py-2.5 text-[11px] leading-4 text-amber-200">
+                  <strong>⚠ Hero image required before publishing.</strong><br />
+                  Upload a landscape image (min 1200×630px) — this is shown as the full-width banner on the article page and in the homepage carousel.
+                </div>
+              )}
               {([
-                { key: 'hero', label: 'Hero', value: heroImageUrl, setter: setHeroImageUrl },
-                { key: 'poster', label: 'Poster', value: posterImageUrl, setter: setPosterImageUrl },
-                { key: 'thumbnail', label: 'Thumb', value: thumbnailImageUrl, setter: setThumbnailImageUrl },
+                { key: 'hero', label: 'Hero — Banner (1200×630px, landscape)', value: heroImageUrl, setter: setHeroImageUrl },
+                { key: 'poster', label: 'Poster — Sidebar (600×900px, portrait)', value: posterImageUrl, setter: setPosterImageUrl },
+                { key: 'thumbnail', label: 'Thumb — Cards & Social (400×225px)', value: thumbnailImageUrl, setter: setThumbnailImageUrl },
               ] as const).map((item) => (
                 <div key={item.key} className="rounded-xl border border-slate-800 bg-slate-900/40 p-3">
                   <div className="flex items-center justify-between">
@@ -731,7 +737,24 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
                   )}
                 </div>
               ))}
-              <p className="text-[10px] text-slate-500">Save a new version to persist image changes.</p>
+              <p className="text-[10px] text-slate-500">Click <strong className="text-slate-400">Save Version</strong> after uploading images to persist them. Poster & Thumbnail fall back to Hero if not set.</p>
+              <div className="mt-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2.5">
+                <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">Publish Checklist</div>
+                <div className="space-y-1">
+                  <div className={`flex items-center gap-1.5 text-[11px] ${heroImageUrl ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    <span>{heroImageUrl ? '✓' : '○'}</span> Hero image uploaded
+                  </div>
+                  <div className={`flex items-center gap-1.5 text-[11px] ${seoTitle ? 'text-emerald-300' : 'text-slate-500'}`}>
+                    <span>{seoTitle ? '✓' : '○'}</span> SEO title set
+                  </div>
+                  <div className={`flex items-center gap-1.5 text-[11px] ${seoDescription ? 'text-emerald-300' : 'text-slate-500'}`}>
+                    <span>{seoDescription ? '✓' : '○'}</span> SEO description set
+                  </div>
+                  <div className={`flex items-center gap-1.5 text-[11px] ${markdown.length > 200 ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    <span>{markdown.length > 200 ? '✓' : '○'}</span> Content reviewed ({markdown.length.toLocaleString()} chars)
+                  </div>
+                </div>
+              </div>
             </div>
           </SidebarSection>
 
