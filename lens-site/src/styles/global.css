@@ -1923,6 +1923,24 @@ h3 {
   background: #c8e6c9;
 }
 
+.social-follow-btn--medium {
+  background: #f5f5f5;
+  color: #242424;
+}
+
+.social-follow-btn--medium:hover {
+  background: #e8e8e8;
+}
+
+.social-follow-btn--linkedin {
+  background: #e8f0fe;
+  color: #0a66c2;
+}
+
+.social-follow-btn--linkedin:hover {
+  background: #d0e1fc;
+}
+
 /* Dark mode overrides for social buttons */
 @media (prefers-color-scheme: dark) {
   .social-follow-btn--telegram {
@@ -1938,6 +1956,20 @@ h3 {
   }
   .social-follow-btn--whatsapp:hover {
     background: rgba(37, 211, 102, 0.25);
+  }
+  .social-follow-btn--medium {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ccc;
+  }
+  .social-follow-btn--medium:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+  .social-follow-btn--linkedin {
+    background: rgba(10, 102, 194, 0.15);
+    color: #70b5f9;
+  }
+  .social-follow-btn--linkedin:hover {
+    background: rgba(10, 102, 194, 0.25);
   }
 }
 
