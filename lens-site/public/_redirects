@@ -1,0 +1,2 @@
+# Redirect old lens-site paths if anyone has bookmarks
+/lens/*  /:splat  301

@@ -14,14 +14,17 @@ export interface DraftVersionInput {
   analysisObjectKey?: string | null;
   blogMarkdown: string;
   id?: string;
+  keywordsJson?: string | null;
   markdownObjectKey?: string | null;
   createdBy?: string | null;
   editorNotes?: string | null;
+  readingMetadataJson?: string | null;
   socials?: unknown;
   socialsObjectKey?: string | null;
   sourcePayload: unknown;
   sourcePayloadObjectKey?: string | null;
   storageBackend?: string;
+  summaryHook?: string | null;
   video?: unknown;
   videoObjectKey?: string | null;
   versionNo?: number;
@@ -30,6 +33,8 @@ export interface DraftVersionInput {
 export interface CreateDraftInput {
   createdBy?: string | null;
   draftId?: string;
+  heroPriority?: number;
+  isHeroCandidate?: boolean;
   reviewStage?: string | null;
   seoDescription?: string | null;
   seoTitle?: string | null;
@@ -41,6 +46,8 @@ export interface CreateDraftInput {
 }
 
 export interface UpdateDraftInput {
+  heroPriority?: number;
+  isHeroCandidate?: boolean;
   mediumUrl?: string | null;
   reviewStage?: string | null;
   seoDescription?: string | null;
@@ -149,7 +156,9 @@ function mapDraftRow(row: Row) {
     createdAt: String(rowValue(row, "created_at")),
     createdBy: rowValue(row, "created_by") ? String(rowValue(row, "created_by")) : null,
     currentVersionId: rowValue(row, "current_version_id") ? String(rowValue(row, "current_version_id")) : null,
+    heroPriority: Number(rowValue(row, "hero_priority") ?? 0),
     id: String(rowValue(row, "id")),
+    isHeroCandidate: Number(rowValue(row, "is_hero_candidate") ?? 0) === 1,
     latestVersionNo: Number(rowValue(row, "latest_version_no") ?? 0),
     mediumUrl: rowValue(row, "medium_url") ? String(rowValue(row, "medium_url")) : null,
     reviewStage: rowValue(row, "review_stage") ? String(rowValue(row, "review_stage")) : null,
@@ -173,7 +182,9 @@ function mapVersionRow(row: Row) {
     draftId: String(rowValue(row, "draft_id")),
     editorNotes: rowValue(row, "editor_notes") ? String(rowValue(row, "editor_notes")) : null,
     id: String(rowValue(row, "id")),
+    keywordsJson: rowValue(row, "keywords_json") ? String(rowValue(row, "keywords_json")) : null,
     markdownObjectKey: rowValue(row, "markdown_object_key") ? String(rowValue(row, "markdown_object_key")) : null,
+    readingMetadataJson: rowValue(row, "reading_metadata_json") ? String(rowValue(row, "reading_metadata_json")) : null,
     socials: parseJson(rowValue(row, "socials_json") ? String(rowValue(row, "socials_json")) : null),
     socialsObjectKey: rowValue(row, "socials_object_key") ? String(rowValue(row, "socials_object_key")) : null,
     sourcePayload: parseJson(rowValue(row, "source_payload_json") ? String(rowValue(row, "source_payload_json")) : null),
@@ -181,6 +192,7 @@ function mapVersionRow(row: Row) {
       ? String(rowValue(row, "source_payload_object_key"))
       : null,
     storageBackend: rowValue(row, "storage_backend") ? String(rowValue(row, "storage_backend")) : "turso",
+    summaryHook: rowValue(row, "summary_hook") ? String(rowValue(row, "summary_hook")) : null,
     versionNo: Number(rowValue(row, "version_no") ?? 0),
     video: parseJson(rowValue(row, "video_json") ? String(rowValue(row, "video_json")) : null),
     videoObjectKey: rowValue(row, "video_object_key") ? String(rowValue(row, "video_object_key")) : null,
@@ -346,8 +358,8 @@ export async function createDraft(client: Client, input: CreateDraftInput) {
           INSERT INTO drafts (
             id, subject_type, subject_title, review_stage, status, created_by,
             current_version_id, latest_version_no, seo_title, seo_description,
-            created_at, updated_at
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            is_hero_candidate, hero_priority, created_at, updated_at
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         args: [
           draftId,
@@ -360,6 +372,8 @@ export async function createDraft(client: Client, input: CreateDraftInput) {
           1,
           input.seoTitle ?? null,
           input.seoDescription ?? null,
+          input.isHeroCandidate ? 1 : 0,
+          input.heroPriority ?? 0,
           createdAt,
           createdAt,
         ],
@@ -370,8 +384,9 @@ export async function createDraft(client: Client, input: CreateDraftInput) {
             id, draft_id, version_no, source_payload_json, analysis_json,
             blog_markdown, socials_json, video_json, editor_notes,
             created_by, created_at, storage_backend, source_payload_object_key,
-            analysis_object_key, markdown_object_key, socials_object_key, video_object_key
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            analysis_object_key, markdown_object_key, socials_object_key, video_object_key,
+            keywords_json, summary_hook, reading_metadata_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         args: [
           versionId,
@@ -391,6 +406,9 @@ export async function createDraft(client: Client, input: CreateDraftInput) {
           input.version.markdownObjectKey ?? null,
           input.version.socialsObjectKey ?? null,
           input.version.videoObjectKey ?? null,
+          input.version.keywordsJson ?? null,
+          input.version.summaryHook ?? null,
+          input.version.readingMetadataJson ?? null,
         ],
       },
     ],
@@ -458,7 +476,8 @@ export async function updateDraft(client: Client, draftId: string, input: Update
     sql: `
       UPDATE drafts
       SET subject_title = ?, review_stage = ?, status = ?, seo_title = ?,
-          seo_description = ?, website_url = ?, medium_url = ?, updated_at = ?
+          seo_description = ?, website_url = ?, medium_url = ?,
+          is_hero_candidate = ?, hero_priority = ?, updated_at = ?
       WHERE id = ?
     `,
     args: [
@@ -469,6 +488,8 @@ export async function updateDraft(client: Client, draftId: string, input: Update
       input.seoDescription ?? existing.seoDescription,
       input.websiteUrl ?? existing.websiteUrl,
       input.mediumUrl ?? existing.mediumUrl,
+      input.isHeroCandidate !== undefined ? (input.isHeroCandidate ? 1 : 0) : (existing as any).isHeroCandidate ?? 0,
+      input.heroPriority ?? (existing as any).heroPriority ?? 0,
       updatedAt,
       draftId,
     ],
@@ -495,8 +516,9 @@ export async function createDraftVersion(client: Client, draftId: string, input:
             id, draft_id, version_no, source_payload_json, analysis_json,
             blog_markdown, socials_json, video_json, editor_notes,
             created_by, created_at, storage_backend, source_payload_object_key,
-            analysis_object_key, markdown_object_key, socials_object_key, video_object_key
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            analysis_object_key, markdown_object_key, socials_object_key, video_object_key,
+            keywords_json, summary_hook, reading_metadata_json
+          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `,
         args: [
           versionId,
@@ -516,6 +538,9 @@ export async function createDraftVersion(client: Client, draftId: string, input:
           input.markdownObjectKey ?? null,
           input.socialsObjectKey ?? null,
           input.videoObjectKey ?? null,
+          input.keywordsJson ?? null,
+          input.summaryHook ?? null,
+          input.readingMetadataJson ?? null,
         ],
       },
       {

@@ -6,13 +6,16 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lens:dev": "astro dev --root lens-site",
+    "lens:dev": "astro dev --root lens-site --port 4321",
     "lens:build": "astro build --root lens-site",
     "lens:preview": "astro preview --root lens-site",
+    "lens:deploy": "npm run lens:build && wrangler pages deploy lens-site/dist --project-name cinema-greybrain --branch main",
+    "lens:deploy:preview": "npm run lens:build && wrangler pages deploy lens-site/dist --project-name cinema-greybrain --branch preview",
     "lint": "tsc && tsc -p tsconfig.worker.json",
     "preview": "vite preview",
     "cf:dev": "wrangler dev",
     "cf:deploy": "wrangler deploy",
+    "cf:pages:deploy": "wrangler pages deploy dist --project-name greybrainer-dev",
     "cf:typegen": "wrangler types",
     "db:migrate:turso": "node scripts/migrate-turso.mjs",
     "db:migrate:social-channels": "node scripts/migrate-sql.mjs db/social_channels_phase2.sql",
@@ -22,7 +25,9 @@
     "db:migrate:knowledge-backfill": "node scripts/migrate-sql.mjs db/knowledge_backfill_phase6.sql",
     "db:migrate:draft-r2": "node scripts/migrate-sql.mjs db/draft_r2_phase7.sql",
     "db:migrate:ai-keys": "node scripts/migrate-sql.mjs db/ai_keys_phase8.sql",
-    "db:migrate:ai-key-status": "node scripts/migrate-sql.mjs db/ai_key_status_phase9.sql"
+    "db:migrate:ai-key-status": "node scripts/migrate-sql.mjs db/ai_key_status_phase9.sql",
+    "content:backfill-images": "node scripts/backfill_images.mjs",
+    "db:migrate:context": "node scripts/migrate-sql.mjs db/context_mode_phase10.sql"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.1",

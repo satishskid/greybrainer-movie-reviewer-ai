@@ -4,7 +4,7 @@ import { getLensEntries } from '../../data/manifest';
 
 export async function getStaticPaths() {
   const entries = await getLensEntries();
-  return entries.filter((entry) => entry.contentType === 'review').map((entry) => ({
+  return entries.filter((entry) => entry.contentType === 'study').map((entry) => ({
     params: { slug: entry.slug },
     props: { entry },
   }));

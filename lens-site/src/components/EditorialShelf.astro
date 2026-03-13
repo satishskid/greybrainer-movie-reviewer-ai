@@ -1,8 +1,9 @@
 ---
-import type { LensEditorial } from '../data/editorials';
+import type { LensEntry } from '../data/editorials';
+import { getEntryHref } from '../data/editorials';
 
 interface Props {
-  items: LensEditorial[];
+  items: LensEntry[];
   title?: string;
 }
 
@@ -12,24 +13,36 @@ const { items, title = 'From the Shelf' } = Astro.props;
 <section class="shelf-section shell">
   <div class="section-heading">
     <div>
-      <span class="section-kicker">Editorial Shelf</span>
       <h2>{title}</h2>
     </div>
   </div>
   <div class="shelf-grid">
-    {items.map((item) => (
-      <article class="shelf-card">
-        <div class="shelf-card__meta">
-          <span>{item.category}</span>
-          <span>{item.runTime}</span>
-        </div>
-        <h3><a href={`/reviews/${item.slug}`}>{item.title}</a></h3>
-        <p>{item.dek}</p>
-        <div class="shelf-card__footer">
-          <span>{item.releaseFocus}</span>
-          <a href={`/reviews/${item.slug}`}>Open</a>
-        </div>
-      </article>
-    ))}
+    {items.map((item) => {
+      const showDek = item.dek && item.dek !== item.title;
+      return (
+        <article class="shelf-card">
+          <a
+            class="shelf-thumb"
+            href={getEntryHref(item)}
+            data-smooth-nav
+            style={`--thumb-gradient: ${item.heroGradient};${item.thumbnailImageUrl ? `--thumb-image: url('${item.thumbnailImageUrl}');` : ''}`}
+          >
+            <div class="shelf-thumb__overlay"></div>
+            <div class="shelf-thumb__content">
+              <span class="signal-label">{item.thumbnailEyebrow ?? item.category}</span>
+              <strong>{item.title}</strong>
+              {item.overallScore && <span class="score-highlight">{item.overallScore.toFixed(1)}/10</span>}
+            </div>
+          </a>
+          <div class="shelf-card__meta">
+            {showDek && <p>{item.dek}</p>}
+            <div class="shelf-card__footer">
+              <span>{item.releaseFocus}</span>
+              <span>{item.runTime}</span>
+            </div>
+          </div>
+        </article>
+      );
+    })}
   </div>
 </section>

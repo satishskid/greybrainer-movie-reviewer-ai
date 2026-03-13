@@ -1,54 +1,51 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import SiteHeader from '../components/SiteHeader.astro';
-import HeroFeature from '../components/HeroFeature.astro';
+import HeroCarousel from '../components/HeroCarousel.astro';
 import EditorialShelf from '../components/EditorialShelf.astro';
+import MethodologyPromo from '../components/MethodologyPromo.astro';
 import Footer from '../components/Footer.astro';
-import { editorialShelf, featuredEditorials } from '../data/editorials';
+import { getLensEntries } from '../data/manifest';
 
-const lead = featuredEditorials[0];
-const rest = featuredEditorials.slice(1);
+const entries = await getLensEntries();
+const reviewEntries = entries.filter((entry) => entry.contentType === 'review');
+const briefEntries = entries.filter((entry) => entry.contentType === 'brief');
+const researchEntries = entries.filter((entry) => entry.contentType === 'study')
+  .filter((entry, idx, arr) => arr.findIndex(e => e.slug === entry.slug) === idx);
+
+// Carousel: pick up to 5 recent entries, daily briefs float to top via heroPriority
+const heroPool = [...entries]
+  .sort((a, b) => (b.heroPriority ?? 0) - (a.heroPriority ?? 0))
+  .slice(0, 5);
+const latestBriefs = briefEntries.slice(0, 8);
+const featuredReviews = reviewEntries.slice(0, 9);
+const latestResearch = researchEntries.slice(0, 8);
+
+const indianCinema = entries.filter((entry) => entry.tags.some(tag => tag.toLowerCase().includes('india') || tag.toLowerCase().includes('indian')));
+
+// Deduplicate: collect slugs already shown in the category shelves
+const shownSlugs = new Set([
+  ...featuredReviews.map(e => e.slug),
+  ...latestBriefs.map(e => e.slug),
+  ...latestResearch.map(e => e.slug),
+  ...heroPool.map(e => e.slug),
+]);
+const uniqueIndianCinema = indianCinema.filter(e => !shownSlugs.has(e.slug));
 ---
 
 <BaseLayout
-  title="Greybrainer Lens | Editorial Movie Intelligence"
-  description="A fresh editorial surface for movie review, OTT intelligence, and cultural analysis built for Greybrainer on Cloudflare."
+  title="CineCraft — Cinematic Intelligence by GreyBrain"
+  description="Structured film criticism, daily OTT intelligence, and cultural research. Where AI analysis meets editorial authority. Reviews, trends, and storytelling decoded."
 >
   <SiteHeader />
-  <HeroFeature feature={lead} />
+  {heroPool.length > 0 && <HeroCarousel entries={heroPool} />}
 
-  <section class="shell manifesto-band">
-    <div class="manifesto-copy">
-      <span class="section-kicker">What Lens Is Becoming</span>
-      <h2>Not another review blog. A movie intelligence magazine with newsroom authority and streaming-era pace.</h2>
-      <p>
-        Lens should feel like a hybrid of cultural criticism, audience intelligence, and industry reporting. The writing has to carry
-        the interpretive force of a serious publication while still feeling alive to internet speed, platform politics, and OTT-era
-        emotional behaviour.
-      </p>
-    </div>
-    <div class="manifesto-grid">
-      {editorialShelf.map((item) => (
-        <div class="manifesto-card">
-          <strong>{item.label}</strong>
-          <p>{item.note}</p>
-        </div>
-      ))}
-    </div>
-  </section>
+  <MethodologyPromo />
 
-  <EditorialShelf items={rest} title="Signature Studies" />
-
-  <section class="shell newsroom-strip">
-    <div class="newsroom-card">
-      <span class="section-kicker">Editor Workflow</span>
-      <h2>Daily briefs for momentum. Deep studies for authority.</h2>
-      <p>
-        The public site is meant to publish the best of two systems: a once-a-day adaptive intelligence brief and editor-driven deep
-        research on films, stars, fandom, and screen politics.
-      </p>
-    </div>
-  </section>
+  {featuredReviews.length > 0 && <EditorialShelf items={featuredReviews} title="Reviews" />}
+  {latestBriefs.length > 0 && <EditorialShelf items={latestBriefs} title="Daily Briefs" />}
+  {latestResearch.length > 0 && <EditorialShelf items={latestResearch} title="Research" />}
+  {uniqueIndianCinema.length > 0 && <EditorialShelf items={uniqueIndianCinema.slice(0, 8)} title="Indian Cinema" />}
 
   <Footer />
 </BaseLayout>

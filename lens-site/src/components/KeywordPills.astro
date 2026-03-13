@@ -1,0 +1,66 @@
+---
+interface Props {
+  keywords: string[];
+}
+
+const { keywords } = Astro.props;
+if (!keywords.length) return;
+---
+
+<div class="keyword-pills">
+  <span class="keyword-pills__label">Keywords</span>
+  <div class="keyword-pills__list">
+    {keywords.map((keyword) => (
+      <a class="keyword-pill" href={`/search?q=${encodeURIComponent(keyword)}`}>
+        {keyword}
+      </a>
+    ))}
+  </div>
+</div>
+
+<style>
+  .keyword-pills {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 1rem 0;
+  }
+
+  .keyword-pills__label {
+    font-family: var(--sans);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-right: 0.25rem;
+  }
+
+  .keyword-pills__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+  }
+
+  .keyword-pill {
+    display: inline-block;
+    font-family: var(--sans);
+    font-size: 0.72rem;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 0.22em 0.65em;
+    border-radius: 100px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--text-secondary);
+    transition: all 180ms ease;
+    text-decoration: none;
+  }
+
+  .keyword-pill:hover {
+    background: rgba(193, 67, 46, 0.15);
+    border-color: rgba(193, 67, 46, 0.4);
+    color: var(--accent-light);
+  }
+</style>

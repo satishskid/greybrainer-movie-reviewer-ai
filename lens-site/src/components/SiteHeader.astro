@@ -1,22 +1,38 @@
 ---
-const nav = [
-  { href: '/', label: 'Home' },
+const sections = [
+  { href: '/briefs', label: 'Briefs' },
   { href: '/reviews', label: 'Reviews' },
-  { href: '/manifesto', label: 'Manifesto' },
+  { href: '/research', label: 'Research' },
+  { href: '/archive', label: 'Archive' },
+];
+const utility = [
+  { href: '/manifesto', label: 'Method' },
+  { href: '/search', label: 'Search' },
 ];
 ---
 
 <header class="site-header">
   <div class="shell header-row">
     <a class="brand-mark" href="/">
-      <span class="brand-kicker">Greybrainer</span>
-      <span class="brand-name">Lens</span>
+      <span class="brand-kicker">by GreyBrain</span>
+      <span class="brand-name">CineCraft</span>
     </a>
     <nav class="top-nav" aria-label="Primary">
-      {nav.map((item) => (
+      {sections.map((item) => (
+        <a href={item.href}>{item.label}</a>
+      ))}
+      <span class="nav-divider" aria-hidden="true">|</span>
+      {utility.map((item) => (
         <a href={item.href}>{item.label}</a>
       ))}
     </nav>
-    <a class="cta-link" href="/manifesto">Editorial Method</a>
   </div>
 </header>
+
+<style>
+  .nav-divider {
+    color: rgba(255, 255, 255, 0.15);
+    font-size: 0.75rem;
+    user-select: none;
+  }
+</style>

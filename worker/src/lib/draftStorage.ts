@@ -4,6 +4,8 @@ interface DraftArtifactInput {
   analysis?: unknown;
   blogMarkdown: string;
   draftId: string;
+  keywords?: string[];
+  readingMetadata?: unknown;
   socials?: unknown;
   sourcePayload: unknown;
   versionId: string;
@@ -66,6 +68,8 @@ export async function persistDraftArtifacts(env: Env, input: DraftArtifactInput)
   const markdownObjectKey = `${baseKey}/blog.md`;
   const socialsObjectKey = `${baseKey}/socials.json`;
   const videoObjectKey = `${baseKey}/video.json`;
+  const keywordsObjectKey = `${baseKey}/keywords.json`;
+  const readingMetadataObjectKey = `${baseKey}/reading-metadata.json`;
 
   await Promise.all([
     putJson(env.CONTENT_R2, sourcePayloadObjectKey, input.sourcePayload ?? {}),
@@ -73,6 +77,8 @@ export async function persistDraftArtifacts(env: Env, input: DraftArtifactInput)
     putText(env.CONTENT_R2, markdownObjectKey, input.blogMarkdown, "text/markdown; charset=utf-8"),
     putJson(env.CONTENT_R2, socialsObjectKey, input.socials ?? null),
     putJson(env.CONTENT_R2, videoObjectKey, input.video ?? null),
+    input.keywords ? putJson(env.CONTENT_R2, keywordsObjectKey, input.keywords) : Promise.resolve(),
+    input.readingMetadata ? putJson(env.CONTENT_R2, readingMetadataObjectKey, input.readingMetadata) : Promise.resolve(),
   ]);
 
   return {

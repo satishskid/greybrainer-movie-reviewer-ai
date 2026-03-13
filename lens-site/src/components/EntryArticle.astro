@@ -1,0 +1,238 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Footer from './Footer.astro';
+import SiteHeader from './SiteHeader.astro';
+import ArticleSummaryCard from './ArticleSummaryCard.astro';
+import SectionScanner from './SectionScanner.astro';
+import KeywordPills from './KeywordPills.astro';
+import RelatedArticles from './RelatedArticles.astro';
+import ArchiveTeaser from './ArchiveTeaser.astro';
+import type { LensEntry } from '../data/editorials';
+import { getLensEntries } from '../data/manifest';
+
+interface Props {
+  entry: LensEntry;
+}
+
+const { entry } = Astro.props;
+const maxRingScore = Math.max(...(entry.scoreRings?.map((ring) => ring.score) ?? [10]), 10);
+const posterLabel = entry.contentType === 'review' ? 'CineCraft Review' : entry.contentType === 'brief' ? 'Daily Brief' : 'Research Study';
+const posterStyle = entry.posterImageUrl ? `--poster-image: url('${entry.posterImageUrl}');` : '';
+const heroStyle = `--hero-gradient: ${entry.heroGradient};${entry.heroImageUrl ? `--hero-image: url('${entry.heroImageUrl}');` : ''}`;
+// Don't show dek if it's just the title repeated
+const showDek = entry.dek && entry.dek !== entry.title;
+// Only show verdict if it's meaningful text
+const showVerdict = entry.verdict && entry.verdict.length > 10 && !entry.verdict.includes('sitemap') && !entry.verdict.includes('medium.com');
+// Only show pullQuote if it's not the generic fallback
+const showPullQuote = entry.pullQuote && entry.pullQuote !== 'Analysis in three dimensions.' && entry.pullQuote.length > 15;
+
+// Generate section anchor IDs
+function toAnchorId(heading: string): string {
+  return heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+const sectionAnchors = entry.readingMetadata?.sectionAnchors
+  ?? entry.sections.map((s) => ({
+    id: toAnchorId(s.heading),
+    label: s.heading,
+    wordCount: s.body.join(' ').split(/\s+/).filter(Boolean).length,
+  }));
+const readTime = entry.readingMetadata?.estimatedReadTime ?? entry.runTime;
+
+// Load all entries for related articles sidebar
+const allEntries = await getLensEntries();
+const relatedEntries = allEntries
+  .filter((e) => e.contentType === entry.contentType && e.slug !== entry.slug)
+  .slice(0, 4);
+---
+
+<BaseLayout title={`${entry.title} | CineCraft`} description={entry.dek}>
+  <SiteHeader />
+  <article class="article-shell">
+    <section class="article-hero" style={heroStyle}>
+      <div class="shell article-hero__grid article-hero__grid--review">
+        <div>
+          <div class="eyebrow">{entry.category}</div>
+          <h1>{entry.title}</h1>
+          {showDek && <p class="hero-dek">{entry.dek}</p>}
+          <div class="hero-meta">
+            <span>{entry.publishedAt}</span>
+            <span>{entry.runTime}</span>
+            <span>{entry.releaseFocus}</span>
+            {entry.platform && <span>{entry.platform}</span>}
+          </div>
+        </div>
+        <aside class="article-aside poster-panel">
+          <div class="poster-panel__art" style={posterStyle}>
+            <span class="poster-panel__label">{posterLabel}</span>
+            <strong>{entry.posterLabel ?? entry.title}</strong>
+            {entry.year && <span>{entry.year}</span>}
+          </div>
+          {entry.overallScore && (
+            <div class="poster-panel__score">
+              <span>CineCraft Score</span>
+              <strong>{entry.overallScore.toFixed(1)}/10</strong>
+            </div>
+          )}
+          {showVerdict && <p class="poster-panel__verdict">{entry.verdict}</p>}
+        </aside>
+      </div>
+    </section>
+
+    <div class="shell">
+      <ArticleSummaryCard entry={entry} />
+    </div>
+
+    {entry.scoreRings && (
+      <section class="shell methodology-band">
+        <div class="methodology-band__intro">
+          <span class="section-kicker">Three-Ring Analysis</span>
+          <h2>We don't flatten a film into one number.</h2>
+          <p>
+            Each review separates narrative design, conceptual framing, and execution — revealing exactly
+            where the craft lives, and where it falls short.
+          </p>
+        </div>
+        <div class="ring-stack">
+          <div class="ring-stack__visual" aria-label="Three ring score stack">
+            {entry.scoreRings.map((ring, index) => {
+              const ringClass = ring.accent;
+              const radius = 100 - index * 24;
+              const circumference = 2 * Math.PI * radius;
+              const dashOffset = circumference * (1 - ring.score / maxRingScore);
+              return (
+                <svg class={`ring-svg ring-svg--${ringClass}`} viewBox="0 0 240 240">
+                  <circle cx="120" cy="120" r={radius} class="ring-track" />
+                  <circle
+                    cx="120"
+                    cy="120"
+                    r={radius}
+                    class="ring-value"
+                    stroke-dasharray={circumference}
+                    stroke-dashoffset={dashOffset}
+                  />
+                </svg>
+              );
+            })}
+            <div class="ring-stack__center">
+              <span>Method</span>
+              <strong>{entry.overallScore?.toFixed(1) ?? '--'}</strong>
+            </div>
+          </div>
+          <div class="ring-stack__cards">
+            {entry.scoreRings.map((ring) => (
+              <article class={`ring-card ring-card--${ring.accent}`}>
+                <div class="ring-card__topline">
+                  <span>{ring.shortLabel}</span>
+                  <strong>{ring.score.toFixed(1)}/10</strong>
+                </div>
+                <h3>{ring.label}</h3>
+                <p>{ring.description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+    )}
+
+    <section class="shell article-body article-body--expanded">
+      <div class="article-main">
+        {entry.sections.map((section) => (
+          <section class="article-section" id={toAnchorId(section.heading)}>
+            <h2>{section.heading}</h2>
+            {section.body.map((paragraph) => (
+              <p>{paragraph}</p>
+            ))}
+          </section>
+        ))}
+
+        {entry.morphokinetics && (
+          <section class="article-section morph-section">
+            <div class="morph-section__heading">
+              <div>
+                <span class="section-kicker">Morphokinetics</span>
+                <h2>Intensity, pacing, and emotional valence across the film.</h2>
+              </div>
+              <p>{entry.morphokinetics.summary}</p>
+            </div>
+
+            <div class="morph-chart" aria-label="Morphokinetic motion chart">
+              <div class="morph-chart__grid">
+                {entry.morphokinetics.keyMoments.map((moment) => (
+                  <div class="morph-chart__node">
+                    <div
+                      class={`morph-chart__dot morph-chart__dot--${moment.valence}`}
+                      style={`--intensity:${moment.intensity};`}
+                    ></div>
+                    <span>{moment.timeLabel}</span>
+                  </div>
+                ))}
+              </div>
+              <p class="morph-chart__note">{entry.morphokinetics.timelineNotes}</p>
+            </div>
+
+            <div class="morph-moments">
+              {entry.morphokinetics.keyMoments.map((moment) => (
+                <article class="morph-card">
+                  <div class="morph-card__header">
+                    <strong>{moment.timeLabel}</strong>
+                    <div class="morph-card__meta">
+                      {moment.tag && <span class="morph-badge">{moment.tag}</span>}
+                      <span>Intensity {moment.intensity}/10</span>
+                    </div>
+                  </div>
+                  <p>{moment.event}</p>
+                  <div class="morph-card__footer">
+                    <span>{moment.emotion}</span>
+                    <span class={`morph-valence morph-valence--${moment.valence}`}>{moment.valence}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {entry.contentType === 'review' && (
+          <section class="article-section creator-insights">
+            <span class="section-kicker">For Creators</span>
+            <h2>Lessons & Inspiration</h2>
+            <p>Key techniques and creative decisions that shaped this film's impact — extracted for directors, writers, and producers working on their own craft.</p>
+            <div class="creator-prompts">
+              <h3>Creative Prompts</h3>
+              <ul>
+                <li>How might you adapt this film's {entry.scoreRings?.find(r => r.accent === 'story')?.shortLabel.toLowerCase()} approach in your project?</li>
+                <li>What conceptual elements from this review could enhance your visual storytelling?</li>
+                <li>Consider the morphokinetic moments—how does pacing influence audience engagement in your work?</li>
+              </ul>
+            </div>
+          </section>
+        )}
+      </div>
+      <aside class="article-rail">
+        <SectionScanner anchors={sectionAnchors} estimatedReadTime={readTime} />
+        <div class="rail-card">
+          <span class="section-kicker">Lens Position</span>
+          {showPullQuote && <blockquote>{entry.pullQuote}</blockquote>}
+          <div class="rail-meta">
+            {entry.tags.map((tag) => (
+              <span>{tag}</span>
+            ))}
+          </div>
+        </div>
+        {entry.keywords && entry.keywords.length > 0 && (
+          <div class="rail-card">
+            <KeywordPills keywords={entry.keywords} />
+          </div>
+        )}
+        <RelatedArticles entries={relatedEntries} currentSlug={entry.slug} />
+        <ArchiveTeaser totalCount={allEntries.length} contentType={entry.contentType} />
+        <div class="rail-card">
+          <span class="section-kicker">Community</span>
+          <h3>Join the Discussion</h3>
+          <p>Share your thoughts on this analysis and connect with other creators.</p>
+          <a class="cta-link" href="/discussions">Discuss This</a>
+        </div>
+      </aside>
+    </section>
+  </article>
+  <Footer />
+</BaseLayout>

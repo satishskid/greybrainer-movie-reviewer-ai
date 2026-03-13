@@ -24,7 +24,7 @@
     "GEMINI_MODEL": "gemini-2.5-flash",
     "KNOWLEDGE_STORAGE_MODE": "r2",
     "OMNICHANNEL_API_VERSION": "2026-03-11",
-    "WEBSITE_BASE_URL": "https://greybrainer-dev.pages.dev/lens",
+    "WEBSITE_BASE_URL": "https://cinema.greybrain.ai",
     "WORKERS_AI_FALLBACK_MODEL": "@cf/meta/llama-3.1-8b-instruct"
   },
   "ai": {

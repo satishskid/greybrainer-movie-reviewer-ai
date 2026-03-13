@@ -3,21 +3,39 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import Footer from '../../components/Footer.astro';
 import SiteHeader from '../../components/SiteHeader.astro';
 import EditorialShelf from '../../components/EditorialShelf.astro';
-import { featuredEditorials } from '../../data/editorials';
+import { getLensEntries } from '../../data/manifest';
+
+const entries = await getLensEntries();
+const reviewEntries = entries.filter((entry) => entry.contentType === 'review');
 ---
 
 <BaseLayout
-  title="Greybrainer Lens | Reviews and Studies"
-  description="Browse premium movie intelligence essays, audience studies, and editorial dossiers from Greybrainer Lens."
+  title="Greybrainer Lens | Quantified Reviews"
+  description="Browse Greybrainer's quantified movie reviews with three-ring scoring and morphokinetic narrative analysis."
 >
   <SiteHeader />
   <section class="shell archive-hero">
-    <span class="section-kicker">Archive</span>
-    <h1>Reviews, essays, and screen studies.</h1>
+    <span class="section-kicker">Quantified Reviews</span>
+    <h1>Single-title analysis with visible rings and visible reasoning.</h1>
     <p>
-      A curated shelf for editorial movie intelligence. This public surface is designed for future Cloudflare-native publishing from the Greybrainer engine.
+      This is the flagship Greybrainer format: one film, one thesis, one score stack, and a motion map that makes narrative behavior
+      legible instead of vague.
     </p>
+    <div class="archive-signals">
+      <div class="signal-card">
+        <span class="signal-label">Review Count</span>
+        <strong>{reviewEntries.length}</strong>
+      </div>
+      <div class="signal-card">
+        <span class="signal-label">Method</span>
+        <strong>3 Rings + Morphokinetics</strong>
+      </div>
+      <div class="signal-card">
+        <span class="signal-label">Explore All</span>
+        <a class="cta-link" href="/archive">Open Archive</a>
+      </div>
+    </div>
   </section>
-  <EditorialShelf items={featuredEditorials} title="Current Archive" />
+  <EditorialShelf items={reviewEntries} title="Review Archive" />
   <Footer />
 </BaseLayout>

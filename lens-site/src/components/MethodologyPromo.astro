@@ -1,0 +1,156 @@
+---
+// Three-Ring Decomposition & Morphokinetic Pacing — Technical Methodology
+---
+
+<section class="three-lenses shell">
+  <header class="three-lenses__header">
+    <span class="section-kicker">The Framework</span>
+    <h2>Three-Ring Decomposition</h2>
+    <p class="three-lenses__intro">We don't rate films. We decompose them. Every title is separated into three independently scored dimensions — a structured method for isolating where the craft holds and where it fractures.</p>
+  </header>
+
+  <div class="three-lenses__core">
+    <!-- Ring Visualization -->
+    <div class="three-lenses__viz">
+      <div class="ring-viz">
+        <svg class="ring-svg" viewBox="0 0 260 260" aria-label="Three concentric scoring rings representing Story, Concept, and Performance">
+          <!-- Track rings (background) -->
+          <circle cx="130" cy="130" r="110" class="rv-track" />
+          <circle cx="130" cy="130" r="80" class="rv-track" />
+          <circle cx="130" cy="130" r="50" class="rv-track" />
+          <!-- Scored arcs — dasharray = 2πr, dashoffset controls fill -->
+          <circle cx="130" cy="130" r="110" class="rv-arc rv-arc--story"
+            stroke-dasharray="691" stroke-dashoffset="207" transform="rotate(-90 130 130)" />
+          <circle cx="130" cy="130" r="80" class="rv-arc rv-arc--concept"
+            stroke-dasharray="502" stroke-dashoffset="176" transform="rotate(-90 130 130)" />
+          <circle cx="130" cy="130" r="50" class="rv-arc rv-arc--performance"
+            stroke-dasharray="314" stroke-dashoffset="63" transform="rotate(-90 130 130)" />
+          <!-- Ring labels on the arc -->
+          <text x="130" y="16" class="rv-ring-label rv-ring-label--story" text-anchor="middle">Story</text>
+          <text x="130" y="46" class="rv-ring-label rv-ring-label--concept" text-anchor="middle">Concept</text>
+          <text x="130" y="76" class="rv-ring-label rv-ring-label--perf" text-anchor="middle">Performance</text>
+        </svg>
+        <div class="ring-center">
+          <span class="ring-center__value">7.0</span>
+          <span class="ring-center__label">Composite</span>
+        </div>
+      </div>
+      <div class="ring-legend">
+        <div class="ring-legend__item">
+          <span class="ring-swatch ring-swatch--story"></span>
+          <span>Story <strong>7.0</strong></span>
+        </div>
+        <div class="ring-legend__item">
+          <span class="ring-swatch ring-swatch--concept"></span>
+          <span>Concept <strong>6.5</strong></span>
+        </div>
+        <div class="ring-legend__item">
+          <span class="ring-swatch ring-swatch--perf"></span>
+          <span>Performance <strong>8.0</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Dimension Explanations -->
+    <div class="three-lenses__dims">
+      <article class="dim-card">
+        <div class="dim-accent dim-accent--story"></div>
+        <div class="dim-body">
+          <h3>Ring 1 <span class="dim-sep">—</span> Story</h3>
+          <p>Narrative architecture. We measure plot mechanics, dramatic stakes, character arc completion, and thematic coherence. The question: does the screenplay convert its premise into emotional truth?</p>
+          <div class="dim-measures">
+            <span>Plot</span><span>Stakes</span><span>Arcs</span><span>Theme</span>
+          </div>
+        </div>
+      </article>
+      <article class="dim-card">
+        <div class="dim-accent dim-accent--concept"></div>
+        <div class="dim-body">
+          <h3>Ring 2 <span class="dim-sep">—</span> Concept</h3>
+          <p>Conceptual design. Genre positioning, world-building logic, originality quotient, and cultural context. Is the foundational idea structurally sound enough to carry the narrative weight?</p>
+          <div class="dim-measures">
+            <span>Genre</span><span>World</span><span>Originality</span><span>Context</span>
+          </div>
+        </div>
+      </article>
+      <article class="dim-card">
+        <div class="dim-accent dim-accent--perf"></div>
+        <div class="dim-body">
+          <h3>Ring 3 <span class="dim-sep">—</span> Performance</h3>
+          <p>Cinematic execution. Directorial control, technical craft, acting calibration, and production design. Does the filmmaking apparatus serve or diminish the source material?</p>
+          <div class="dim-measures">
+            <span>Direction</span><span>Craft</span><span>Acting</span><span>Design</span>
+          </div>
+        </div>
+      </article>
+    </div>
+  </div>
+
+  <!-- Morphokinetic Pacing Model -->
+  <div class="three-lenses__morph">
+    <div class="morph-explain">
+      <h3>Morphokinetic Pacing</h3>
+      <p>Beyond static scores, we map <em>emotional intensity</em> across narrative time. The morphokinetic curve models how a film distributes tension, release, and convergence — revealing the pacing architecture that determines whether a story breathes or suffocates.</p>
+      <dl class="morph-terms">
+        <div class="morph-term">
+          <dt>Tension Gradient <span class="morph-sym">∇T</span></dt>
+          <dd>Rate of emotional intensity increase between consecutive narrative beats. Steeper gradients indicate tighter dramatic compression.</dd>
+        </div>
+        <div class="morph-term">
+          <dt>Release Valley <span class="morph-sym">Δ<sub>r</sub></span></dt>
+          <dd>Deliberate decompression zones — the inverse intensity differential between a peak and its subsequent trough.</dd>
+        </div>
+        <div class="morph-term">
+          <dt>Convergence Point <span class="morph-sym">C<sub>p</sub></span></dt>
+          <dd>Where story, concept, and performance scores simultaneously maximize — the structural climax of cinematic craft.</dd>
+        </div>
+      </dl>
+    </div>
+    <div class="morph-graph">
+      <svg viewBox="0 0 480 200" class="morph-waveform" aria-label="Morphokinetic pacing curve showing emotional intensity across narrative time">
+        <defs>
+          <linearGradient id="morphGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#5a9fbf" />
+            <stop offset="50%" stop-color="#8b6dc0" />
+            <stop offset="100%" stop-color="#d4506e" />
+          </linearGradient>
+          <linearGradient id="morphFill" x1="0%" y1="0%" x2="0%" y2="1%">
+            <stop offset="0%" stop-color="#8b6dc0" stop-opacity="0.18" />
+            <stop offset="100%" stop-color="#8b6dc0" stop-opacity="0.02" />
+          </linearGradient>
+        </defs>
+        <!-- Axes -->
+        <line x1="44" y1="15" x2="44" y2="170" stroke="rgba(255,255,255,0.08)" stroke-width="1" />
+        <line x1="44" y1="170" x2="465" y2="170" stroke="rgba(255,255,255,0.1)" stroke-width="1" />
+        <!-- Y-axis labels -->
+        <text x="38" y="24" text-anchor="end" class="morph-axis">High</text>
+        <text x="38" y="95" text-anchor="end" class="morph-axis">Mid</text>
+        <text x="38" y="168" text-anchor="end" class="morph-axis">Low</text>
+        <!-- Horizontal grid -->
+        <line x1="44" y1="92" x2="465" y2="92" stroke="rgba(255,255,255,0.04)" stroke-dasharray="3,6" />
+        <!-- Act dividers -->
+        <line x1="184" y1="15" x2="184" y2="170" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3,6" />
+        <line x1="344" y1="15" x2="344" y2="170" stroke="rgba(255,255,255,0.06)" stroke-dasharray="3,6" />
+        <!-- Act labels -->
+        <text x="114" y="188" class="morph-act">Act I — Setup</text>
+        <text x="264" y="188" class="morph-act">Act II — Confrontation</text>
+        <text x="404" y="188" class="morph-act">Act III — Resolution</text>
+        <!-- Area fill -->
+        <path d="M44 145 Q80 138,110 108 Q135 82,155 95 Q175 112,200 68 Q218 40,240 78 Q260 112,285 58 Q305 30,325 50 Q348 78,368 34 Q388 14,412 30 Q432 44,452 40 L465 44 L465 170 L44 170Z" fill="url(#morphFill)" />
+        <!-- Waveform line -->
+        <path d="M44 145 Q80 138,110 108 Q135 82,155 95 Q175 112,200 68 Q218 40,240 78 Q260 112,285 58 Q305 30,325 50 Q348 78,368 34 Q388 14,412 30 Q432 44,452 40 L465 44" fill="none" stroke="url(#morphGrad)" stroke-width="2.5" stroke-linecap="round" class="morph-path" />
+        <!-- Peak markers with labels -->
+        <circle cx="200" cy="68" r="3.5" fill="#8b6dc0" class="morph-dot" />
+        <text x="200" y="58" class="morph-peak">∇T₁</text>
+        <circle cx="285" cy="58" r="3.5" fill="#8b6dc0" class="morph-dot" />
+        <text x="285" y="48" class="morph-peak">Δᵣ</text>
+        <circle cx="368" cy="34" r="3.5" fill="#d4506e" class="morph-dot" />
+        <text x="368" y="24" class="morph-peak morph-peak--climax">Cₚ</text>
+        <!-- Release valley annotation -->
+        <line x1="240" y1="78" x2="260" y2="112" stroke="rgba(255,255,255,0.12)" stroke-width="1" stroke-dasharray="2,3" />
+        <text x="262" y="126" class="morph-valley">valley</text>
+      </svg>
+      <div class="morph-x-axis">Narrative Timeline →</div>
+    </div>
+  </div>
+</section>

@@ -1,44 +1,71 @@
 ---
-import type { LensEditorial } from '../data/editorials';
+import type { LensEntry } from '../data/editorials';
+import { getEntryHref, getEntrySectionHref } from '../data/editorials';
 
 interface Props {
-  feature: LensEditorial;
+  feature: LensEntry;
 }
 
 const { feature } = Astro.props;
+const primaryLabel =
+  feature.contentType === 'review'
+    ? 'Read the Review'
+    : feature.contentType === 'brief'
+      ? 'Read the Brief'
+      : 'Read the Research';
+const secondaryHref = getEntrySectionHref(feature.contentType);
+const secondaryLabel =
+  feature.contentType === 'review'
+    ? 'Browse Reviews'
+    : feature.contentType === 'brief'
+      ? 'Browse Briefs'
+      : 'Browse Research';
+const heroStyle = `--hero-gradient: ${feature.heroGradient};${feature.heroImageUrl ? `--hero-image: url('${feature.heroImageUrl}');` : ''}`;
+const showDek = feature.dek && feature.dek !== feature.title;
 ---
 
-<section class="hero-feature" style={`--hero-gradient: ${feature.heroGradient};`}>
+<section class="hero-feature" style={heroStyle}>
   <div class="shell hero-grid">
     <div class="hero-copy">
       <div class="eyebrow">{feature.category}</div>
       <h1>{feature.title}</h1>
-      <p class="hero-dek">{feature.dek}</p>
+      {showDek && <p class="hero-dek">{feature.dek}</p>}
       <div class="hero-meta">
         <span>{feature.publishedAt}</span>
         <span>{feature.runTime}</span>
         <span>{feature.releaseFocus}</span>
       </div>
       <div class="hero-actions">
-        <a class="primary-button" href={`/reviews/${feature.slug}`}>Read the Study</a>
-        <a class="secondary-button" href="/manifesto">See the Lens Thesis</a>
+        <a class="primary-button" href={getEntryHref(feature)}>{primaryLabel}</a>
+        <a class="secondary-button" href={secondaryHref}>{secondaryLabel}</a>
       </div>
     </div>
     <div class="hero-panel">
-      <div class="signal-card">
-        <div class="signal-label">Lead Thesis</div>
-        <blockquote>{feature.pullQuote}</blockquote>
-      </div>
-      <div class="signal-grid">
-        <div>
-          <span class="signal-label">Angle</span>
-          <strong>{feature.criticAngle}</strong>
+      {feature.scoreRings && feature.overallScore && (
+        <div class="signal-card score-signal">
+          <div class="signal-label">CineCraft Score</div>
+          <div class="hero-score">{feature.overallScore.toFixed(1)}</div>
+          <div class="hero-score__meta">
+            {feature.scoreRings.map((ring) => (
+              <span>{ring.shortLabel} {ring.score.toFixed(1)}</span>
+            ))}
+          </div>
         </div>
-        <div>
-          <span class="signal-label">Mood</span>
-          <strong>{feature.mood}</strong>
+      )}
+      {feature.platform && (
+        <div class="signal-grid">
+          <div>
+            <span class="signal-label">Platform</span>
+            <strong>{feature.platform}</strong>
+          </div>
+          {feature.year && (
+            <div>
+              <span class="signal-label">Year</span>
+              <strong>{feature.year}</strong>
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </div>
   </div>
 </section>

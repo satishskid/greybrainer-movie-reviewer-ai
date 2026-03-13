@@ -1,10 +1,12 @@
 {
-  "name": "greybrainer-lens-site",
+  "name": "cinecraft-cinema-site",
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "astro dev",
+    "dev": "astro dev --port 4321",
     "build": "astro build",
-    "preview": "astro preview"
+    "preview": "astro preview",
+    "deploy": "astro build && wrangler pages deploy dist --project-name cinema-greybrain --branch main",
+    "deploy:preview": "astro build && wrangler pages deploy dist --project-name cinema-greybrain --branch preview"
   }
 }

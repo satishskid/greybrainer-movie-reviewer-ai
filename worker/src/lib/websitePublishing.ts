@@ -10,12 +10,14 @@ interface WebsitePublishInput {
   requestedBy?: string | null;
   versionId?: string | null;
   websiteUrl?: string | null;
+  skipKnowledge?: boolean;
 }
 
 export interface WebsitePublishResult {
   canonicalUrl: string;
+  deployTriggered: boolean;
   draft: Awaited<ReturnType<typeof getDraftById>>;
-  knowledgeDocumentId: string;
+  knowledgeDocumentId: string | null;
   publication: {
     channel: string;
     externalId: string;
@@ -201,6 +203,32 @@ async function persistPublishedWebsiteArtifacts(
   const socialsObjectKey = `${baseKey}/socials.json`;
   const sourcePayloadObjectKey = `${baseKey}/source-payload.json`;
 
+  const sourcePayload =
+    (input.selectedVersion.sourcePayload ?? {}) as {
+      image?: { heroUrl?: string | null; posterUrl?: string | null; thumbnailUrl?: string | null };
+      heroImageUrl?: string | null;
+      posterImageUrl?: string | null;
+      thumbnailImageUrl?: string | null;
+      platform?: string | null;
+      releaseFocus?: string | null;
+      thumbnailEyebrow?: string | null;
+      verdict?: string | null;
+      year?: string | null;
+      category?: string | null;
+    };
+
+  const heroImageUrl = sourcePayload.heroImageUrl ?? sourcePayload.image?.heroUrl ?? null;
+  const posterImageUrl = sourcePayload.posterImageUrl ?? sourcePayload.image?.posterUrl ?? heroImageUrl ?? null;
+  const thumbnailImageUrl =
+    sourcePayload.thumbnailImageUrl ?? sourcePayload.image?.thumbnailUrl ?? posterImageUrl ?? heroImageUrl ?? null;
+  const metadataTags = [
+    input.draft.subjectType,
+    input.draft.reviewStage,
+    "website",
+    "published",
+    ...((Array.isArray(sourcePayload.tags) ? sourcePayload.tags : []) as string[]),
+  ].filter((tag): tag is string => Boolean(tag && tag.trim()));
+
   await Promise.all([
     putJson(env.CONTENT_R2, metadataObjectKey, {
       canonicalUrl: input.canonicalUrl,
@@ -216,6 +244,21 @@ async function persistPublishedWebsiteArtifacts(
       subjectTitle: input.draft.subjectTitle,
       summary: input.summary,
       title: input.title,
+      category: sourcePayload.category ?? null,
+      platform: sourcePayload.platform ?? null,
+      releaseFocus: sourcePayload.releaseFocus ?? null,
+      thumbnailEyebrow: sourcePayload.thumbnailEyebrow ?? null,
+      verdict: sourcePayload.verdict ?? null,
+      year: sourcePayload.year ?? null,
+      tags: metadataTags,
+      heroImageUrl,
+      posterImageUrl,
+      thumbnailImageUrl,
+      image: {
+        heroUrl: heroImageUrl,
+        posterUrl: posterImageUrl,
+        thumbnailUrl: thumbnailImageUrl,
+      },
     }),
     putText(env.CONTENT_R2, blogObjectKey, input.selectedVersion.blogMarkdown, "text/markdown; charset=utf-8"),
     putText(env.CONTENT_R2, htmlObjectKey, input.htmlContent, "text/html; charset=utf-8"),
@@ -273,64 +316,68 @@ export async function publishDraftToWebsite(
     title,
   });
 
-  const chunks = chunkMarkdown(selectedVersion.blogMarkdown, {
-    articleId: draft.id,
-    canonicalUrl,
-    title,
-  });
-  const knowledgeStorage = await persistKnowledgeArtifacts(env, {
-    articleId: draft.id,
-    canonicalUrl,
-    chunks,
-    feedUrl: canonicalUrl,
-    htmlContent,
-    markdownContent: selectedVersion.blogMarkdown,
-    rawPayload: {
-      draftId: draft.id,
-      draftStatus: "published",
-      publicationChannel: "website",
-      publishedArtifact: storage,
-      requestedBy: input.requestedBy ?? null,
-      reviewStage: draft.reviewStage,
-      seoDescription: draft.seoDescription,
-      sourcePayload: selectedVersion.sourcePayload ?? null,
-      versionId: selectedVersion.id,
-      versionNo: selectedVersion.versionNo,
-    },
-    sourceAccount: "greybrain.ai",
-    sourceType: "greybrainer-website",
-    title,
-  });
-  const contentHash = await hashString(selectedVersion.blogMarkdown);
-  const knowledgeDocument = await upsertKnowledgeDocument(client, {
-    articleId: draft.id,
-    authorName: input.requestedBy ?? draft.createdBy ?? null,
-    canonicalUrl,
-    chunkManifestObjectKey: knowledgeStorage.chunkManifestObjectKey,
-    contentHash,
-    externalId: `greybrainer-website:${draft.id}`,
-    htmlContent: knowledgeStorage.storageBackend === "r2" ? htmlPreview(htmlContent) : htmlContent,
-    htmlObjectKey: knowledgeStorage.htmlObjectKey,
-    ingestionStatus: "rag_ready",
-    markdownContent: knowledgeStorage.markdownPreview,
-    markdownObjectKey: knowledgeStorage.markdownObjectKey,
-    publishedAt,
-    rawPayload: knowledgeStorage.rawPayloadPreview,
-    rawPayloadObjectKey: knowledgeStorage.rawPayloadObjectKey,
-    sourceAccount: "greybrain.ai",
-    sourceType: "greybrainer-website",
-    storageBackend: knowledgeStorage.storageBackend,
-    summary,
-    tags: [draft.subjectType, "website", "published"].filter(Boolean),
-    title,
-    updatedAt: publishedAt,
-  });
+  let knowledgeDocumentId: string | null = null;
+  if (!input.skipKnowledge) {
+    const chunks = chunkMarkdown(selectedVersion.blogMarkdown, {
+      articleId: draft.id,
+      canonicalUrl,
+      title,
+    });
+    const knowledgeStorage = await persistKnowledgeArtifacts(env, {
+      articleId: draft.id,
+      canonicalUrl,
+      chunks,
+      feedUrl: canonicalUrl,
+      htmlContent,
+      markdownContent: selectedVersion.blogMarkdown,
+      rawPayload: {
+        draftId: draft.id,
+        draftStatus: "published",
+        publicationChannel: "website",
+        publishedArtifact: storage,
+        requestedBy: input.requestedBy ?? null,
+        reviewStage: draft.reviewStage,
+        seoDescription: draft.seoDescription,
+        sourcePayload: selectedVersion.sourcePayload ?? null,
+        versionId: selectedVersion.id,
+        versionNo: selectedVersion.versionNo,
+      },
+      sourceAccount: "greybrain.ai",
+      sourceType: "greybrainer-website",
+      title,
+    });
+    const contentHash = await hashString(selectedVersion.blogMarkdown);
+    const knowledgeDocument = await upsertKnowledgeDocument(client, {
+      articleId: draft.id,
+      authorName: input.requestedBy ?? draft.createdBy ?? null,
+      canonicalUrl,
+      chunkManifestObjectKey: knowledgeStorage.chunkManifestObjectKey,
+      contentHash,
+      externalId: `greybrainer-website:${draft.id}`,
+      htmlContent: knowledgeStorage.storageBackend === "r2" ? htmlPreview(htmlContent) : htmlContent,
+      htmlObjectKey: knowledgeStorage.htmlObjectKey,
+      ingestionStatus: "rag_ready",
+      markdownContent: knowledgeStorage.markdownPreview,
+      markdownObjectKey: knowledgeStorage.markdownObjectKey,
+      publishedAt,
+      rawPayload: knowledgeStorage.rawPayloadPreview,
+      rawPayloadObjectKey: knowledgeStorage.rawPayloadObjectKey,
+      sourceAccount: "greybrain.ai",
+      sourceType: "greybrainer-website",
+      storageBackend: knowledgeStorage.storageBackend,
+      summary,
+      tags: [draft.subjectType, "website", "published"].filter(Boolean),
+      title,
+      updatedAt: publishedAt,
+    });
 
-  if (!knowledgeDocument) {
-    throw new Error("Failed to persist website knowledge document.");
+    if (!knowledgeDocument) {
+      throw new Error("Failed to persist website knowledge document.");
+    }
+
+    await replaceKnowledgeChunks(client, knowledgeDocument.id, chunks);
+    knowledgeDocumentId = knowledgeDocument.id;
   }
-
-  await replaceKnowledgeChunks(client, knowledgeDocument.id, chunks);
 
   await updateDraft(client, draft.id, {
     status: "published",
@@ -343,7 +390,7 @@ export async function publishDraftToWebsite(
     externalUrl: canonicalUrl,
     payload: {
       contentStorage: storage,
-      knowledgeDocumentId: knowledgeDocument.id,
+      knowledgeDocumentId,
       publishedAt,
       requestedBy: input.requestedBy ?? null,
       title,
@@ -359,10 +406,22 @@ export async function publishDraftToWebsite(
     throw new Error("Website publication completed, but the refreshed draft state could not be loaded.");
   }
 
+  // Trigger Cloudflare Pages deploy so Lens site rebuilds automatically
+  let deployTriggered = false;
+  if (env.CF_PAGES_DEPLOY_HOOK) {
+    try {
+      const deployResponse = await fetch(env.CF_PAGES_DEPLOY_HOOK, { method: "POST" });
+      deployTriggered = deployResponse.ok;
+    } catch {
+      // Non-fatal — content is published, deploy can be triggered manually
+    }
+  }
+
   return {
     canonicalUrl,
+    deployTriggered,
     draft: refreshedDraft,
-    knowledgeDocumentId: knowledgeDocument.id,
+    knowledgeDocumentId,
     publication: {
       channel: websitePublication.channel,
       externalId: websitePublication.externalId ?? slug,

@@ -2,11 +2,14 @@
 interface Props {
   title: string;
   description: string;
+  ogImage?: string;
 }
 
 import '../styles/global.css';
 
-const { title, description } = Astro.props;
+const { title, description, ogImage } = Astro.props;
+const canonicalUrl = new URL(Astro.url.pathname, 'https://cinema.greybrain.ai');
+const socialImage = ogImage ?? 'https://cinema.greybrain.ai/og-default.jpg';
 ---
 
 <!doctype html>
@@ -16,6 +19,22 @@ const { title, description } = Astro.props;
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>{title}</title>
     <meta name="description" content={description} />
+    <link rel="canonical" href={canonicalUrl.href} />
+
+    <!-- Open Graph -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonicalUrl.href} />
+    <meta property="og:image" content={socialImage} />
+    <meta property="og:site_name" content="CineCraft by GreyBrain" />
+
+    <!-- Twitter Card -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={socialImage} />
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -25,5 +44,21 @@ const { title, description } = Astro.props;
   </head>
   <body>
     <slot />
+    <script is:inline>
+      /* ── Smooth page-exit transition ──
+         Intercepts all [data-smooth-nav] links,
+         plays a 350 ms fade-out, then navigates. */
+      document.addEventListener('click', function (e) {
+        var anchor = e.target.closest('[data-smooth-nav]');
+        if (!anchor) return;
+        var href = anchor.getAttribute('href');
+        if (!href || href.startsWith('#') || href.startsWith('http') || e.ctrlKey || e.metaKey) return;
+        e.preventDefault();
+        document.body.classList.add('page-leaving');
+        setTimeout(function () {
+          window.location.href = href;
+        }, 350);
+      });
+    </script>
   </body>
 </html>

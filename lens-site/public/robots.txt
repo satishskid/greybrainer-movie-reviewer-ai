@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://cinema.greybrain.ai/sitemap-index.xml

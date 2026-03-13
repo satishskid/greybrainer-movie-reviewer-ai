@@ -63,6 +63,7 @@ export interface DraftPublishResult {
 
 export interface WebsitePublishResult {
   canonicalUrl: string;
+  deployTriggered?: boolean;
   draft: DraftRecord;
   knowledgeDocumentId: string;
   publication: {
@@ -231,6 +232,13 @@ export interface CloudflareSystemStatus {
   timestamp: string;
 }
 
+export interface DraftAssetUploadResult {
+  key: string;
+  url: string;
+  contentType: string | null;
+  size: number;
+}
+
 export interface SocialAccountTestResult {
   checkedAt: string;
   details: string;
@@ -315,6 +323,13 @@ async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
     response = await fetch(`${getApiBaseUrl()}${path}`, init);
   } catch (error) {
     throw new Error(`Unable to reach the Cloudflare backend at ${getApiBaseUrl()}.`);
+  }
+  const contentType = response.headers.get("content-type") ?? "";
+  if (!contentType.includes("application/json")) {
+    throw new Error(
+      `Worker API returned non-JSON (${contentType || "no content-type"}) for ${path}. ` +
+      `Ensure VITE_OMNICHANNEL_API_BASE_URL is set correctly (current: ${getApiBaseUrl()}).`
+    );
   }
   if (!response.ok) {
     const errorBody = (await response.json().catch(() => null)) as { error?: string } | null;
@@ -591,4 +606,34 @@ export async function syncDriveFolder(folderUrlOrId: string, requestedBy?: strin
       requestedBy: requestedBy ?? null,
     }),
   });
+}
+
+export async function uploadDraftAsset(payload: {
+  file: File;
+  draftId: string;
+  kind?: string;
+}): Promise<DraftAssetUploadResult> {
+  const formData = new FormData();
+  formData.append("file", payload.file);
+  formData.append("draftId", payload.draftId);
+  if (payload.kind) {
+    formData.append("kind", payload.kind);
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}/assets/upload`, {
+      method: "POST",
+      body: formData,
+    });
+  } catch (error) {
+    throw new Error(`Unable to reach the Cloudflare backend at ${getApiBaseUrl()}.`);
+  }
+
+  if (!response.ok) {
+    const errorBody = (await response.json().catch(() => null)) as { error?: string } | null;
+    throw new Error(errorBody?.error ?? "Asset upload failed.");
+  }
+
+  return response.json() as Promise<DraftAssetUploadResult>;
 }

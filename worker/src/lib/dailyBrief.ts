@@ -182,11 +182,17 @@ Topic: One or two lines.
 Past GreyBrainer Medium context (use for optimization guidance):
 ${pastContext || "No past posts provided."}
 
+Also return:
+- A "keywords" array of 5-10 key terms from this brief (movie titles, platform names like Netflix/Prime Video, cultural themes, genre tags, trending topics).
+- A "summary_hook" string — one punchy sentence (max 150 characters) capturing the essence of today's brief for a hero card overlay.
+
 Output must be valid JSON with this schema:
 {
   "blog_markdown": "...full markdown including the LENS_NARRATIVE tag block and an Optimization section...",
   "seo_title": "...",
   "seo_description": "...",
+  "keywords": ["OTT", "Netflix", "Pan-Indian", "...up to 10 terms..."],
+  "summary_hook": "Short punchy sentence for the hero card (max 150 chars)",
   "socials": {
     "x_thread": ["...","..."],
     "linkedin_post": "..."
@@ -275,8 +281,10 @@ async function callGemini(client: Client, env: Env, prompt: string) {
 
   let parsed: {
     blog_markdown: string;
+    keywords?: string[];
     seo_title?: string;
     seo_description?: string;
+    summary_hook?: string;
     socials?: { x_thread?: string[]; linkedin_post?: string };
   };
   try {
@@ -336,6 +344,18 @@ export async function generateDailyBrief(
   if (generated.generationMode === "workers-ai-fallback" && !generated.blog_markdown.includes("Fallback note for editor")) {
     generated.blog_markdown = `${generated.blog_markdown}\n\n> Fallback note for editor: This draft was scaffolded with Workers AI because the current Gemini key hit quota limits. Please run a premium pass when a fresh Gemini key is available.\n`;
   }
+  // Extract keywords and summary hook from AI output (with fallbacks)
+  const keywords = Array.isArray(generated.keywords) && generated.keywords.length
+    ? generated.keywords.slice(0, 10)
+    : extractKeywordsFromMarkdown(generated.blog_markdown);
+  const summaryHook = (generated.summary_hook ?? "").slice(0, 160) || extractSummaryHook(generated.blog_markdown);
+  const sectionAnchors = parseSectionAnchors(generated.blog_markdown);
+  const readingMetadata = {
+    estimatedReadTime: estimateReadTime(generated.blog_markdown),
+    sectionAnchors,
+    relatedSlugs: [] as string[],
+  };
+
   const subjectTitle = `GreyBrain Intelligence Brief — ${dateLabel}`;
 
   const draftId = `draft_daily_${dateKey.replace(/-/g, "")}`;
@@ -346,6 +366,8 @@ export async function generateDailyBrief(
     analysis: { type: "daily-brief", generatedAt: nowIso(), promptVersion: "v1", generationMode: generated.generationMode },
     blogMarkdown: generated.blog_markdown,
     draftId,
+    keywords,
+    readingMetadata,
     socials: generated.socials ?? null,
     sourcePayload: {
       dateKey,
@@ -361,6 +383,8 @@ export async function generateDailyBrief(
   const draft = existing
     ? await (async () => {
         await updateDraft(client, existing.id, {
+          heroPriority: 100,
+          isHeroCandidate: true,
           reviewStage: dateKey,
           seoDescription: generated.seo_description ?? null,
           seoTitle: generated.seo_title ?? subjectTitle,
@@ -373,7 +397,9 @@ export async function generateDailyBrief(
           blogMarkdown: generated.blog_markdown,
           createdBy: options?.requestedBy ?? "system:daily-brief",
           id: versionId,
+          keywordsJson: JSON.stringify(keywords),
           markdownObjectKey: artifacts.markdownObjectKey,
+          readingMetadataJson: JSON.stringify(readingMetadata),
           socials: generated.socials ?? null,
           socialsObjectKey: artifacts.socialsObjectKey,
           sourcePayload: {
@@ -384,6 +410,7 @@ export async function generateDailyBrief(
           },
           sourcePayloadObjectKey: artifacts.sourcePayloadObjectKey,
           storageBackend: artifacts.storageBackend,
+          summaryHook: summaryHook,
           versionNo,
           video: null,
           videoObjectKey: artifacts.videoObjectKey,
@@ -392,6 +419,8 @@ export async function generateDailyBrief(
     : await createDraft(client, {
         createdBy: options?.requestedBy ?? "system:daily-brief",
         draftId,
+        heroPriority: 100,
+        isHeroCandidate: true,
         reviewStage: dateKey,
         seoDescription: generated.seo_description ?? null,
         seoTitle: generated.seo_title ?? subjectTitle,
@@ -410,7 +439,9 @@ export async function generateDailyBrief(
           blogMarkdown: generated.blog_markdown,
           createdBy: options?.requestedBy ?? "system:daily-brief",
           id: versionId,
+          keywordsJson: JSON.stringify(keywords),
           markdownObjectKey: artifacts.markdownObjectKey,
+          readingMetadataJson: JSON.stringify(readingMetadata),
           socials: generated.socials ?? null,
           socialsObjectKey: artifacts.socialsObjectKey,
           sourcePayload: {
@@ -421,6 +452,7 @@ export async function generateDailyBrief(
           },
           sourcePayloadObjectKey: artifacts.sourcePayloadObjectKey,
           storageBackend: artifacts.storageBackend,
+          summaryHook: summaryHook,
           versionNo,
           video: null,
           videoObjectKey: artifacts.videoObjectKey,
@@ -443,4 +475,76 @@ export async function generateDailyBrief(
     dateLabel,
     draftId: draft.id,
   };
+}
+
+/** Fallback: extract keywords from markdown via bold text, proper nouns, and known terms */
+function extractKeywordsFromMarkdown(markdown: string): string[] {
+  const keywords = new Set<string>();
+
+  // Extract bold text (**keyword**)
+  const boldMatches = markdown.matchAll(/\*\*([^*]{2,40})\*\*/g);
+  for (const m of boldMatches) {
+    const term = m[1].trim();
+    if (term.length > 2 && term.length < 40) {
+      keywords.add(term);
+    }
+  }
+
+  // Known platform/industry terms
+  const knownTerms = [
+    "Netflix", "Prime Video", "Disney+ Hotstar", "JioCinema", "Zee5",
+    "SonyLIV", "MX Player", "OTT", "Pan-Indian", "Bollywood", "Tollywood",
+    "Kollywood", "Box Office", "IMAX",
+  ];
+  for (const term of knownTerms) {
+    if (markdown.toLowerCase().includes(term.toLowerCase())) {
+      keywords.add(term);
+    }
+  }
+
+  return Array.from(keywords).slice(0, 10);
+}
+
+/** Fallback: extract first meaningful sentence as summary hook */
+function extractSummaryHook(markdown: string): string {
+  const paragraphs = markdown
+    .replace(/\[\[LENS_NARRATIVE:[\s\S]*?\]\]/g, "")
+    .split(/\n{2,}/)
+    .map((p) => p.replace(/^#+\s+/gm, "").replace(/\*\*/g, "").trim())
+    .filter((p) => p.length > 40 && !p.startsWith(">"));
+
+  const first = paragraphs[0] ?? "";
+  if (first.length <= 160) return first;
+
+  const sentenceEnd = first.indexOf(".", 60);
+  return sentenceEnd > 0 ? first.slice(0, sentenceEnd + 1) : first.slice(0, 157) + "...";
+}
+
+/** Parse markdown headings into section anchors */
+function parseSectionAnchors(markdown: string): Array<{ id: string; label: string; wordCount: number }> {
+  const anchors: Array<{ id: string; label: string; wordCount: number }> = [];
+  const sections = markdown.split(/^(#{2,3})\s+(.+)$/gm);
+
+  for (let i = 1; i < sections.length; i += 3) {
+    const heading = sections[i + 1]?.trim();
+    const body = sections[i + 2] ?? "";
+    if (!heading) continue;
+
+    const id = heading
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 60);
+    const wordCount = body.split(/\s+/).filter(Boolean).length;
+    anchors.push({ id, label: heading, wordCount });
+  }
+
+  return anchors;
+}
+
+/** Estimate read time from markdown content */
+function estimateReadTime(markdown: string): string {
+  const wordCount = markdown.split(/\s+/).filter(Boolean).length;
+  const minutes = Math.max(1, Math.ceil(wordCount / 230));
+  return `${minutes} min read`;
 }

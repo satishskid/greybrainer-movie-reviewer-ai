@@ -5,6 +5,7 @@ import ReactDOM from 'react-dom/client';
 import App from '../App';
 import { LensPreviewApp } from './LensPreviewApp';
 import { DraftReviewApp } from './DraftReviewApp';
+import { DraftsListApp } from './DraftsListApp';
 import './index.css'; // Import Tailwind CSS
 
 const rootElement = document.getElementById('root');
@@ -14,13 +15,17 @@ if (!rootElement) {
 
 const root = ReactDOM.createRoot(rootElement);
 
+function resolveApp() {
+  const path = window.location.pathname;
+  if (path === '/lens' || path.startsWith('/lens/')) return <LensPreviewApp />;
+  if (path === '/studio/drafts' || path === '/studio/drafts/') return <DraftsListApp />;
+  if (path.startsWith('/studio/drafts/')) return <DraftReviewApp />;
+  return <App />;
+}
+
 // Render the application - API keys are now managed through BYOK system
 root.render(
   <React.StrictMode>
-    {window.location.pathname === '/lens' || window.location.pathname.startsWith('/lens/')
-      ? <LensPreviewApp />
-      : window.location.pathname.startsWith('/studio/drafts/')
-        ? <DraftReviewApp />
-        : <App />}
+    {resolveApp()}
   </React.StrictMode>
 );

@@ -7,8 +7,10 @@ import { backfillMediumUrls } from "./lib/knowledgeBackfill";
 import { listKnowledgeDocuments, listKnowledgeImportJobs } from "./lib/knowledgeRepository";
 import { syncMediumKnowledgeFeed } from "./lib/mediumKnowledge";
 import { handleNativeCallback, publishDraftToSocialAccounts, startNativeConnection } from "./lib/nativeConnectorRuntime";
+import { listPublicLensManifest } from "./lib/publicLensManifest";
 import { publishDraftToWebsite } from "./lib/websitePublishing";
 import { handleWebsitePreviewRoute } from "./lib/websitePreview";
+import { createContextEvent, listContextEvents, searchContextEvents } from "./lib/contextRepository";
 import {
   createSocialAccount,
   type CreateDraftInput,
@@ -56,6 +58,24 @@ function badRequest(message: string) {
 
 function generateEntityId(prefix: string) {
   return `${prefix}_${crypto.randomUUID().replace(/-/g, "")}`;
+}
+
+function toSafeExtension(filename: string, contentType: string | null) {
+  const nameMatch = filename.match(/\.([a-z0-9]+)$/i);
+  if (nameMatch?.[1]) {
+    return nameMatch[1].toLowerCase();
+  }
+  if (contentType?.startsWith("image/")) {
+    return contentType.replace("image/", "");
+  }
+  return "bin";
+}
+
+function toAssetKey(draftId: string, kind: string, filename: string, contentType: string | null) {
+  const extension = toSafeExtension(filename, contentType);
+  const suffix = crypto.randomUUID().split("-")[0];
+  const safeKind = kind.replace(/[^a-z0-9_-]/gi, "").toLowerCase() || "asset";
+  return `draft-assets/${draftId}/${safeKind}-${Date.now()}-${suffix}.${extension}`;
 }
 
 async function parseBody<T>(request: Request): Promise<T | null> {
@@ -171,6 +191,169 @@ export default {
           const limit = Math.min(Number(url.searchParams.get("limit") ?? "20"), 100);
           const documents = await listKnowledgeDocuments(client, Number.isFinite(limit) ? limit : 20);
           return json({ documents });
+        }
+      }
+
+      if (segments[1] === "public" && segments[2] === "lens" && segments[3] === "manifest" && request.method === "GET") {
+        const limit = Math.min(Number(url.searchParams.get("limit") ?? "50"), 200);
+        const entries = await listPublicLensManifest(client, env, Number.isFinite(limit) ? limit : 50);
+        return json({ entries });
+      }
+
+      // Archive endpoint — filterable list of published entries for the archive page
+      if (segments[1] === "public" && segments[2] === "lens" && segments[3] === "archive" && request.method === "GET") {
+        const limit = Math.min(Number(url.searchParams.get("limit") ?? "50"), 200);
+        const keyword = url.searchParams.get("keyword")?.trim() || null;
+        const contentType = url.searchParams.get("type")?.trim() || null;
+
+        const entries = await listPublicLensManifest(client, env, Number.isFinite(limit) ? limit : 50);
+        let filtered = entries;
+        if (contentType) {
+          filtered = filtered.filter((e) => e.contentType === contentType);
+        }
+        if (keyword) {
+          const lower = keyword.toLowerCase();
+          filtered = filtered.filter(
+            (e) =>
+              e.keywords.some((k) => k.toLowerCase().includes(lower)) ||
+              e.tags.some((t) => t.toLowerCase().includes(lower)) ||
+              e.title.toLowerCase().includes(lower),
+          );
+        }
+
+        // Build facets
+        const typeCounts: Record<string, number> = {};
+        const keywordCounts: Record<string, number> = {};
+        for (const e of entries) {
+          typeCounts[e.contentType] = (typeCounts[e.contentType] ?? 0) + 1;
+          for (const k of e.keywords) {
+            keywordCounts[k] = (keywordCounts[k] ?? 0) + 1;
+          }
+        }
+
+        return json({
+          entries: filtered.map((e) => ({
+            contentType: e.contentType,
+            keywords: e.keywords,
+            overallScore: e.overallScore,
+            publishedAt: e.publishedAt,
+            slug: e.slug,
+            summaryHook: e.summaryHook,
+            thumbnailImageUrl: e.thumbnailImageUrl,
+            title: e.title,
+            websiteUrl: e.websiteUrl,
+          })),
+          facets: { keywords: keywordCounts, types: typeCounts },
+          total: filtered.length,
+        });
+      }
+
+      if (segments[1] === "context") {
+        if (segments[2] === "events") {
+          if (request.method === "GET") {
+            const sessionId = url.searchParams.get("sessionId");
+            if (!sessionId) {
+              return badRequest("sessionId is required.");
+            }
+            const limit = Math.min(Number(url.searchParams.get("limit") ?? "20"), 100);
+            const events = await listContextEvents(client, sessionId, Number.isFinite(limit) ? limit : 20);
+            return json({ events });
+          }
+
+          if (request.method === "POST") {
+            const body = await parseBody<{
+              sessionId?: string;
+              eventType?: string;
+              actor?: string | null;
+              content?: string;
+              payload?: unknown;
+            }>(request);
+            if (!body?.sessionId || !body?.eventType || !body?.content) {
+              return badRequest("sessionId, eventType, and content are required.");
+            }
+            const event = await createContextEvent(client, {
+              sessionId: body.sessionId,
+              eventType: body.eventType,
+              actor: body.actor ?? null,
+              content: body.content,
+              payload: body.payload ?? null,
+            });
+            return json({ event }, 201);
+          }
+        }
+
+        if (segments[2] === "search" && request.method === "POST") {
+          const body = await parseBody<{ query?: string; sessionId?: string | null; limit?: number }>(request);
+          if (!body?.query) {
+            return badRequest("query is required.");
+          }
+          const limit = Math.min(Number(body.limit ?? 12), 50);
+          const events = await searchContextEvents(client, body.query, body.sessionId ?? null, Number.isFinite(limit) ? limit : 12);
+          return json({ events });
+        }
+      }
+
+      if (segments[1] === "assets") {
+        if (segments[2] === "upload" && request.method === "POST") {
+          if (!env.CONTENT_R2) {
+            return badRequest("CONTENT_R2 is not configured.");
+          }
+          const formData = await request.formData();
+          const draftId = String(formData.get("draftId") ?? "").trim();
+          if (!draftId) {
+            return badRequest("draftId is required.");
+          }
+          const kind = String(formData.get("kind") ?? "asset").trim();
+          const file = formData.get("file");
+          if (!file || !(file instanceof File)) {
+            return badRequest("file is required.");
+          }
+          if (!file.type.startsWith("image/")) {
+            return badRequest("Only image uploads are supported.");
+          }
+          const maxBytes = 12 * 1024 * 1024;
+          if (file.size > maxBytes) {
+            return badRequest("Image size exceeds 12MB limit.");
+          }
+          const key = toAssetKey(draftId, kind, file.name || "asset", file.type || null);
+          await env.CONTENT_R2.put(key, await file.arrayBuffer(), {
+            httpMetadata: {
+              contentType: file.type || "application/octet-stream",
+            },
+            customMetadata: {
+              draftId,
+              kind,
+              originalName: file.name || "asset",
+            },
+          });
+          const origin = new URL(request.url).origin;
+          const url = `${origin}/api/assets/${encodeURIComponent(key)}`;
+          return json(
+            {
+              key,
+              url,
+              contentType: file.type || null,
+              size: file.size,
+            },
+            201,
+          );
+        }
+
+        if (segments.length >= 3 && request.method === "GET") {
+          if (!env.CONTENT_R2) {
+            return badRequest("CONTENT_R2 is not configured.");
+          }
+          const key = decodeURIComponent(segments.slice(2).join("/"));
+          const object = await env.CONTENT_R2.get(key);
+          if (!object) {
+            return json({ error: "Asset not found" }, 404);
+          }
+          const headers = new Headers({
+            ...corsHeaders(),
+            "cache-control": "public, max-age=31536000, immutable",
+            "content-type": object.httpMetadata?.contentType ?? "application/octet-stream",
+          });
+          return new Response(object.body, { status: 200, headers });
         }
       }
 
@@ -453,12 +636,15 @@ export default {
       }
 
       if (segments.length === 4 && segments[3] === "publish-website" && request.method === "POST") {
-        const body = await parseBody<{ requestedBy?: string | null; versionId?: string | null; websiteUrl?: string | null }>(request);
+        const body = await parseBody<{ requestedBy?: string | null; versionId?: string | null; websiteUrl?: string | null; skipKnowledge?: boolean }>(
+          request,
+        );
         const result = await publishDraftToWebsite(client, env, {
           draftId: segments[2],
           requestedBy: body?.requestedBy ?? null,
           versionId: body?.versionId ?? null,
           websiteUrl: body?.websiteUrl ?? null,
+          skipKnowledge: body?.skipKnowledge ?? false,
         });
         return json(result, 201);
       }
