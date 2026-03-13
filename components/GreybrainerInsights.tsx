@@ -15,7 +15,6 @@ import { DailyBriefStudio } from './DailyBriefStudio';
 interface GreybrainerInsightsProps {
   currentUserEmail?: string | null;
   logTokenUsage?: LogTokenUsageFn;
-  onOpenPublishingWorkspace?: () => void;
 }
 
 type WorkflowMode = 'daily-adaptive' | 'deep-research';
@@ -25,7 +24,6 @@ type AnalysisLayer = 'story' | 'orchestration' | 'performance' | 'morphokinetics
 export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
   currentUserEmail,
   logTokenUsage,
-  onOpenPublishingWorkspace,
 }) => {
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode>('daily-adaptive');
   // Deep research mode selection
@@ -399,7 +397,6 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
         {workflowMode === 'daily-adaptive' && (
           <DailyBriefStudio
             currentUserEmail={currentUserEmail}
-            onOpenPublishingWorkspace={onOpenPublishingWorkspace}
           />
         )}
 

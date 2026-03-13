@@ -434,10 +434,6 @@ const App: React.FC = () => {
               <GreybrainerInsights
                 currentUserEmail={authUser?.email}
                 logTokenUsage={logTokenUsage}
-                onOpenPublishingWorkspace={() => {
-                  setSettingsInitialTab('omnichannel');
-                  setShowSettings(true);
-                }}
               />
               <GreybrainerComparison logTokenUsage={logTokenUsage} />
               {/* Monthly Scoreboard temporarily disabled due to network issues */}
