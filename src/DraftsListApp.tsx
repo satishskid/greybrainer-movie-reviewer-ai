@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { listDrafts, updateDraftRecord, publishDraftToWebsite } from '../services/omnichannelDraftService';
 import type { DraftRecord } from '../services/omnichannelDraftService';
+import { AuthWrapper } from '../components/AuthWrapper';
 
 type StatusFilter = 'all' | 'generated' | 'approved' | 'published';
 
@@ -135,6 +136,14 @@ function formatDate(raw: string | null) {
 }
 
 export const DraftsListApp: React.FC = () => {
+  return (
+    <AuthWrapper>
+      {(user) => <DraftsListInner currentUserEmail={user?.email ?? null} />}
+    </AuthWrapper>
+  );
+};
+
+const DraftsListInner: React.FC<{ currentUserEmail: string | null }> = ({ currentUserEmail }) => {
   const [drafts, setDrafts] = useState<DraftRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -172,7 +181,7 @@ export const DraftsListApp: React.FC = () => {
       }
       // Publish to website
       const result = await publishDraftToWebsite(draft.id, {
-        requestedBy: 'editor:studio',
+        requestedBy: currentUserEmail ?? 'editor:studio',
         versionId: draft.currentVersionId,
       });
       setMessage(`✅ Published: ${result.canonicalUrl}`);
@@ -199,6 +208,7 @@ export const DraftsListApp: React.FC = () => {
         </h1>
         <p style={{ color: '#a0a0a0', fontSize: '0.85rem', margin: '0.4rem 0 0' }}>
           Content pipeline — review AI output, add images, and publish to Lens.
+          {currentUserEmail && <span style={{ float: 'right', fontSize: '0.75rem', color: '#64748b' }}>Signed in as {currentUserEmail}</span>}
         </p>
       </header>
 
