@@ -40,13 +40,30 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
     return () => unsubscribe();
   }, []);
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleGoogleLogin = async () => {
     setIsLoggingIn(true);
     setLoginError('');
 
     try {
       await firebaseAuthService.signInWithGoogle();
+    } catch (error: any) {
+      setLoginError(error.message || 'Login failed. Please try again.');
+    } finally {
+      setIsLoggingIn(false);
+    }
+  };
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!email || !password) {
+      setLoginError('Please enter both email and password.');
+      return;
+    }
+    setIsLoggingIn(true);
+    setLoginError('');
+
+    try {
+      await firebaseAuthService.signInWithEmail(email, password);
     } catch (error: any) {
       setLoginError(error.message || 'Login failed. Please check your credentials.');
     } finally {
@@ -93,7 +110,7 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
             )}
 
             <button
-              onClick={handleLogin}
+              onClick={handleGoogleLogin}
               disabled={isLoggingIn}
               className="w-full bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-3 border border-gray-300"
             >
@@ -114,6 +131,46 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                 </>
               )}
             </button>
+
+            {/* Divider */}
+            <div className="flex items-center space-x-3">
+              <div className="flex-1 h-px bg-slate-600"></div>
+              <span className="text-slate-500 text-sm">or</span>
+              <div className="flex-1 h-px bg-slate-600"></div>
+            </div>
+
+            {/* Email/Password Form */}
+            <form onSubmit={handleEmailLogin} className="space-y-4">
+              <div>
+                <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+                <input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1">Password</label>
+                <input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={isLoggingIn}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200"
+              >
+                {isLoggingIn ? 'Signing In...' : 'Sign In with Email'}
+              </button>
+            </form>
           </div>
 
           <div className="mt-6 pt-6 border-t border-slate-700">

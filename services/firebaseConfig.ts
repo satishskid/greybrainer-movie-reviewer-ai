@@ -1,6 +1,6 @@
 // Firebase Configuration and Services
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, deleteDoc, addDoc, orderBy, limit } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getAnalytics } from 'firebase/analytics';
@@ -81,6 +81,37 @@ export class FirebaseAuthService {
     }
   }
   
+  // Sign in with Email and Password
+  async signInWithEmail(email: string, password: string): Promise<GreybrainerUser | null> {
+    try {
+      const result = await signInWithEmailAndPassword(auth, email, password);
+      const user = result.user;
+
+      // Check if user is whitelisted
+      const isWhitelisted = await this.isUserWhitelisted(user.email!);
+      if (!isWhitelisted) {
+        await signOut(auth);
+        throw new Error('Access denied. Please contact administrator for access.');
+      }
+
+      // Create or update user profile
+      const greybrainerUser = await this.createOrUpdateUserProfile(user);
+      return greybrainerUser;
+    } catch (error: any) {
+      console.error('Email sign-in error:', error);
+      if (error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
+        throw new Error('Incorrect email or password.');
+      }
+      if (error.code === 'auth/user-not-found') {
+        throw new Error('No account found with this email.');
+      }
+      if (error.code === 'auth/too-many-requests') {
+        throw new Error('Too many failed attempts. Please try again later.');
+      }
+      throw error;
+    }
+  }
+
   // Sign out
   async signOut(): Promise<void> {
     try {
