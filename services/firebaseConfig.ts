@@ -46,7 +46,8 @@ const ADMIN_EMAILS = [
   'satish@skids.health',
   'satish.rath@gmail.com',
   'dr.satish@greybrain.ai',
-  'digi.social@greybrain.ai'
+  'digi.social@greybrain.ai',
+  'support@skids.health'
 ];
 
 // Editor emails

@@ -21,7 +21,8 @@ export class AdminService {
         'satish@skids.health',
         'satish.rath@gmail.com',
         'dr.satish@greybrain.ai',
-        'digi.social@greybrain.ai'
+        'digi.social@greybrain.ai',
+        'support@skids.health'
       ];
       
       if (ADMIN_EMAILS.includes(user.email)) {
@@ -84,7 +85,8 @@ export class AdminService {
       'satish@skids.health',
       'satish.rath@gmail.com',
       'dr.satish@greybrain.ai',
-      'digi.social@greybrain.ai'
+      'digi.social@greybrain.ai',
+      'support@skids.health'
     ];
     
     return ADMIN_EMAILS.includes(user.email);
