@@ -86,14 +86,22 @@ class ModelConfigurationService {
    * Get the currently selected model with environment variable override
    */
   getSelectedModel(): string {
-    const stored = localStorage.getItem('greybrainer_gemini_model');
+    let stored = localStorage.getItem('greybrainer_gemini_model');
+    
+    // PROACTIVE FIX: Clear the specifically known incorrect model ID that was previously suggested
+    // this handles cases where the browser hasn't picked up the config change yet
+    if (stored === 'gemini-3.1-flash') {
+      localStorage.removeItem('greybrainer_gemini_model');
+      stored = null;
+      this.logInfo('Cleared known incorrect model ID: gemini-3.1-flash');
+    }
     
     // Check if stored model is still available in current configuration
     if (stored && this.isModelAvailable(stored)) {
       return stored;
     }
     
-    // If stored model is invalid, clear it and use preferred model
+    // If stored model is invalid (and not just human-cleared), clear it and use preferred model
     if (stored && !this.isModelAvailable(stored)) {
       localStorage.removeItem('greybrainer_gemini_model');
       this.logInfo(`Cleared invalid stored model: ${stored}`);
