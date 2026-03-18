@@ -5,12 +5,88 @@
     "description": "Verified Gemini model configuration - using REAL available models from Google API"
   },
   "defaultModels": {
-    "preferred": "gemini-2.5-flash",
-    "fallback": "gemini-2.5-pro",
-    "experimental": "gemini-2.0-flash-exp",
-    "legacy": "gemini-2.0-flash"
+    "preferred": "gemini-3.1-flash",
+    "fallback": "gemini-3.1-pro",
+    "experimental": "gemini-3-flash-preview",
+    "legacy": "gemini-2.5-flash"
   },
   "availableModels": [
+    {
+      "id": "gemini-3.1-flash",
+      "name": "Greybrainer Ultra (3.1 Flash)",
+      "description": "Next-gen Gemini 3.1 Flash - exceptional speed and reasoning (2026)",
+      "category": "standard",
+      "isRecommended": true,
+      "isStable": true,
+      "maxTokens": 1048576,
+      "costTier": "economy",
+      "lastVerified": "2026-03-18",
+      "useCase": "Primary model for all film analysis features",
+      "apiVersion": "v1beta",
+      "supportedMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ]
+    },
+    {
+      "id": "gemini-3.1-pro",
+      "name": "Greybrainer Ultra Pro (3.1 Pro)",
+      "description": "Next-gen Gemini 3.1 Pro - state-of-the-art cinematic intelligence (2026)",
+      "category": "premium",
+      "isRecommended": true,
+      "isStable": true,
+      "maxTokens": 2097152,
+      "costTier": "premium",
+      "lastVerified": "2026-03-18",
+      "useCase": "Complex deep-dive cinematic analysis",
+      "apiVersion": "v1beta",
+      "supportedMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ]
+    },
+    {
+      "id": "gemini-3.0-flash",
+      "name": "Greybrainer (3.0 Flash)",
+      "description": "Stable Gemini 3.0 Flash (2026)",
+      "category": "standard",
+      "isRecommended": false,
+      "isStable": true,
+      "maxTokens": 1048576,
+      "costTier": "economy",
+      "lastVerified": "2026-03-18",
+      "useCase": "High-speed film analysis",
+      "apiVersion": "v1beta",
+      "supportedMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ]
+    },
+    {
+      "id": "gemini-3.0-pro",
+      "name": "Greybrainer (3.0 Pro)",
+      "description": "Stable Gemini 3.0 Pro (2026)",
+      "category": "premium",
+      "isRecommended": false,
+      "isStable": true,
+      "maxTokens": 2097152,
+      "costTier": "premium",
+      "lastVerified": "2026-03-18",
+      "useCase": "Advanced narrative evaluation",
+      "apiVersion": "v1beta",
+      "supportedMethods": [
+        "generateContent",
+        "countTokens",
+        "createCachedContent",
+        "batchGenerateContent"
+      ]
+    },
     {
       "id": "gemini-2.5-flash",
       "name": "Greybrainer Fast (Recommended)",
@@ -168,14 +244,36 @@
     }
   ],
   "modelPriority": [
+    "gemini-3.1-flash",
+    "gemini-3.1-pro",
+    "gemini-3.0-flash",
+    "gemini-3.0-pro",
+    "gemini-1.5-flash-latest",
+    "gemini-1.5-pro-latest",
     "gemini-2.5-flash",
-    "gemini-2.5-pro",
-    "gemini-flash-latest",
-    "gemini-2.5-flash-lite",
-    "gemini-2.0-flash",
-    "gemini-pro-latest"
+    "gemini-2.5-pro"
   ],
   "discoveryPatterns": [
+    {
+      "pattern": "gemini-3\\.1-flash",
+      "priority": 1,
+      "description": "Current flagship Flash model (Gemini 3.1)"
+    },
+    {
+      "pattern": "gemini-3\\.1-pro",
+      "priority": 2,
+      "description": "Current flagship Pro model (Gemini 3.1)"
+    },
+    {
+      "pattern": "gemini-3\\.0-flash",
+      "priority": 3,
+      "description": "Stable Gemini 3.0 Flash"
+    },
+    {
+      "pattern": "gemini-3\\.0-pro",
+      "priority": 4,
+      "description": "Stable Gemini 3.0 Pro"
+    },
     {
       "pattern": "gemini-2\\.5-flash",
       "priority": 1,
