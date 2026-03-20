@@ -2,7 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { generateDailyNewsletter, LogTokenUsageFn } from '../services/geminiService';
 import { fetchPastNewslettersContext, saveDailyNewsletter } from '../services/newsletterService';
 import { LoadingSpinner } from './LoadingSpinner';
-import { Newspaper, Send, Mail, Copy, Download, MessageCircle, FileCode } from 'lucide-react';
+import { Newspaper, Copy, Download, FileCode } from 'lucide-react';
 import { ReadMoreLess } from './ReadMoreLess';
 
 interface DailyNewsletterProps {
@@ -91,24 +91,7 @@ export const DailyNewsletter: React.FC<DailyNewsletterProps> = ({ logTokenUsage 
     URL.revokeObjectURL(url);
   };
 
-  const handleShareWhatsApp = () => {
-    if (!dailyNewsletter) return;
-    const text = `*${dailyNewsletter.title}*\n\n${dailyNewsletter.content}`;
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
-  };
 
-  const handleShareTelegram = () => {
-    if (!dailyNewsletter) return;
-    const text = `*${dailyNewsletter.title}*\n\n${dailyNewsletter.content}`;
-    window.open(`https://t.me/share/url?url=${encodeURIComponent('https://greybrainer.ai')}&text=${encodeURIComponent(text)}`, '_blank');
-  };
-
-  const handleShareEmail = () => {
-    if (!dailyNewsletter) return;
-    const subject = dailyNewsletter.title;
-    const body = dailyNewsletter.content;
-    window.location.href = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  };
 
   return (
     <div className="bg-slate-800/80 rounded-2xl shadow-2xl p-6 sm:p-10 mb-8 border border-emerald-500/30 overflow-hidden transform transition-all duration-300">
@@ -198,30 +181,6 @@ export const DailyNewsletter: React.FC<DailyNewsletterProps> = ({ logTokenUsage 
                   Download
                 </button>
                 
-                <div className="flex-1"></div>
-                
-                {/* Social Share Group */}
-                <button
-                  onClick={handleShareWhatsApp}
-                  className="flex items-center justify-center p-2 bg-[#25D366]/20 hover:bg-[#25D366]/30 text-[#25D366] rounded-md transition-colors"
-                  title="Share to WhatsApp"
-                >
-                  <MessageCircle className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={handleShareTelegram}
-                  className="flex items-center justify-center p-2 bg-[#0088cc]/20 hover:bg-[#0088cc]/30 text-[#0088cc] rounded-md transition-colors"
-                  title="Share to Telegram"
-                >
-                  <Send className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={handleShareEmail}
-                  className="flex items-center justify-center p-2 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 rounded-md transition-colors"
-                  title="Send via Email"
-                >
-                  <Mail className="w-5 h-5" />
-                </button>
               </div>
               
               <div className="p-6 md:p-8 bg-slate-900/80 rounded-xl border border-slate-700/80 shadow-inner">
