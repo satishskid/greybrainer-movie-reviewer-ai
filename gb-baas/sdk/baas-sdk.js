@@ -1,4 +1,5 @@
-export const apiBase = "https://gb-baas.satish-9f4.workers.dev";
+export const apiBase = "https://greybrainer-api.satish-9f4.workers.dev";
+
 export const PUBLIC_JWK = {}; // Replace with actual JWK object after deployment
 
 export const BaasSDK = {
