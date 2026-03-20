@@ -7,8 +7,7 @@ import { GeminiKeyPrompt } from './GeminiKeyPrompt';
 import { GeminiKeyManager } from './GeminiKeyManager';
 import GeminiDebugTest from './GeminiDebugTest';
 import { hasGeminiApiKey } from '../utils/geminiKeyStorage';
-import { hasGoogleSearchApiKey } from '../utils/googleSearchKeyStorage';
-import { GoogleSearchKeyPrompt } from './GoogleSearchKeyPrompt';
+
 
 interface AuthWrapperProps {
   children: (user: GreybrainerUser | null) => React.ReactNode;
@@ -22,7 +21,6 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showGeminiKeyPrompt, setShowGeminiKeyPrompt] = useState(false);
-  const [showGoogleSearchKeyPrompt, setShowGoogleSearchKeyPrompt] = useState(false);
 
   useEffect(() => {
     const unsubscribe = firebaseAuthService.onAuthStateChanged((user: GreybrainerUser | null) => {
@@ -32,8 +30,6 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
       // Check if user is authenticated but doesn't have API keys
       if (user && !hasGeminiApiKey()) {
         setShowGeminiKeyPrompt(true);
-      } else if (user && hasGeminiApiKey() && !hasGoogleSearchApiKey()) {
-        setShowGoogleSearchKeyPrompt(true);
       }
     });
 
@@ -128,30 +124,12 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
     );
   }
 
-  const handleGeminiKeySubmit = (apiKey: string) => {
-    // The key storage is handled inside the GeminiKeyPrompt component
+  const handleGeminiKeySubmit = (_apiKey: string) => {
     setShowGeminiKeyPrompt(false);
-    // After Gemini key is set, check for Google Search key
-    if (!hasGoogleSearchApiKey()) {
-      setShowGoogleSearchKeyPrompt(true);
-    }
   };
 
   const handleGeminiKeySkip = () => {
     setShowGeminiKeyPrompt(false);
-    // After skipping Gemini key, still check for Google Search key
-    if (!hasGoogleSearchApiKey()) {
-      setShowGoogleSearchKeyPrompt(true);
-    }
-  };
-
-  const handleGoogleSearchKeySubmit = (apiKey: string) => {
-    // The key storage is handled inside the GoogleSearchKeyPrompt component
-    setShowGoogleSearchKeyPrompt(false);
-  };
-
-  const handleGoogleSearchKeySkip = () => {
-    setShowGoogleSearchKeyPrompt(false);
   };
 
   // Show Gemini key prompt if user is authenticated but no API key is stored
@@ -167,18 +145,6 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
     );
   }
 
-  // Show Google Search key prompt after Gemini key is configured
-  if (user && showGoogleSearchKeyPrompt) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
-        <GoogleSearchKeyPrompt 
-          isOpen={true}
-          onSubmit={handleGoogleSearchKeySubmit}
-          onSkip={handleGoogleSearchKeySkip}
-        />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
