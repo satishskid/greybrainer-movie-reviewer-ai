@@ -87,27 +87,33 @@ class ModelConfigurationService {
    */
   getSelectedModel(): string {
     let stored = localStorage.getItem('greybrainer_gemini_model');
+    let source = 'localStorage';
     
-    // PROACTIVE FIX: Clear the specifically known incorrect model ID that was previously suggested
-    // this handles cases where the browser hasn't picked up the config change yet
-    if (stored === 'gemini-3.1-flash') {
+    // PROACTIVE FIX: Clear the specifically known incorrect model IDs that were previously used
+    const invalidModels = ['gemini-3.1-flash', 'gemini-3-flash', 'gemini-3.1-pro'];
+    if (stored && invalidModels.includes(stored)) {
+      console.warn(`⚠️ ModelConfigService: Detected invalid model ${stored} in localStorage. Clearing it.`);
       localStorage.removeItem('greybrainer_gemini_model');
       stored = null;
-      this.logInfo('Cleared known incorrect model ID: gemini-3.1-flash');
     }
+    
+    let modelId: string;
     
     // Check if stored model is still available in current configuration
     if (stored && this.isModelAvailable(stored)) {
-      return stored;
+      modelId = stored;
+    } else {
+      // If stored model is invalid or not in current list, clear it and use preferred model
+      if (stored) {
+        localStorage.removeItem('greybrainer_gemini_model');
+        console.warn(`⚠️ ModelConfigService: Cleared invalid/unavailable stored model: ${stored}`);
+      }
+      modelId = this.config.preferredModel;
+      source = 'configuration/env';
     }
     
-    // If stored model is invalid (and not just human-cleared), clear it and use preferred model
-    if (stored && !this.isModelAvailable(stored)) {
-      localStorage.removeItem('greybrainer_gemini_model');
-      this.logInfo(`Cleared invalid stored model: ${stored}`);
-    }
-    
-    return this.config.preferredModel;
+    console.log(`🤖 ModelConfigService: Selected model "${modelId}" from ${source}`);
+    return modelId;
   }
 
   /**

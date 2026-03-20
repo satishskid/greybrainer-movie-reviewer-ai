@@ -1,65 +1,63 @@
 {
   "modelConfiguration": {
-    "version": "6.0.0",
-    "lastUpdated": "2026-03-18",
-    "description": "Verified Gemini model configuration for 2026 - using REAL technical IDs"
+    "version": "7.0.0",
+    "lastUpdated": "2026-03-20",
+    "description": "Updated Gemini model configuration for March 2026 - Migrated to Gemini 3.x"
   },
   "defaultModels": {
-    "preferred": "gemini-3-flash",
-    "fallback": "gemini-3.1-pro",
-    "experimental": "gemini-3.1-flash-lite",
+    "preferred": "gemini-3-flash-preview",
+    "fallback": "gemini-3.1-pro-preview",
+    "experimental": "gemini-3.1-flash-lite-preview",
     "legacy": "gemini-2.5-flash"
   },
   "availableModels": [
     {
-      "id": "gemini-3.1-pro",
-      "name": "Greybrainer Ultra Pro (3.1 Pro)",
-      "description": "Next-gen Gemini 3.1 Pro - state-of-the-art cinematic intelligence (2026)",
+      "id": "gemini-3.1-pro-preview",
+      "name": "Greybrainer Ultra Pro (3.1 Pro Preview)",
+      "description": "Latest Gemini 3.1 Pro Preview - state-of-the-art cinematic intelligence (Released Feb 2026)",
       "category": "premium",
       "isRecommended": true,
-      "isStable": true,
+      "isStable": false,
       "maxTokens": 2097152,
       "costTier": "premium",
-      "lastVerified": "2026-03-18",
-      "useCase": "Complex deep-dive cinematic analysis",
+      "lastVerified": "2026-03-20",
+      "useCase": "Deep-dive cinematic analysis and complex reasoning",
       "apiVersion": "v1beta",
       "supportedMethods": [
         "generateContent",
         "countTokens",
-        "createCachedContent",
-        "batchGenerateContent"
+        "createCachedContent"
       ]
     },
     {
-      "id": "gemini-3-flash",
-      "name": "Greybrainer Ultra (3 Flash)",
-      "description": "Next-gen Gemini 3 Flash - exceptional speed and reasoning (2026)",
+      "id": "gemini-3-flash-preview",
+      "name": "Greybrainer Ultra (3 Flash Preview)",
+      "description": "Gemini 3 Flash Preview - exceptional speed and multimodal reasoning (Released Dec 2025)",
       "category": "standard",
       "isRecommended": true,
-      "isStable": true,
+      "isStable": false,
       "maxTokens": 1048576,
       "costTier": "economy",
-      "lastVerified": "2026-03-18",
-      "useCase": "Primary model for all film analysis features",
+      "lastVerified": "2026-03-20",
+      "useCase": "Primary model for high-speed film analysis",
       "apiVersion": "v1beta",
       "supportedMethods": [
         "generateContent",
         "countTokens",
-        "createCachedContent",
-        "batchGenerateContent"
+        "createCachedContent"
       ]
     },
     {
-      "id": "gemini-3.1-flash-lite",
-      "name": "Greybrainer Ultra Lite (3.1 Lite)",
-      "description": "Cost-efficient Gemini 3.1 Flash-Lite (2026)",
+      "id": "gemini-3.1-flash-lite-preview",
+      "name": "Greybrainer Ultra Lite (3.1 Lite Preview)",
+      "description": "Cost-optimized Gemini 3.1 Flash-Lite (Released March 2026)",
       "category": "standard",
       "isRecommended": false,
-      "isStable": true,
+      "isStable": false,
       "maxTokens": 524288,
       "costTier": "economy",
-      "lastVerified": "2026-03-18",
-      "useCase": "High-volume, cost-sensitive film traffic",
+      "lastVerified": "2026-03-20",
+      "useCase": "High-volume, simple movie metadata extraction",
       "apiVersion": "v1beta",
       "supportedMethods": [
         "generateContent",
@@ -69,52 +67,35 @@
     {
       "id": "gemini-2.5-pro",
       "name": "Greybrainer Pro (2.5 Pro)",
-      "description": "Robust Gemini 2.5 Pro - complex reasoning (2025)",
+      "description": "Legacy Gemini 2.5 Pro - complex reasoning (Stable 2025)",
       "category": "premium",
-      "isRecommended": true,
+      "isRecommended": false,
       "isStable": true,
+      "isDeprecated": true,
+      "deprecationWarning": "Shutdown scheduled for June 17, 2026. Migrate to gemini-3.1-pro-preview.",
       "maxTokens": 2097152,
       "costTier": "premium",
-      "lastVerified": "2026-03-18",
-      "useCase": "Fallback for complex reasoning",
+      "lastVerified": "2026-03-20",
+      "useCase": "Legacy fallback for complex reasoning",
       "apiVersion": "v1beta",
       "supportedMethods": [
         "generateContent",
-        "countTokens",
-        "createCachedContent",
-        "batchGenerateContent"
+        "countTokens"
       ]
     },
     {
       "id": "gemini-2.5-flash",
       "name": "Greybrainer Fast (2.5 Flash)",
-      "description": "Stable Gemini 2.5 Flash - price-performance leader (2025)",
+      "description": "Legacy Gemini 2.5 Flash - price-performance leader (Stable 2025)",
       "category": "standard",
-      "isRecommended": true,
-      "isStable": true,
-      "maxTokens": 1048576,
-      "costTier": "economy",
-      "lastVerified": "2026-03-18",
-      "useCase": "Stable fallback for standard features",
-      "apiVersion": "v1beta",
-      "supportedMethods": [
-        "generateContent",
-        "countTokens",
-        "createCachedContent",
-        "batchGenerateContent"
-      ]
-    },
-    {
-      "id": "gemini-1.5-flash-latest",
-      "name": "Greybrainer Core (1.5 Flash)",
-      "description": "Long-term stable Gemini 1.5 Flash - highly reliable",
-      "category": "legacy",
       "isRecommended": false,
       "isStable": true,
+      "isDeprecated": true,
+      "deprecationWarning": "Shutdown scheduled for June 17, 2026. Migrate to gemini-3-flash-preview.",
       "maxTokens": 1048576,
       "costTier": "economy",
-      "lastVerified": "2026-03-18",
-      "useCase": "Emergency fallback for legacy stability",
+      "lastVerified": "2026-03-20",
+      "useCase": "Legacy fallback for standard features",
       "apiVersion": "v1beta",
       "supportedMethods": [
         "generateContent",
@@ -123,33 +104,27 @@
     }
   ],
   "modelPriority": [
-    "gemini-3-flash",
-    "gemini-3.1-pro",
-    "gemini-3.1-flash-lite",
+    "gemini-3-flash-preview",
+    "gemini-3.1-pro-preview",
+    "gemini-3.1-flash-lite-preview",
     "gemini-2.5-flash",
-    "gemini-2.5-pro",
-    "gemini-1.5-flash-latest"
+    "gemini-2.5-pro"
   ],
   "discoveryPatterns": [
     {
-      "pattern": "gemini-3\\.1-pro",
+      "pattern": "gemini-3\\.1-pro-preview",
       "priority": 1,
-      "description": "Current flagship Pro model (Gemini 3.1)"
+      "description": "Flagship Pro model"
     },
     {
-      "pattern": "gemini-3-flash",
+      "pattern": "gemini-3-flash-preview",
       "priority": 1,
-      "description": "Current flagship Flash model (Gemini 3)"
+      "description": "Flagship Flash model"
     },
     {
-      "pattern": "gemini-2\\.5-flash",
-      "priority": 3,
-      "description": "Stable Gemini 2.5 Flash"
-    },
-    {
-      "pattern": "gemini-2\\.5-pro",
-      "priority": 4,
-      "description": "Stable Gemini 2.5 Pro"
+      "pattern": "gemini-3\\.1-flash-lite-preview",
+      "priority": 2,
+      "description": "Flash Lite model"
     }
   ],
   "errorHandling": {
