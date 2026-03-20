@@ -69,7 +69,6 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
   const [verdictError, setVerdictError] = useState<string | null>(null);
   const [copiedVerdict, setCopiedVerdict] = useState<boolean>(false);
 
-
   const fetchDynamicInsight = useCallback(async () => {
     setIsFetchingDynamicInsight(true);
     setDynamicInsightError(null);

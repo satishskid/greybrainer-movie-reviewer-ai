@@ -23,6 +23,7 @@ import { MorphokineticsDisplay } from './components/MorphokineticsDisplay';
 import { LightBulbIcon } from './components/icons/LightBulbIcon';
 import { GreybrainerInsights } from './components/GreybrainerInsights';
 import { GreybrainerComparison } from './components/GreybrainerComparison';
+import { DailyNewsletter } from './components/DailyNewsletter';
 // Admin components moved to AdminSettings modal
 
 import { GoogleSearchKeyManager } from './components/GoogleSearchKeyManager';
@@ -418,6 +419,7 @@ const App: React.FC = () => {
 
               <GreybrainerInsights logTokenUsage={logTokenUsage} />
               <GreybrainerComparison logTokenUsage={logTokenUsage} />
+              <DailyNewsletter logTokenUsage={logTokenUsage} />
               {/* Monthly Scoreboard temporarily disabled due to network issues */}
               {/* <MonthlyMagicScoreboard 
             scoreboardData={monthlyScoreboardData} 

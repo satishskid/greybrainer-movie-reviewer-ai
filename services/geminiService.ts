@@ -2504,3 +2504,81 @@ Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
     }
   });
 };
+
+/**
+ * Generate an SEO Optimized Daily Newsletter with Narrative Continuity
+ * Uses Google Search Grounding for live trends and RAG context for memory.
+ */
+export const generateDailyNewsletter = async (
+  pastContentContext: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<{ title: string, themes: string, content: string }> => {
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  
+  const prompt = `**ROLE**
+You are the Editor-in-Chief for the @GreyBrainer Daily Newsletter. Your readers are cinephiles and industry professionals who value "Morphokinetic" analysis, vulnerability, and deep cultural insights into Indian and global cinema.
+
+**OBJECTIVE**
+Write today's edition of the daily newsletter (${today}). It must be SEO-optimized, highly engaging, and form a continuous narrative with our past dispatches. 
+
+**LIVE GOOGLE SEARCH REQUIREMENT**
+Search Google right now to find:
+1. What are the top 3 trending stories in the Indian cinema ecosystem today?
+2. What notable movies or web series are releasing this week or later this month?
+
+**RAG CONTEXT (WHAT WE WROTE RECENTLY)**
+Here is the context of what we've written over the past 7 days:
+${pastContentContext}
+*(Note: If the past context mentions a movie or trend, DO NOT repeat the same analysis. Instead, build upon it extending the narrative.)*
+
+**OUTPUT STRUCTURE**
+Your output MUST be a JSON object with this exact structure (no markdown code blocks, just raw JSON):
+{
+  "title": "[Catchy, SEO-Friendly Newsletter Title]",
+  "themes": "[Comma-separated SEO keywords/themes covered in this issue]",
+  "content": "[The full newsletter content in clean Markdown string]"
+}
+
+**THE NEWSLETTER CONTENT FORMAT (Markdown)**
+# [The H1 Title Again]
+*(Start with a vulnerable, personal, or punchy 2-sentence hook that acknowledges what day/week it is and sets the thematic tone)*
+
+## 📰 The Ecosystem Pulse
+*(Synthesize the top news you found via Google Search. Group it into a single cohesive narrative rather than just listing news. Explain the "Grey Area" or why this news matters to the industry's evolution.)*
+
+## 🔗 The Narrative Thread
+*(This is where you MUST interlink with our past content. Create a thematic bridge between today's news and what we wrote in the RAG Context.)*
+
+## 🍿 On The Horizon
+*(Highlight one upcoming release found via your search. Provide a brief "Grey Anticipation" - not just what it is, but what it represents for the genre or the lead actor's career trajectory.)*
+
+## 🔮 The Grey Verdict & Question
+*(End with a bold take on today's landscape and pose a thought-provoking question to the readers to drive engagement/comments.)*
+
+**CRITICAL CONSTRAINTS:**
+- **Zero Repetition:** Do not re-explain concepts we covered in the Past Context. 
+- **SEO Optimization:** Naturally weave the keywords into the H2 headers and body text.
+- **Skimmability:** Use bullet points, bold text for emphasis.
+- **Strict JSON:** You must output ONLY valid JSON, parseable by JSON.parse().`;
+
+  return runGeminiWithFallback(
+    'Daily Newsletter Engine',
+    prompt,
+    {
+      temperature: 0.7,
+      maxOutputTokens: 4000
+    },
+    (responseText) => {
+      try {
+        const jsonMatch = responseText.match(/\\{([\\s\\S]*)\\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : responseText;
+        return JSON.parse(jsonStr);
+      } catch (e) {
+        console.error('Failed to parse Daily Newsletter JSON', e, responseText);
+        throw new Error('Failed to generate proper newsletter format. Please try again.');
+      }
+    },
+    logTokenUsage,
+    [{ googleSearch: {} }] as any[]
+  );
+};
