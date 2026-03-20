@@ -70,6 +70,13 @@ service cloud.firestore {
       // Only admins can delete scoreboards
       allow delete: if request.auth != null && isAdmin();
     }
+
+    // Daily Newsletters collection - all authenticated users can read, editors/admins can write
+    match /daily_newsletters/{newsletterId} {
+      allow read: if request.auth != null;
+      allow create, update: if request.auth != null && (isAdmin() || isEditor());
+      allow delete: if request.auth != null && isAdmin();
+    }
     
     // Helper functions
     function isAdmin() {

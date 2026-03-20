@@ -2570,8 +2570,12 @@ Your output MUST be a JSON object with this exact structure (no markdown code bl
     },
     (responseText) => {
       try {
-        const jsonMatch = responseText.match(/\\{([\\s\\S]*)\\}/);
-        const jsonStr = jsonMatch ? jsonMatch[0] : responseText;
+        // Strip markdown code fences (```json ... ``` or ``` ... ```)
+        let cleaned = responseText.trim();
+        cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+        // Extract the JSON object in case there's surrounding text
+        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : cleaned;
         return JSON.parse(jsonStr);
       } catch (e) {
         console.error('Failed to parse Daily Newsletter JSON', e, responseText);
