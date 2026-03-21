@@ -1,7 +1,7 @@
 
 
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { EnhancedMovieInputForm } from './components/EnhancedMovieInputForm';
@@ -30,6 +30,7 @@ import { GoogleSearchKeyManager } from './components/GoogleSearchKeyManager';
 import { AdminSettings } from './components/AdminSettings';
 
 import { AuthWrapper } from './components/AuthWrapper';
+import { fetchRecentNewsletterSuggestions } from './services/newsletterService';
 
 
 const App: React.FC = () => {
@@ -69,6 +70,10 @@ const App: React.FC = () => {
   const [tokenBudgetConfig, setTokenBudgetConfig] = useState<TokenBudgetConfig>(INITIAL_TOKEN_BUDGET_CONFIG);
   const [showTokenDashboard, setShowTokenDashboard] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [newsletterSuggestions, setNewsletterSuggestions] = useState<{ movies: MovieSuggestion[]; topics: string[] }>({ movies: [], topics: [] });
+
+  const lastBudgetFetchTitleRef = useRef<string>('');
+  const budgetFetchDebounceRef = useRef<number | null>(null);
 
   const [morphokineticsAnalysis, setMorphokineticsAnalysis] = useState<MorphokineticsAnalysis | null>(null);
   const [isAnalyzingMorphokinetics, setIsAnalyzingMorphokinetics] = useState<boolean>(false);
@@ -95,12 +100,11 @@ const App: React.FC = () => {
       .map((item, index) => ({ ...item, ranking: index + 1 }));
     setMonthlyScoreboardData(sortedScoreboardData);
 
-    // User data now comes from AuthWrapper
-  }, []);
+    fetchRecentNewsletterSuggestions(14)
+      .then((s) => setNewsletterSuggestions(s))
+      .catch(() => {});
 
-  const saveTokenBudgetConfig = useCallback((config: TokenBudgetConfig) => {
-    setTokenBudgetConfig(config);
-    localStorage.setItem('tokenBudgetConfig', JSON.stringify(config));
+    // User data now comes from AuthWrapper
   }, []);
 
   const logTokenUsage: LogTokenUsageFn = useCallback((operation, inputChars, outputChars) => {
@@ -116,6 +120,76 @@ const App: React.FC = () => {
       return updatedLog;
     });
   }, [tokenBudgetConfig.isEnabled]);
+
+  const fetchBudgetEstimate = useCallback(async (titleOverride?: string) => {
+    if (!movieInput.enableROIAnalysis) return;
+    if (movieInput.productionBudget !== undefined) return;
+
+    const titleToFetch = (titleOverride ?? movieInput.movieTitle).trim();
+    if (!titleToFetch) return;
+
+    if (lastBudgetFetchTitleRef.current === titleToFetch && (financialAnalysisData?.fetchedBudget || financialAnalysisData?.isLoadingBudget)) {
+      return;
+    }
+
+    lastBudgetFetchTitleRef.current = titleToFetch;
+    setFinancialAnalysisData(prev => ({ ...(prev || {}), isLoadingBudget: true, errorBudget: null }));
+    try {
+      const financials = await fetchMovieFinancialsWithGemini(titleToFetch, logTokenUsage);
+      setFinancialAnalysisData(prev => ({
+        ...(prev || {}),
+        fetchedBudget: financials.budget,
+        fetchedBudgetCurrency: financials.currency,
+        fetchedBudgetSources: financials.sources,
+        fetchedDuration: financials.duration,
+        isLoadingBudget: false,
+        isFallbackBudgetResult: financials.isFallbackResult,
+        errorBudget: null,
+      }));
+    } catch (error) {
+      setFinancialAnalysisData(prev => ({
+        ...(prev || {}),
+        isLoadingBudget: false,
+        errorBudget: error instanceof Error ? error.message : 'Failed to fetch budget info.',
+      }));
+    }
+  }, [movieInput.enableROIAnalysis, movieInput.productionBudget, movieInput.movieTitle, financialAnalysisData?.fetchedBudget, financialAnalysisData?.isLoadingBudget, logTokenUsage]);
+
+  const applyBudgetEstimate = useCallback((budgetUsd: number) => {
+    const rounded = Math.round(budgetUsd);
+    setMovieInput(prev => ({ ...prev, productionBudget: rounded, enableROIAnalysis: true }));
+    setFinancialAnalysisData(prev => ({ ...(prev || {}), userProvidedBudget: rounded }));
+  }, []);
+
+  useEffect(() => {
+    if (!movieInput.enableROIAnalysis) return;
+    if (movieInput.productionBudget !== undefined) return;
+
+    const title = movieInput.movieTitle.trim();
+    if (!title) return;
+
+    const stableIdentifier = !!movieInput.year || /\(\d{4}\)/.test(title);
+    if (!stableIdentifier) return;
+
+    if (budgetFetchDebounceRef.current) {
+      window.clearTimeout(budgetFetchDebounceRef.current);
+    }
+    budgetFetchDebounceRef.current = window.setTimeout(() => {
+      fetchBudgetEstimate(title);
+    }, 900);
+
+    return () => {
+      if (budgetFetchDebounceRef.current) {
+        window.clearTimeout(budgetFetchDebounceRef.current);
+        budgetFetchDebounceRef.current = null;
+      }
+    };
+  }, [movieInput.enableROIAnalysis, movieInput.productionBudget, movieInput.movieTitle, movieInput.year, fetchBudgetEstimate]);
+
+  const saveTokenBudgetConfig = useCallback((config: TokenBudgetConfig) => {
+    setTokenBudgetConfig(config);
+    localStorage.setItem('tokenBudgetConfig', JSON.stringify(config));
+  }, []);
 
   const resetAllAnalysesState = () => {
     setOverallError(null); setLayerAnalyses(initialLayerAnalyses()); setSummaryReport(null);
@@ -190,15 +264,56 @@ const App: React.FC = () => {
   }, [movieInput.movieTitle, analyzeMovieFlowInternal]);
 
   const handleGetSuggestions = useCallback(async (title: string): Promise<MovieSuggestion[]> => {
+    const query = title.trim().toLowerCase();
+    const normalizeKey = (t: string) => t.toLowerCase().replace(/\s*\(\d{4}\)\s*$/, '').trim();
+
+    const newsletterMatches = query.length
+      ? newsletterSuggestions.movies
+          .filter((m) => normalizeKey(m.title).includes(query) || m.title.toLowerCase().includes(query))
+          .slice(0, 6)
+      : [];
+
     try {
-      // Use Gemini API for movie suggestions instead of Google Search
-      const suggestions = await searchMovies(title, logTokenUsage);
-      return suggestions;
+      const aiSuggestions = await searchMovies(title, logTokenUsage);
+      const merged: MovieSuggestion[] = [];
+      const seen = new Set<string>();
+
+      [...newsletterMatches, ...aiSuggestions].forEach((m) => {
+        if (!m || typeof m.title !== 'string') return;
+        const key = normalizeKey(m.title);
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        merged.push(m);
+      });
+
+      return merged.slice(0, 10);
     } catch (error) {
       console.error('Error getting movie title suggestions:', error);
-      return [];
+      return newsletterMatches;
     }
-  }, [logTokenUsage]);
+  }, [logTokenUsage, newsletterSuggestions.movies]);
+
+  const handleNewsletterSuggestionsUpdated = useCallback((data: { movies: MovieSuggestion[]; topics: string[] }) => {
+    setNewsletterSuggestions((prev) => {
+      const movieMap = new Map<string, MovieSuggestion>();
+      prev.movies.forEach((m) => {
+        if (!m?.title) return;
+        movieMap.set(m.title.trim().toLowerCase(), { ...m, title: m.title.trim() });
+      });
+      data.movies.forEach((m) => {
+        if (!m?.title) return;
+        movieMap.set(m.title.trim().toLowerCase(), { ...m, title: m.title.trim() });
+      });
+
+      const topicSet = new Set<string>(prev.topics.map((t) => t.trim()).filter(Boolean));
+      data.topics.forEach((t) => {
+        const cleaned = t.trim();
+        if (cleaned) topicSet.add(cleaned);
+      });
+
+      return { movies: Array.from(movieMap.values()), topics: Array.from(topicSet.values()) };
+    });
+  }, []);
 
 
 
@@ -383,6 +498,10 @@ const App: React.FC = () => {
                 onAnalyze={handleAnalyzeMovie}
                 isAnalyzing={isAnalyzingLayers}
                 onGetSuggestions={handleGetSuggestions}
+                financialAnalysisData={financialAnalysisData}
+                onFetchBudgetEstimate={() => fetchBudgetEstimate()}
+                onApplyBudgetEstimate={applyBudgetEstimate}
+                newsletterSuggestedMovies={newsletterSuggestions.movies}
               />
 
               {overallError && (<div className={`my-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}>{overallError}</div>)}
@@ -417,9 +536,9 @@ const App: React.FC = () => {
 
               {morphokineticsAnalysis && !isAnalyzingMorphokinetics && (<MorphokineticsDisplay analysis={morphokineticsAnalysis} />)}
 
-              <GreybrainerInsights logTokenUsage={logTokenUsage} />
+              <GreybrainerInsights logTokenUsage={logTokenUsage} newsletterSuggestions={newsletterSuggestions} />
               <GreybrainerComparison logTokenUsage={logTokenUsage} />
-              <DailyNewsletter logTokenUsage={logTokenUsage} />
+              <DailyNewsletter logTokenUsage={logTokenUsage} onNewsletterSuggestionsUpdated={handleNewsletterSuggestionsUpdated} />
               {/* Monthly Scoreboard temporarily disabled due to network issues */}
               {/* <MonthlyMagicScoreboard 
             scoreboardData={monthlyScoreboardData} 

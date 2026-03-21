@@ -1,5 +1,6 @@
 import { collection, query, orderBy, limit, getDocs, setDoc, doc, Timestamp, getDoc } from 'firebase/firestore';
 import { db } from './firebaseConfig';
+import { DistributionPack, MovieSuggestion } from '../types';
 
 export interface NewsletterEntry {
   id: string; // e.g. "YYYY-MM-DD"
@@ -7,6 +8,9 @@ export interface NewsletterEntry {
   title: string;
   themes: string;
   content: string;
+  suggestedReviews?: MovieSuggestion[];
+  suggestedResearchTopics?: string[];
+  distributionPack?: DistributionPack;
 }
 
 const NEWSLETTER_COLLECTION = 'daily_newsletters';
@@ -18,7 +22,10 @@ export const saveDailyNewsletter = async (
   dateStr: string,
   title: string,
   themes: string,
-  content: string
+  content: string,
+  suggestedReviews?: MovieSuggestion[],
+  suggestedResearchTopics?: string[],
+  distributionPack?: DistributionPack
 ): Promise<void> => {
   try {
     const docRef = doc(db, NEWSLETTER_COLLECTION, dateStr);
@@ -27,6 +34,9 @@ export const saveDailyNewsletter = async (
       title,
       themes,
       content,
+      suggestedReviews: suggestedReviews || [],
+      suggestedResearchTopics: suggestedResearchTopics || [],
+      ...(distributionPack ? { distributionPack } : {}),
       createdAt: Timestamp.now()
     });
     console.log(`Saved newsletter for ${dateStr}`);
@@ -78,5 +88,64 @@ export const getNewsletterByDate = async (dateStr: string): Promise<NewsletterEn
     return null;
   } catch (error) {
     return null;
+  }
+};
+
+export const saveNewsletterDistributionPack = async (
+  dateStr: string,
+  distributionPack: DistributionPack
+): Promise<void> => {
+  try {
+    const docRef = doc(db, NEWSLETTER_COLLECTION, dateStr);
+    await setDoc(docRef, { distributionPack }, { merge: true });
+  } catch (error) {
+    console.error('Error saving newsletter distribution pack:', error);
+    throw new Error('Failed to save the distribution pack.');
+  }
+};
+
+export const fetchRecentNewsletterSuggestions = async (
+  days: number = 14
+): Promise<{ movies: MovieSuggestion[]; topics: string[] }> => {
+  try {
+    const q = query(
+      collection(db, NEWSLETTER_COLLECTION),
+      orderBy('id', 'desc'),
+      limit(days)
+    );
+
+    const querySnapshot = await getDocs(q);
+    if (querySnapshot.empty) {
+      return { movies: [], topics: [] };
+    }
+
+    const movieMap = new Map<string, MovieSuggestion>();
+    const topicSet = new Set<string>();
+
+    querySnapshot.forEach((d) => {
+      const data = d.data() as NewsletterEntry;
+      const movies = Array.isArray(data.suggestedReviews) ? data.suggestedReviews : [];
+      const topics = Array.isArray(data.suggestedResearchTopics) ? data.suggestedResearchTopics : [];
+
+      movies.forEach((m) => {
+        if (!m || typeof m.title !== 'string') return;
+        const key = m.title.trim().toLowerCase();
+        if (!key) return;
+        if (!movieMap.has(key)) {
+          movieMap.set(key, { ...m, title: m.title.trim() });
+        }
+      });
+
+      topics.forEach((t) => {
+        if (typeof t !== 'string') return;
+        const cleaned = t.trim();
+        if (cleaned) topicSet.add(cleaned);
+      });
+    });
+
+    return { movies: Array.from(movieMap.values()), topics: Array.from(topicSet.values()) };
+  } catch (error) {
+    console.error('Error fetching newsletter suggestions:', error);
+    return { movies: [], topics: [] };
   }
 };

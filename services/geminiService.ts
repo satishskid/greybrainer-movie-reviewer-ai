@@ -1,5 +1,5 @@
 import { GoogleGenerativeAI, GenerateContentResult } from "@google/generative-ai";
-import { ReviewLayer, ReviewStage, LayerAnalysisData, GroundingChunkWeb, GroundingMetadata, PersonnelData, SummaryReportData, CreativeSparkResult, VonnegutShapeData, PlotPoint, ScriptIdeaInput, MagicQuotientAnalysis, MorphokineticsAnalysis, FinancialAnalysisData, SocialSnippets, MovieSuggestion } from '../types';
+import { ReviewLayer, ReviewStage, LayerAnalysisData, GroundingChunkWeb, GroundingMetadata, PersonnelData, SummaryReportData, CreativeSparkResult, VonnegutShapeData, PlotPoint, ScriptIdeaInput, MagicQuotientAnalysis, MorphokineticsAnalysis, FinancialAnalysisData, SocialSnippets, MovieSuggestion, DistributionPack } from '../types';
 import { MAX_SCORE, MAGIC_QUOTIENT_DISCLAIMER } from '../constants';
 import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
@@ -2505,6 +2505,76 @@ Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
   });
 };
 
+const extractFirstJsonValue = (text: string): string | null => {
+  const input = text.trim();
+  const starts: Array<'{' | '['> = ['{', '['];
+  const startIndexes: number[] = [];
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i] as '{' | '[' | string;
+    if (starts.includes(ch as any)) startIndexes.push(i);
+  }
+
+  for (const start of startIndexes) {
+    const stack: string[] = [];
+    let inString = false;
+    let escape = false;
+    const startCh = input[start];
+    stack.push(startCh === '{' ? '}' : ']');
+
+    for (let i = start + 1; i < input.length; i++) {
+      const ch = input[i];
+
+      if (inString) {
+        if (escape) {
+          escape = false;
+          continue;
+        }
+        if (ch === '\\') {
+          escape = true;
+          continue;
+        }
+        if (ch === '"') {
+          inString = false;
+        }
+        continue;
+      }
+
+      if (ch === '"') {
+        inString = true;
+        continue;
+      }
+
+      if (ch === '{') {
+        stack.push('}');
+        continue;
+      }
+      if (ch === '[') {
+        stack.push(']');
+        continue;
+      }
+
+      const expectedClose = stack[stack.length - 1];
+      if (expectedClose && ch === expectedClose) {
+        stack.pop();
+        if (stack.length === 0) {
+          return input.slice(start, i + 1);
+        }
+      }
+    }
+  }
+
+  return null;
+};
+
+const extractJsonPayloadFromModelText = (responseText: string): string => {
+  let cleaned = responseText.trim();
+  const fenced = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenced?.[1]) cleaned = fenced[1].trim();
+
+  const extracted = extractFirstJsonValue(cleaned);
+  return (extracted ?? cleaned).trim();
+};
+
 /**
  * Generate an SEO Optimized Daily Newsletter with Narrative Continuity
  * Uses Google Search Grounding for live trends and RAG context for memory.
@@ -2512,7 +2582,7 @@ Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
 export const generateDailyNewsletter = async (
   pastContentContext: string,
   logTokenUsage?: LogTokenUsageFn,
-): Promise<{ title: string, themes: string, content: string }> => {
+): Promise<{ title: string, themes: string, content: string, suggestedReviews: MovieSuggestion[], suggestedResearchTopics: string[] }> => {
   const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
   
   const prompt = `**ROLE**
@@ -2536,7 +2606,18 @@ Your output MUST be a JSON object with this exact structure (no markdown code bl
 {
   "title": "[Catchy, SEO-Friendly Newsletter Title]",
   "themes": "[Comma-separated SEO keywords/themes covered in this issue]",
-  "content": "[The full newsletter content in clean Markdown string]"
+  "content": "[The full newsletter content in clean Markdown string]",
+  "suggestedReviews": [
+    {
+      "title": "Movie or Series Title",
+      "year": "YYYY (optional)",
+      "type": "Movie|Series (optional)",
+      "description": "1 sentence: why this is worth a deeper Greybrainer review this week"
+    }
+  ],
+  "suggestedResearchTopics": [
+    "Short research angle/topic phrased as a headline"
+  ]
 }
 
 **THE NEWSLETTER CONTENT FORMAT (Markdown)**
@@ -2566,17 +2647,48 @@ Your output MUST be a JSON object with this exact structure (no markdown code bl
     prompt,
     {
       temperature: 0.7,
-      maxOutputTokens: 4000
+      maxOutputTokens: 4000,
+      responseMimeType: "application/json"
     },
     (responseText) => {
       try {
-        // Strip markdown code fences (```json ... ``` or ``` ... ```)
-        let cleaned = responseText.trim();
-        cleaned = cleaned.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
-        // Extract the JSON object in case there's surrounding text
-        const jsonMatch = cleaned.match(/\{[\s\S]*\}/);
-        const jsonStr = jsonMatch ? jsonMatch[0] : cleaned;
-        return JSON.parse(jsonStr);
+        const jsonStr = extractJsonPayloadFromModelText(responseText);
+        const parsed = JSON.parse(jsonStr) as {
+          title?: unknown;
+          themes?: unknown;
+          content?: unknown;
+          suggestedReviews?: unknown;
+          suggestedResearchTopics?: unknown;
+        };
+        if (typeof parsed?.title !== 'string' || typeof parsed?.themes !== 'string' || typeof parsed?.content !== 'string') {
+          throw new Error('Newsletter JSON missing required string fields');
+        }
+        const suggestedReviews: MovieSuggestion[] = Array.isArray(parsed?.suggestedReviews)
+          ? (parsed.suggestedReviews as any[])
+              .filter((m) => m && typeof m === 'object')
+              .map((m) => ({
+                title: typeof (m as any).title === 'string' ? (m as any).title.trim() : '',
+                year: typeof (m as any).year === 'string' ? (m as any).year.trim() : undefined,
+                director: typeof (m as any).director === 'string' ? (m as any).director.trim() : undefined,
+                type: (m as any).type === 'Movie' || (m as any).type === 'Series' ? (m as any).type : undefined,
+                description: typeof (m as any).description === 'string' ? (m as any).description.trim() : undefined,
+              }))
+              .filter((m) => typeof m.title === 'string' && m.title.length > 0)
+          : [];
+
+        const suggestedResearchTopics: string[] = Array.isArray(parsed?.suggestedResearchTopics)
+          ? (parsed.suggestedResearchTopics as any[])
+              .filter((t) => typeof t === 'string' && t.trim().length > 0)
+              .map((t) => (t as string).trim())
+          : [];
+
+        return {
+          title: parsed.title,
+          themes: parsed.themes,
+          content: parsed.content,
+          suggestedReviews,
+          suggestedResearchTopics,
+        };
       } catch (e) {
         console.error('Failed to parse Daily Newsletter JSON', e, responseText);
         throw new Error('Failed to generate proper newsletter format. Please try again.');
@@ -2584,5 +2696,179 @@ Your output MUST be a JSON object with this exact structure (no markdown code bl
     },
     logTokenUsage,
     [{ googleSearch: {} }] as any[]
+  );
+};
+
+export const generateDistributionPackForNewsletter = async (
+  newsletter: { title: string; themes: string; content: string; suggestedReviews?: MovieSuggestion[]; suggestedResearchTopics?: string[] },
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<DistributionPack> => {
+  const prompt = `You are a distribution specialist for @GreyBrainer.
+
+Your job: convert the content below into a complete SEO + social distribution pack that drives momentum.
+
+INPUT:
+- Title: ${newsletter.title}
+- Themes/SEO keywords: ${newsletter.themes}
+- Suggested Reviews: ${(newsletter.suggestedReviews || []).map(m => (m.year ? `${m.title} (${m.year})` : m.title)).join(', ')}
+- Suggested Research Topics: ${(newsletter.suggestedResearchTopics || []).join(' | ')}
+- Content (markdown excerpt): ${newsletter.content.substring(0, 3500)}
+
+OUTPUT REQUIREMENTS:
+- Output MUST be valid JSON only (no markdown fences).
+- Keep everything actionable and short, optimized for shareability + search.
+- Use IST time windows in bestTimeLocal (e.g. "09:00-11:00 IST").
+
+OUTPUT JSON SHAPE:
+{
+  "primaryKeyword": "string",
+  "secondaryKeywords": ["string"],
+  "longTailQueries": ["string"],
+  "slug": "string",
+  "metaTitle": "string",
+  "metaDescription": "string",
+  "headlines": ["string"],
+  "twitterThread": ["string"],
+  "linkedinPost": "string",
+  "instagramCaption": "string",
+  "hashtags": ["#tag"],
+  "quoteCards": ["string"],
+  "internalLinksPlan": ["string"],
+  "postingPlan": [
+    { "platform": "Medium|LinkedIn|X|Instagram|YouTube|Newsletter|Other", "postType": "string", "copy": "string", "bestTimeLocal": "string", "goal": "string" }
+  ]
+}`;
+
+  return runGeminiWithFallback(
+    `Distribution Pack (Newsletter): ${newsletter.title}`,
+    prompt,
+    { temperature: 0.4, maxOutputTokens: 2048, responseMimeType: "application/json" },
+    (responseText) => {
+      const jsonStr = extractJsonPayloadFromModelText(responseText);
+      const parsed = JSON.parse(jsonStr) as Partial<DistributionPack>;
+
+      const toStringArray = (v: unknown): string[] =>
+        Array.isArray(v) ? v.filter((x) => typeof x === 'string').map((x) => (x as string).trim()).filter(Boolean) : [];
+
+      const postingPlan = Array.isArray((parsed as any).postingPlan) ? (parsed as any).postingPlan : [];
+      const normalizedPostingPlan = postingPlan
+        .filter((p: any) => p && typeof p === 'object')
+        .map((p: any) => ({
+          platform: p.platform,
+          postType: typeof p.postType === 'string' ? p.postType.trim() : '',
+          copy: typeof p.copy === 'string' ? p.copy.trim() : '',
+          bestTimeLocal: typeof p.bestTimeLocal === 'string' ? p.bestTimeLocal.trim() : '',
+          goal: typeof p.goal === 'string' ? p.goal.trim() : '',
+        }))
+        .filter((p: any) => typeof p.platform === 'string' && p.platform && p.postType && p.copy);
+
+      const pack: DistributionPack = {
+        primaryKeyword: typeof parsed.primaryKeyword === 'string' ? parsed.primaryKeyword.trim() : '',
+        secondaryKeywords: toStringArray(parsed.secondaryKeywords),
+        longTailQueries: toStringArray(parsed.longTailQueries),
+        slug: typeof parsed.slug === 'string' ? parsed.slug.trim() : '',
+        metaTitle: typeof parsed.metaTitle === 'string' ? parsed.metaTitle.trim() : '',
+        metaDescription: typeof parsed.metaDescription === 'string' ? parsed.metaDescription.trim() : '',
+        headlines: toStringArray(parsed.headlines),
+        twitterThread: toStringArray(parsed.twitterThread),
+        linkedinPost: typeof parsed.linkedinPost === 'string' ? parsed.linkedinPost.trim() : '',
+        instagramCaption: typeof parsed.instagramCaption === 'string' ? parsed.instagramCaption.trim() : '',
+        hashtags: toStringArray(parsed.hashtags),
+        quoteCards: toStringArray(parsed.quoteCards),
+        internalLinksPlan: toStringArray(parsed.internalLinksPlan),
+        postingPlan: normalizedPostingPlan as any,
+      };
+
+      if (!pack.primaryKeyword || !pack.slug || !pack.metaTitle || !pack.metaDescription) {
+        throw new Error('Distribution pack JSON missing required fields');
+      }
+      return pack;
+    },
+    logTokenUsage
+  );
+};
+
+export const generateDistributionPackForResearch = async (
+  trendInput: { trendingTopics: string; researchReport: string },
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<DistributionPack> => {
+  const prompt = `You are a distribution specialist for @GreyBrainer.
+
+Turn the research report into an SEO + social distribution pack. The aim is momentum: one core post, then follow-ups and repurposed social content.
+
+INPUT:
+- Trending Topics: ${trendInput.trendingTopics.substring(0, 1800)}
+- Research Report excerpt: ${trendInput.researchReport.substring(0, 4000)}
+
+OUTPUT REQUIREMENTS:
+- Output MUST be valid JSON only (no markdown fences).
+- Use IST time windows in bestTimeLocal (e.g. "09:00-11:00 IST").
+
+OUTPUT JSON SHAPE:
+{
+  "primaryKeyword": "string",
+  "secondaryKeywords": ["string"],
+  "longTailQueries": ["string"],
+  "slug": "string",
+  "metaTitle": "string",
+  "metaDescription": "string",
+  "headlines": ["string"],
+  "twitterThread": ["string"],
+  "linkedinPost": "string",
+  "instagramCaption": "string",
+  "hashtags": ["#tag"],
+  "quoteCards": ["string"],
+  "internalLinksPlan": ["string"],
+  "postingPlan": [
+    { "platform": "Medium|LinkedIn|X|Instagram|YouTube|Newsletter|Other", "postType": "string", "copy": "string", "bestTimeLocal": "string", "goal": "string" }
+  ]
+}`;
+
+  return runGeminiWithFallback(
+    `Distribution Pack (Research)`,
+    prompt,
+    { temperature: 0.4, maxOutputTokens: 2048, responseMimeType: "application/json" },
+    (responseText) => {
+      const jsonStr = extractJsonPayloadFromModelText(responseText);
+      const parsed = JSON.parse(jsonStr) as Partial<DistributionPack>;
+
+      const toStringArray = (v: unknown): string[] =>
+        Array.isArray(v) ? v.filter((x) => typeof x === 'string').map((x) => (x as string).trim()).filter(Boolean) : [];
+
+      const postingPlan = Array.isArray((parsed as any).postingPlan) ? (parsed as any).postingPlan : [];
+      const normalizedPostingPlan = postingPlan
+        .filter((p: any) => p && typeof p === 'object')
+        .map((p: any) => ({
+          platform: p.platform,
+          postType: typeof p.postType === 'string' ? p.postType.trim() : '',
+          copy: typeof p.copy === 'string' ? p.copy.trim() : '',
+          bestTimeLocal: typeof p.bestTimeLocal === 'string' ? p.bestTimeLocal.trim() : '',
+          goal: typeof p.goal === 'string' ? p.goal.trim() : '',
+        }))
+        .filter((p: any) => typeof p.platform === 'string' && p.platform && p.postType && p.copy);
+
+      const pack: DistributionPack = {
+        primaryKeyword: typeof parsed.primaryKeyword === 'string' ? parsed.primaryKeyword.trim() : '',
+        secondaryKeywords: toStringArray(parsed.secondaryKeywords),
+        longTailQueries: toStringArray(parsed.longTailQueries),
+        slug: typeof parsed.slug === 'string' ? parsed.slug.trim() : '',
+        metaTitle: typeof parsed.metaTitle === 'string' ? parsed.metaTitle.trim() : '',
+        metaDescription: typeof parsed.metaDescription === 'string' ? parsed.metaDescription.trim() : '',
+        headlines: toStringArray(parsed.headlines),
+        twitterThread: toStringArray(parsed.twitterThread),
+        linkedinPost: typeof parsed.linkedinPost === 'string' ? parsed.linkedinPost.trim() : '',
+        instagramCaption: typeof parsed.instagramCaption === 'string' ? parsed.instagramCaption.trim() : '',
+        hashtags: toStringArray(parsed.hashtags),
+        quoteCards: toStringArray(parsed.quoteCards),
+        internalLinksPlan: toStringArray(parsed.internalLinksPlan),
+        postingPlan: normalizedPostingPlan as any,
+      };
+
+      if (!pack.primaryKeyword || !pack.slug || !pack.metaTitle || !pack.metaDescription) {
+        throw new Error('Distribution pack JSON missing required fields');
+      }
+      return pack;
+    },
+    logTokenUsage
   );
 };

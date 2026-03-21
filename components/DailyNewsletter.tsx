@@ -1,19 +1,26 @@
 import React, { useState, useCallback } from 'react';
-import { generateDailyNewsletter, LogTokenUsageFn } from '../services/geminiService';
-import { fetchPastNewslettersContext, saveDailyNewsletter } from '../services/newsletterService';
+import { generateDailyNewsletter, generateDistributionPackForNewsletter, LogTokenUsageFn } from '../services/geminiService';
+import { fetchPastNewslettersContext, saveDailyNewsletter, saveNewsletterDistributionPack } from '../services/newsletterService';
 import { LoadingSpinner } from './LoadingSpinner';
 import { Newspaper, Copy, Download, FileCode } from 'lucide-react';
 import { ReadMoreLess } from './ReadMoreLess';
+import { DistributionPack, MovieSuggestion } from '../types';
 
 interface DailyNewsletterProps {
   logTokenUsage?: LogTokenUsageFn;
+  onNewsletterSuggestionsUpdated?: (data: { movies: MovieSuggestion[]; topics: string[] }) => void;
 }
 
-export const DailyNewsletter: React.FC<DailyNewsletterProps> = ({ logTokenUsage }) => {
-  const [dailyNewsletter, setDailyNewsletter] = useState<{title: string, themes: string, content: string} | null>(null);
+export const DailyNewsletter: React.FC<DailyNewsletterProps> = ({ logTokenUsage, onNewsletterSuggestionsUpdated }) => {
+  const [dailyNewsletter, setDailyNewsletter] = useState<{title: string, themes: string, content: string, suggestedReviews: MovieSuggestion[], suggestedResearchTopics: string[]} | null>(null);
+  const [newsletterDateStr, setNewsletterDateStr] = useState<string>('');
   const [isGeneratingNewsletter, setIsGeneratingNewsletter] = useState<boolean>(false);
   const [newsletterError, setNewsletterError] = useState<string | null>(null);
   const [copiedNewsletter, setCopiedNewsletter] = useState<string | null>(null);
+  const [distributionPack, setDistributionPack] = useState<DistributionPack | null>(null);
+  const [isGeneratingPack, setIsGeneratingPack] = useState<boolean>(false);
+  const [packError, setPackError] = useState<string | null>(null);
+  const [copiedPack, setCopiedPack] = useState<string | null>(null);
 
   const handleGenerateDailyNewsletter = useCallback(async () => {
     if (isGeneratingNewsletter) return;
@@ -21,13 +28,24 @@ export const DailyNewsletter: React.FC<DailyNewsletterProps> = ({ logTokenUsage 
     setIsGeneratingNewsletter(true);
     setNewsletterError(null);
     setDailyNewsletter(null);
+    setDistributionPack(null);
+    setPackError(null);
     try {
       const pastContext = await fetchPastNewslettersContext(7);
       const newsletter = await generateDailyNewsletter(pastContext, logTokenUsage);
       setDailyNewsletter(newsletter);
       
       const todayStr = new Date().toISOString().split('T')[0];
-      await saveDailyNewsletter(todayStr, newsletter.title, newsletter.themes, newsletter.content);
+      setNewsletterDateStr(todayStr);
+      await saveDailyNewsletter(
+        todayStr,
+        newsletter.title,
+        newsletter.themes,
+        newsletter.content,
+        newsletter.suggestedReviews,
+        newsletter.suggestedResearchTopics
+      );
+      onNewsletterSuggestionsUpdated?.({ movies: newsletter.suggestedReviews, topics: newsletter.suggestedResearchTopics });
       
     } catch (err) {
       console.error("Failed to generate daily newsletter:", err);
@@ -35,7 +53,12 @@ export const DailyNewsletter: React.FC<DailyNewsletterProps> = ({ logTokenUsage 
     } finally {
       setIsGeneratingNewsletter(false);
     }
-  }, [isGeneratingNewsletter, logTokenUsage]);
+  }, [isGeneratingNewsletter, logTokenUsage, onNewsletterSuggestionsUpdated]);
+
+  const setCopiedPackState = (type: string) => {
+    setCopiedPack(type);
+    setTimeout(() => setCopiedPack(null), 2500);
+  };
 
   const setCopiedState = (type: string) => {
     setCopiedNewsletter(type);
@@ -91,7 +114,58 @@ export const DailyNewsletter: React.FC<DailyNewsletterProps> = ({ logTokenUsage 
     URL.revokeObjectURL(url);
   };
 
+  const handleGenerateDistributionPack = useCallback(async () => {
+    if (!dailyNewsletter || isGeneratingPack) return;
+    setIsGeneratingPack(true);
+    setPackError(null);
+    try {
+      const pack = await generateDistributionPackForNewsletter(dailyNewsletter, logTokenUsage);
+      setDistributionPack(pack);
+      if (newsletterDateStr) {
+        await saveNewsletterDistributionPack(newsletterDateStr, pack);
+      }
+    } catch (err) {
+      console.error('Failed to generate distribution pack:', err);
+      setPackError(err instanceof Error ? err.message : 'An unknown error occurred while generating the distribution pack.');
+    } finally {
+      setIsGeneratingPack(false);
+    }
+  }, [dailyNewsletter, isGeneratingPack, logTokenUsage, newsletterDateStr]);
 
+  const handleCopyPackJson = () => {
+    if (!distributionPack) return;
+    navigator.clipboard.writeText(JSON.stringify(distributionPack, null, 2)).then(() => {
+      setCopiedPackState('json');
+    }).catch(err => console.error('Failed to copy pack json: ', err));
+  };
+
+  const handleCopyLinkedIn = () => {
+    if (!distributionPack) return;
+    navigator.clipboard.writeText(distributionPack.linkedinPost).then(() => {
+      setCopiedPackState('li');
+    }).catch(err => console.error('Failed to copy linkedin: ', err));
+  };
+
+  const handleCopyTwitterThread = () => {
+    if (!distributionPack) return;
+    navigator.clipboard.writeText(distributionPack.twitterThread.join('\n\n')).then(() => {
+      setCopiedPackState('x');
+    }).catch(err => console.error('Failed to copy twitter thread: ', err));
+  };
+
+  const handleDownloadPackJson = () => {
+    if (!distributionPack) return;
+    const blob = new Blob([JSON.stringify(distributionPack, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const safeName = newsletterDateStr || new Date().toISOString().split('T')[0];
+    link.download = `distribution_pack_${safeName}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="bg-slate-800/80 rounded-2xl shadow-2xl p-6 sm:p-10 mb-8 border border-emerald-500/30 overflow-hidden transform transition-all duration-300">
@@ -180,8 +254,127 @@ export const DailyNewsletter: React.FC<DailyNewsletterProps> = ({ logTokenUsage 
                   <Download className="w-4 h-4 mr-2" />
                   Download
                 </button>
-                
+                <button
+                  onClick={handleGenerateDistributionPack}
+                  disabled={isGeneratingPack}
+                  className="flex items-center px-3 py-2 bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-200 text-sm font-medium rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGeneratingPack ? <><LoadingSpinner size="sm" /><span className="ml-2">Generating Pack...</span></> : <><FileCode className="w-4 h-4 mr-2" />SEO + Social Pack</>}
+                </button>
               </div>
+
+              {packError && (
+                <div className="mb-6 p-4 bg-red-900/30 border border-red-500/50 rounded-lg text-red-300 text-sm">
+                  <span className="font-bold flex items-center mb-1">
+                    <span className="mr-2">⚠️</span> Distribution Pack Error
+                  </span>
+                  {packError}
+                </div>
+              )}
+
+              {distributionPack && (
+                <div className="mb-6 p-4 bg-slate-900/60 rounded-xl border border-emerald-500/20">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
+                    <div>
+                      <div className="text-sm font-semibold text-emerald-200">SEO + Social Distribution Pack</div>
+                      <div className="text-xs text-slate-400">
+                        Primary keyword: <span className="text-slate-200">{distributionPack.primaryKeyword}</span> • Slug: <span className="text-slate-200">{distributionPack.slug}</span>
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        onClick={handleCopyPackJson}
+                        className="flex items-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-md shadow transition-colors"
+                      >
+                        <Copy className="w-3 h-3 mr-1.5" />
+                        {copiedPack === 'json' ? 'Copied JSON!' : 'Copy JSON'}
+                      </button>
+                      <button
+                        onClick={handleCopyLinkedIn}
+                        className="flex items-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-md shadow transition-colors"
+                      >
+                        <Copy className="w-3 h-3 mr-1.5" />
+                        {copiedPack === 'li' ? 'Copied LinkedIn!' : 'Copy LinkedIn'}
+                      </button>
+                      <button
+                        onClick={handleCopyTwitterThread}
+                        className="flex items-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-md shadow transition-colors"
+                      >
+                        <Copy className="w-3 h-3 mr-1.5" />
+                        {copiedPack === 'x' ? 'Copied Thread!' : 'Copy X Thread'}
+                      </button>
+                      <button
+                        onClick={handleDownloadPackJson}
+                        className="flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                      >
+                        <Download className="w-3 h-3 mr-1.5" />
+                        Download JSON
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700">
+                      <div className="text-xs font-semibold text-slate-300 mb-2">Headlines</div>
+                      <ul className="list-disc list-inside text-sm text-slate-200 space-y-1">
+                        {distributionPack.headlines.slice(0, 5).map((h, i) => <li key={`h-${i}`}>{h}</li>)}
+                      </ul>
+                    </div>
+                    <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700">
+                      <div className="text-xs font-semibold text-slate-300 mb-2">Hashtags</div>
+                      <div className="text-sm text-slate-200 whitespace-pre-wrap">
+                        {distributionPack.hashtags.slice(0, 12).join(' ')}
+                      </div>
+                    </div>
+                    <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700 lg:col-span-2">
+                      <div className="text-xs font-semibold text-slate-300 mb-2">Posting Plan</div>
+                      <div className="space-y-2">
+                        {distributionPack.postingPlan.slice(0, 6).map((p, i) => (
+                          <div key={`pp-${i}`} className="text-sm text-slate-200">
+                            <span className="text-emerald-200 font-semibold">{p.platform}</span>
+                            <span className="text-slate-400"> • {p.bestTimeLocal}</span>
+                            <div className="text-xs text-slate-300">{p.postType} — {p.goal}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {(dailyNewsletter.suggestedReviews?.length > 0 || dailyNewsletter.suggestedResearchTopics?.length > 0) && (
+                <div className="mb-6 p-4 bg-slate-900/60 rounded-xl border border-emerald-500/20">
+                  <div className="text-xs font-semibold text-emerald-200 uppercase tracking-wider mb-3">Next Actions (Auto-Extracted)</div>
+                  {dailyNewsletter.suggestedReviews?.length > 0 && (
+                    <div className="mb-4">
+                      <div className="text-sm font-semibold text-slate-200 mb-2">Suggested Reviews</div>
+                      <div className="space-y-2">
+                        {dailyNewsletter.suggestedReviews.slice(0, 6).map((m, idx) => (
+                          <div key={`nr-${idx}-${m.title}`} className="p-3 bg-slate-800/60 rounded-lg border border-slate-700">
+                            <div className="text-slate-100 font-medium">
+                              {m.year ? `${m.title} (${m.year})` : m.title}
+                              {m.type ? <span className="ml-2 text-xs text-slate-400">{m.type}</span> : null}
+                            </div>
+                            {m.description ? <div className="text-xs text-slate-400 mt-1">{m.description}</div> : null}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  {dailyNewsletter.suggestedResearchTopics?.length > 0 && (
+                    <div>
+                      <div className="text-sm font-semibold text-slate-200 mb-2">Suggested Research Topics</div>
+                      <div className="flex flex-wrap gap-2">
+                        {dailyNewsletter.suggestedResearchTopics.slice(0, 10).map((t, idx) => (
+                          <span key={`rt-${idx}`} className="px-2 py-1 text-xs rounded bg-slate-800 text-slate-200 border border-slate-700">
+                            {t}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
               
               <div className="p-6 md:p-8 bg-slate-900/80 rounded-xl border border-slate-700/80 shadow-inner">
                 <div className="text-slate-200 whitespace-pre-wrap leading-loose text-base gb-content-area prose prose-invert prose-emerald max-w-none">

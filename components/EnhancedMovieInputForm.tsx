@@ -1,6 +1,6 @@
 // Simplified movie input form with basic search and IMDb ID lookup
 import React, { useState, useEffect, useCallback } from 'react';
-import { ReviewStage, MovieAnalysisInput, MovieSuggestion } from '../types';
+import { FinancialAnalysisData, ReviewStage, MovieAnalysisInput, MovieSuggestion } from '../types';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { LoadingSpinner } from './LoadingSpinner';
 import { LightBulbIcon } from './icons/LightBulbIcon';
@@ -13,6 +13,10 @@ interface EnhancedMovieInputFormProps {
   onAnalyze: () => void;
   isAnalyzing: boolean;
   onGetSuggestions?: (title: string) => Promise<MovieSuggestion[]>;
+  financialAnalysisData?: FinancialAnalysisData | null;
+  onFetchBudgetEstimate?: () => void;
+  onApplyBudgetEstimate?: (budgetUsd: number) => void;
+  newsletterSuggestedMovies?: MovieSuggestion[];
 }
 
 export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
@@ -22,6 +26,10 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
   onAnalyze,
   isAnalyzing,
   onGetSuggestions,
+  financialAnalysisData,
+  onFetchBudgetEstimate,
+  onApplyBudgetEstimate,
+  newsletterSuggestedMovies,
 }) => {
   const [inputMode, setInputMode] = useState<'search' | 'id'>('search');
   const [idInput, setIdInput] = useState('');
@@ -379,6 +387,24 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
                 </div>
               )}
             </div>
+            {!movieInput.movieTitle.trim() && newsletterSuggestedMovies && newsletterSuggestedMovies.length > 0 ? (
+              <div className="mt-2">
+                <div className="text-xs text-slate-400 mb-1">From Newsletter</div>
+                <div className="flex flex-wrap gap-2">
+                  {newsletterSuggestedMovies.slice(0, 8).map((m, idx) => (
+                    <button
+                      key={`nl-pick-${idx}-${m.title}`}
+                      type="button"
+                      onClick={() => handleSuggestionSelect(m)}
+                      className="px-2 py-1 text-xs rounded bg-slate-800 hover:bg-slate-600 text-slate-200 border border-slate-700"
+                      title={m.description || m.title}
+                    >
+                      {m.year ? `${m.title} (${m.year})` : m.title}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
 
             {/* Real-time Suggestions Dropdown */}
             {showSuggestions && suggestions.length > 0 && (
@@ -467,6 +493,18 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
             <div className="flex items-center space-x-2">
               <button
                 type="button"
+                onClick={() => setMovieInput({ ...movieInput, enableROIAnalysis: !movieInput.enableROIAnalysis })}
+                className={`flex items-center space-x-1 px-2 py-1 rounded text-xs transition-colors ${
+                  movieInput.enableROIAnalysis
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                <span>💰</span>
+                <span>ROI</span>
+              </button>
+              <button
+                type="button"
                 onClick={() => setShowBudgetEstimates(!showBudgetEstimates)}
                 className="flex items-center space-x-1 text-green-400 hover:text-green-300 transition-colors"
               >
@@ -492,6 +530,63 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
             className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-slate-100 placeholder-slate-400"
             aria-label="Production Budget Input"
           />
+          {movieInput.enableROIAnalysis && (
+            <div className="mt-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs text-slate-400 flex-1">
+                  {financialAnalysisData?.isLoadingBudget
+                    ? 'Fetching budget estimate via Gemini grounding...'
+                    : financialAnalysisData?.fetchedBudget
+                      ? `AI found ~${financialAnalysisData.fetchedBudget.toLocaleString()} ${financialAnalysisData.fetchedBudgetCurrency || 'USD'}`
+                      : financialAnalysisData?.errorBudget
+                        ? `Budget fetch failed: ${financialAnalysisData.errorBudget}`
+                        : 'No AI budget estimate yet.'}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onFetchBudgetEstimate}
+                    disabled={!onFetchBudgetEstimate || !!financialAnalysisData?.isLoadingBudget || !movieInput.movieTitle.trim()}
+                    className="px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Fetch
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const budget = financialAnalysisData?.fetchedBudget;
+                      const currency = (financialAnalysisData?.fetchedBudgetCurrency || 'USD').toUpperCase();
+                      if (budget && onApplyBudgetEstimate && currency === 'USD') {
+                        onApplyBudgetEstimate(budget);
+                      }
+                    }}
+                    disabled={
+                      !onApplyBudgetEstimate ||
+                      !financialAnalysisData?.fetchedBudget ||
+                      ((financialAnalysisData?.fetchedBudgetCurrency || 'USD').toUpperCase() !== 'USD')
+                    }
+                    className="px-2 py-1 text-xs rounded bg-indigo-700 hover:bg-indigo-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Use
+                  </button>
+                </div>
+              </div>
+              {financialAnalysisData?.fetchedBudgetSources && financialAnalysisData.fetchedBudgetSources.length > 0 && (
+                <div className="mt-2 text-xs">
+                  <div className="text-slate-500 mb-1">Sources:</div>
+                  <ul className="list-disc list-inside ml-3 space-y-0.5">
+                    {financialAnalysisData.fetchedBudgetSources.slice(0, 3).map((s, i) => (
+                      <li key={`budget-src-${i}`}>
+                        <a href={s.uri} target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline">
+                          {s.title || s.uri}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
           {showBudgetEstimates && (
             <div className="mt-2 p-3 bg-slate-700/50 rounded-lg border border-slate-600">
               <div className="text-xs text-slate-300 space-y-1">

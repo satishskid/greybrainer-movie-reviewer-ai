@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
 import { LoadingSpinner } from './LoadingSpinner';
-import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, generateMovieAnchoredInsightWithGemini, generateExpandedPublicationInsight, generateGreybrainerResearch, generateGreyVerdictEditorial, LogTokenUsageFn } from '../services/geminiService';
+import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, generateMovieAnchoredInsightWithGemini, generateExpandedPublicationInsight, generateGreybrainerResearch, generateGreyVerdictEditorial, generateDistributionPackForResearch, LogTokenUsageFn } from '../services/geminiService';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon'; // New Icon for detailed report
 import { ClipboardIcon } from './icons/ClipboardIcon';
@@ -10,15 +10,17 @@ import { DownloadIcon } from './icons/DownloadIcon';
 import { ReadMoreLess } from './ReadMoreLess'; // For potentially long detailed reports
 import GeminiCanvasExport from './GeminiCanvasExport';
 import { FileText, Newspaper } from 'lucide-react';
+import { DistributionPack, MovieSuggestion } from '../types';
 
 interface GreybrainerInsightsProps {
   logTokenUsage?: LogTokenUsageFn;
+  newsletterSuggestions?: { movies: MovieSuggestion[]; topics: string[] };
 }
 
 type InsightMode = 'on-demand' | 'movie-anchored' | 'research-trending' | 'grey-verdict';
 type AnalysisLayer = 'story' | 'orchestration' | 'performance' | 'morphokinetics' | 'random';
 
-export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTokenUsage }) => {
+export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTokenUsage, newsletterSuggestions }) => {
   // Mode selection - Default to Research & Trending
   const [insightMode, setInsightMode] = useState<InsightMode>('research-trending');
   
@@ -59,6 +61,10 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
   const [isGeneratingResearch, setIsGeneratingResearch] = useState<boolean>(false);
   const [researchError, setResearchError] = useState<string | null>(null);
   const [copiedResearch, setCopiedResearch] = useState<boolean>(false);
+  const [researchDistributionPack, setResearchDistributionPack] = useState<DistributionPack | null>(null);
+  const [isGeneratingResearchPack, setIsGeneratingResearchPack] = useState<boolean>(false);
+  const [researchPackError, setResearchPackError] = useState<string | null>(null);
+  const [copiedResearchPack, setCopiedResearchPack] = useState<string | null>(null);
 
   // Grey Verdict state (new)
   const [greyVerdictMovieTitle, setGreyVerdictMovieTitle] = useState<string>('');
@@ -255,6 +261,8 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
     setIsGeneratingResearch(true);
     setResearchError(null);
     setResearchReport(null);
+    setResearchDistributionPack(null);
+    setResearchPackError(null);
     
     try {
       const report = await generateGreybrainerResearch(
@@ -269,6 +277,47 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
     } finally {
       setIsGeneratingResearch(false);
     }
+  };
+
+  const setCopiedResearchPackState = (type: string) => {
+    setCopiedResearchPack(type);
+    setTimeout(() => setCopiedResearchPack(null), 2500);
+  };
+
+  const handleGenerateResearchDistributionPack = async () => {
+    if (!researchReport || isGeneratingResearchPack) return;
+    setIsGeneratingResearchPack(true);
+    setResearchPackError(null);
+    try {
+      const pack = await generateDistributionPackForResearch({ trendingTopics, researchReport }, logTokenUsage);
+      setResearchDistributionPack(pack);
+    } catch (err) {
+      console.error('Failed to generate research distribution pack:', err);
+      setResearchPackError(err instanceof Error ? err.message : 'An unknown error occurred while generating the distribution pack.');
+    } finally {
+      setIsGeneratingResearchPack(false);
+    }
+  };
+
+  const handleCopyResearchPackJson = () => {
+    if (!researchDistributionPack) return;
+    navigator.clipboard.writeText(JSON.stringify(researchDistributionPack, null, 2)).then(() => {
+      setCopiedResearchPackState('json');
+    }).catch(err => console.error('Failed to copy research pack json: ', err));
+  };
+
+  const handleDownloadResearchPackJson = () => {
+    if (!researchDistributionPack) return;
+    const blob = new Blob([JSON.stringify(researchDistributionPack, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const today = new Date().toISOString().split('T')[0];
+    link.download = `research_distribution_pack_${today}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleCopyResearch = () => {
@@ -580,6 +629,24 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                 className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-amber-500 focus:outline-none"
               />
               <p className="text-xs text-slate-400 mt-1">Enter a recent Indian film or OTT show that's fresh in audience's mind</p>
+              {newsletterSuggestions?.movies?.length ? (
+                <div className="mt-2">
+                  <div className="text-xs text-slate-400 mb-1">Suggested from Newsletter</div>
+                  <div className="flex flex-wrap gap-2">
+                    {newsletterSuggestions.movies.slice(0, 10).map((m, idx) => (
+                      <button
+                        key={`nl-movie-${idx}-${m.title}`}
+                        type="button"
+                        onClick={() => setSelectedMovie(m.year ? `${m.title} (${m.year})` : m.title)}
+                        className="px-2 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                        title={m.description || m.title}
+                      >
+                        {m.year ? `${m.title} (${m.year})` : m.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {/* Layer Selection */}
@@ -733,6 +800,50 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
               <p className="text-slate-300 text-sm mb-4">
                 <strong>Build your continuous Medium narrative.</strong> Analyze trending topics and create strategic research that connects to your @GreyBrainer audience at https://medium.com/@GreyBrainer/greybrainer. Generate actionable insights that position each post as a chapter in an ongoing story.
               </p>
+              {(newsletterSuggestions?.movies?.length || newsletterSuggestions?.topics?.length) ? (
+                <div className="mb-4 p-3 bg-slate-800/60 rounded-lg border border-amber-500/20">
+                  <div className="text-xs font-semibold text-amber-200 uppercase tracking-wider mb-2">Newsletter Suggestions</div>
+                  {newsletterSuggestions?.topics?.length ? (
+                    <div className="mb-2">
+                      <div className="text-xs text-slate-400 mb-1">Research Topics</div>
+                      <div className="flex flex-wrap gap-2">
+                        {newsletterSuggestions.topics.slice(0, 10).map((t, idx) => (
+                          <button
+                            key={`nl-topic-${idx}`}
+                            type="button"
+                            onClick={() => setTrendingTopics((prev) => (prev.trim() ? `${prev.trim()}\n• ${t}` : `• ${t}`))}
+                            className="px-2 py-1 text-xs rounded bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                            title="Add to Trending Topics"
+                          >
+                            {t}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  {newsletterSuggestions?.movies?.length ? (
+                    <div>
+                      <div className="text-xs text-slate-400 mb-1">Movies / Series</div>
+                      <div className="flex flex-wrap gap-2">
+                        {newsletterSuggestions.movies.slice(0, 10).map((m, idx) => {
+                          const label = m.year ? `${m.title} (${m.year})` : m.title;
+                          return (
+                            <button
+                              key={`nl-movie-trend-${idx}-${m.title}`}
+                              type="button"
+                              onClick={() => setTrendingTopics((prev) => (prev.trim() ? `${prev.trim()}\n• ${label}` : `• ${label}`))}
+                              className="px-2 py-1 text-xs rounded bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                              title={m.description || 'Add to Trending Topics'}
+                            >
+                              {label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
               
               <div className="space-y-3">
                 <div>
@@ -787,6 +898,14 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                   </h3>
                   <div className="flex gap-2">
                     <button
+                      onClick={handleGenerateResearchDistributionPack}
+                      disabled={isGeneratingResearchPack}
+                      className="flex items-center px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white text-xs font-medium rounded-md shadow transition-colors disabled:opacity-50"
+                      title="Generate SEO + Social distribution pack"
+                    >
+                      {isGeneratingResearchPack ? '✨ Packing...' : '🚀 SEO + Social Pack'}
+                    </button>
+                    <button
                       onClick={handleCopyResearch}
                       className="flex items-center px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium rounded-md shadow transition-colors"
                       title="Copy research report"
@@ -804,6 +923,51 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                     </button>
                   </div>
                 </div>
+                {researchPackError && (
+                  <div className="mb-3 p-3 bg-red-900/30 border border-red-500 rounded-lg text-red-200 text-sm">
+                    <strong>Error:</strong> {researchPackError}
+                  </div>
+                )}
+                {researchDistributionPack && (
+                  <div className="mb-4 p-4 bg-slate-900/60 rounded-lg border border-amber-500/20">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
+                      <div className="text-sm text-slate-200">
+                        <span className="text-amber-200 font-semibold">Distribution Pack</span>
+                        <span className="text-slate-400"> • {researchDistributionPack.primaryKeyword} • {researchDistributionPack.slug}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={handleCopyResearchPackJson}
+                          className="flex items-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-md shadow transition-colors"
+                        >
+                          <ClipboardIcon className="w-3 h-3 mr-1.5" />
+                          {copiedResearchPack === 'json' ? 'Copied JSON!' : 'Copy JSON'}
+                        </button>
+                        <button
+                          onClick={handleDownloadResearchPackJson}
+                          className="flex items-center px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                        >
+                          <DownloadIcon className="w-3 h-3 mr-1.5" />
+                          Download JSON
+                        </button>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+                      <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700">
+                        <div className="text-xs font-semibold text-slate-300 mb-2">Headlines</div>
+                        <ul className="list-disc list-inside text-sm text-slate-200 space-y-1">
+                          {researchDistributionPack.headlines.slice(0, 5).map((h, i) => <li key={`rh-${i}`}>{h}</li>)}
+                        </ul>
+                      </div>
+                      <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700">
+                        <div className="text-xs font-semibold text-slate-300 mb-2">Hashtags</div>
+                        <div className="text-sm text-slate-200 whitespace-pre-wrap">
+                          {researchDistributionPack.hashtags.slice(0, 12).join(' ')}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
                 <div className="p-4 bg-slate-900/60 rounded-lg border border-amber-500/30">
                   <ReadMoreLess
                     text={researchReport}

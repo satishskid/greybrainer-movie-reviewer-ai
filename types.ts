@@ -3,6 +3,29 @@ export interface SocialSnippets {
   linkedin?: string;
 }
 
+export interface DistributionPack {
+  primaryKeyword: string;
+  secondaryKeywords: string[];
+  longTailQueries: string[];
+  slug: string;
+  metaTitle: string;
+  metaDescription: string;
+  headlines: string[];
+  twitterThread: string[];
+  linkedinPost: string;
+  instagramCaption: string;
+  hashtags: string[];
+  quoteCards: string[];
+  internalLinksPlan: string[];
+  postingPlan: Array<{
+    platform: 'Medium' | 'LinkedIn' | 'X' | 'Instagram' | 'YouTube' | 'Newsletter' | 'Other';
+    postType: string;
+    copy: string;
+    bestTimeLocal: string;
+    goal: string;
+  }>;
+}
+
 export interface MovieSuggestion {
   title: string;
   year?: string;
