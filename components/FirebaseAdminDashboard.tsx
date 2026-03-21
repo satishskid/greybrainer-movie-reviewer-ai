@@ -164,16 +164,8 @@ export const FirebaseAdminDashboard: React.FC<FirebaseAdminDashboardProps> = ({ 
           <h1 className="text-2xl font-bold text-slate-100">Admin Dashboard</h1>
           <p className="text-slate-300">Manage content, users, and platform settings</p>
         </div>
-        <div className="flex items-center gap-4">
-          <button
-            onClick={() => setShowAdminSettings(true)}
-            className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm rounded-lg transition-colors flex items-center gap-2"
-          >
-            ⚙️ System Settings
-          </button>
-          <div className="text-sm text-slate-500">
-            Welcome back, {currentUser.displayName}
-          </div>
+        <div className="text-sm text-slate-500">
+          Welcome back, {currentUser.displayName}
         </div>
       </div>
 

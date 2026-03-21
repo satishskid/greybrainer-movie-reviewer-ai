@@ -2699,6 +2699,66 @@ Your output MUST be a JSON object with this exact structure (no markdown code bl
   );
 };
 
+export const extractNewsletterSuggestionsFromContent = async (
+  newsletter: { title?: string; themes?: string; content: string },
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<{ suggestedReviews: MovieSuggestion[]; suggestedResearchTopics: string[] }> => {
+  const prompt = `You are an editorial assistant for @GreyBrainer.
+
+Given the newsletter content below, extract:
+1) Suggested movies/series to review next (title + optional year/type + 1 sentence why).
+2) Suggested research topics (headline-style).
+
+OUTPUT MUST be valid JSON only (no markdown fences) with exactly:
+{
+  "suggestedReviews": [
+    { "title": "string", "year": "YYYY (optional)", "type": "Movie|Series (optional)", "description": "string (optional)" }
+  ],
+  "suggestedResearchTopics": ["string"]
+}
+
+NEWSLETTER TITLE: ${newsletter.title || ''}
+THEMES/SEO: ${newsletter.themes || ''}
+CONTENT (markdown):
+${newsletter.content.substring(0, 12000)}
+`;
+
+  return runGeminiWithFallback(
+    'Newsletter Suggestions Extraction',
+    prompt,
+    { temperature: 0.2, maxOutputTokens: 2048, responseMimeType: "application/json" },
+    (responseText) => {
+      const jsonStr = extractJsonPayloadFromModelText(responseText);
+      const parsed = JSON.parse(jsonStr) as {
+        suggestedReviews?: unknown;
+        suggestedResearchTopics?: unknown;
+      };
+
+      const suggestedReviews: MovieSuggestion[] = Array.isArray(parsed?.suggestedReviews)
+        ? (parsed.suggestedReviews as any[])
+            .filter((m) => m && typeof m === 'object')
+            .map((m) => ({
+              title: typeof (m as any).title === 'string' ? (m as any).title.trim() : '',
+              year: typeof (m as any).year === 'string' ? (m as any).year.trim() : undefined,
+              director: typeof (m as any).director === 'string' ? (m as any).director.trim() : undefined,
+              type: (m as any).type === 'Movie' || (m as any).type === 'Series' ? (m as any).type : undefined,
+              description: typeof (m as any).description === 'string' ? (m as any).description.trim() : undefined,
+            }))
+            .filter((m) => typeof m.title === 'string' && m.title.length > 0)
+        : [];
+
+      const suggestedResearchTopics: string[] = Array.isArray(parsed?.suggestedResearchTopics)
+        ? (parsed.suggestedResearchTopics as any[])
+            .filter((t) => typeof t === 'string' && t.trim().length > 0)
+            .map((t) => (t as string).trim())
+        : [];
+
+      return { suggestedReviews, suggestedResearchTopics };
+    },
+    logTokenUsage
+  );
+};
+
 export const generateDistributionPackForNewsletter = async (
   newsletter: { title: string; themes: string; content: string; suggestedReviews?: MovieSuggestion[]; suggestedResearchTopics?: string[] },
   logTokenUsage?: LogTokenUsageFn,

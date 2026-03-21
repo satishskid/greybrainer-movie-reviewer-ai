@@ -48,6 +48,21 @@ export default {
       }
     }
 
+    if (url.pathname === '/newsletter/recent') {
+      try {
+        const daysParam = url.searchParams.get('days');
+        const days = Math.min(Math.max(parseInt(daysParam || '30', 10) || 30, 1), 365);
+        const { results } = await env.DB.prepare(
+          "SELECT * FROM newsletters ORDER BY date DESC LIMIT ?"
+        ).bind(days).all();
+        return new Response(JSON.stringify(results || []), {
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        });
+      } catch (err: any) {
+        return new Response(JSON.stringify({ error: err.message }), { status: 500, headers: corsHeaders });
+      }
+    }
+
     return new Response(JSON.stringify({ status: "GB BaaS Online" }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   },
 

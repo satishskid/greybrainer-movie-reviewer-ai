@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import GeminiDebugTest from './GeminiDebugTest';
 import { FeatureVerificationTest } from './FeatureVerificationTest';
 import { FirebaseAdminDashboard } from './FirebaseAdminDashboard';
 import { GeminiKeyManager } from './GeminiKeyManager';
 import { GoogleSearchKeyManager } from './GoogleSearchKeyManager';
 import { getSelectedGeminiModel, getModelInfo } from '../utils/geminiModelStorage';
-import { getGeminiApiKeyString, hasGeminiApiKey } from '../utils/geminiKeyStorage';
+import { hasGeminiApiKey } from '../utils/geminiKeyStorage';
 import { LoadingSpinner } from './LoadingSpinner';
-import { MonthlyScoreboardAdmin } from './MonthlyScoreboardAdmin';
+import { AdminService } from '../services/adminService';
+import { enrichRecentFirestoreNewslettersWithSuggestions, importBaasNewslettersToFirestore, runNewsletterPipelineAudit, NewsletterPipelineAudit } from '../services/newsletterService';
 
 interface AdminSettingsProps {
   isOpen: boolean;
@@ -16,9 +17,13 @@ interface AdminSettingsProps {
 }
 
 export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'keys' | 'admin' | 'debug' | 'health' | 'scoreboard'>('keys');
+  const [activeTab, setActiveTab] = useState<'newsletter' | 'keys' | 'admin' | 'health' | 'diagnostics'>('newsletter');
   const [systemHealth, setSystemHealth] = useState<any>(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
+  const [newsletterAudit, setNewsletterAudit] = useState<NewsletterPipelineAudit | null>(null);
+  const [isRunningNewsletterAudit, setIsRunningNewsletterAudit] = useState(false);
+  const [newsletterAction, setNewsletterAction] = useState<{ type: string; message: string } | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
 
   const checkSystemHealth = async () => {
     setIsCheckingHealth(true);
@@ -48,15 +53,84 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
 
   if (!isOpen) return null;
 
+  const isAdmin = AdminService.isAdminSync(currentUser);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setActiveTab('newsletter');
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (showAdvanced) return;
+    if (activeTab === 'admin' || activeTab === 'health' || activeTab === 'diagnostics') {
+      setActiveTab('newsletter');
+    }
+  }, [activeTab, showAdvanced]);
+
+  const handleRunNewsletterAudit = async () => {
+    setIsRunningNewsletterAudit(true);
+    setNewsletterAction(null);
+    try {
+      const audit = await runNewsletterPipelineAudit(30);
+      setNewsletterAudit(audit);
+    } catch (e) {
+      setNewsletterAction({ type: 'error', message: e instanceof Error ? e.message : 'Failed to run audit' });
+    } finally {
+      setIsRunningNewsletterAudit(false);
+    }
+  };
+
+  const handleImportFromBaas = async () => {
+    setIsRunningNewsletterAudit(true);
+    setNewsletterAction(null);
+    try {
+      const result = await importBaasNewslettersToFirestore(60);
+      setNewsletterAction({ type: 'success', message: `Imported ${result.imported}, skipped ${result.skippedExisting}, failed ${result.failed}` });
+      const audit = await runNewsletterPipelineAudit(30);
+      setNewsletterAudit(audit);
+      window.dispatchEvent(new Event('newsletterSuggestions:refresh'));
+    } catch (e) {
+      setNewsletterAction({ type: 'error', message: e instanceof Error ? e.message : 'Import failed' });
+    } finally {
+      setIsRunningNewsletterAudit(false);
+    }
+  };
+
+  const handleEnrichSuggestions = async () => {
+    setIsRunningNewsletterAudit(true);
+    setNewsletterAction(null);
+    try {
+      const result = await enrichRecentFirestoreNewslettersWithSuggestions(14);
+      setNewsletterAction({ type: 'success', message: `Enriched ${result.enriched}, skipped ${result.skipped}, failed ${result.failed}` });
+      const audit = await runNewsletterPipelineAudit(30);
+      setNewsletterAudit(audit);
+      window.dispatchEvent(new Event('newsletterSuggestions:refresh'));
+    } catch (e) {
+      setNewsletterAction({ type: 'error', message: e instanceof Error ? e.message : 'Enrichment failed' });
+    } finally {
+      setIsRunningNewsletterAudit(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-slate-900 rounded-xl border border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between p-6 border-b border-slate-700">
           <div>
-            <h2 className="text-xl font-semibold text-slate-100">Admin Settings</h2>
-            <p className="text-sm text-slate-400">System configuration and health monitoring</p>
+            <h2 className="text-xl font-semibold text-slate-100">Settings</h2>
+            <p className="text-sm text-slate-400">Newsletter workflow and required keys</p>
           </div>
+          <div className="flex items-center gap-3">
+            {isAdmin && (
+              <button
+                type="button"
+                onClick={() => setShowAdvanced((v) => !v)}
+                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+              >
+                {showAdvanced ? 'Hide admin' : 'Admin'}
+              </button>
+            )}
           <button
             onClick={onClose}
             className="text-slate-400 hover:text-slate-200 transition-colors"
@@ -65,10 +139,21 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
+          </div>
         </div>
 
         {/* Tabs */}
         <div className="flex border-b border-slate-700">
+          <button
+            onClick={() => setActiveTab('newsletter')}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'newsletter'
+                ? 'text-indigo-400 border-b-2 border-indigo-400'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            📰 Newsletter
+          </button>
           <button
             onClick={() => setActiveTab('keys')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
@@ -77,52 +162,136 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
-            🔑 API Keys
+            🔑 Keys
           </button>
-          <button
-            onClick={() => setActiveTab('admin')}
-            className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'admin'
-                ? 'text-indigo-400 border-b-2 border-indigo-400'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            👑 Admin Dashboard
-          </button>
-          <button
-            onClick={() => setActiveTab('health')}
-            className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'health'
-                ? 'text-indigo-400 border-b-2 border-indigo-400'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            🏥 System Health
-          </button>
-          <button
-            onClick={() => setActiveTab('debug')}
-            className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'debug'
-                ? 'text-indigo-400 border-b-2 border-indigo-400'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            🔧 Debug Tools
-          </button>
-          <button
-            onClick={() => setActiveTab('scoreboard')}
-            className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'scoreboard'
-                ? 'text-indigo-400 border-b-2 border-indigo-400'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            🏆 Scoreboard
-          </button>
+          {showAdvanced && (
+            <>
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`px-6 py-3 text-sm font-medium transition-colors ${
+                  activeTab === 'admin'
+                    ? 'text-indigo-400 border-b-2 border-indigo-400'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                👑 Admin
+              </button>
+              <button
+                onClick={() => setActiveTab('health')}
+                className={`px-6 py-3 text-sm font-medium transition-colors ${
+                  activeTab === 'health'
+                    ? 'text-indigo-400 border-b-2 border-indigo-400'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🏥 Health
+              </button>
+              <button
+                onClick={() => setActiveTab('diagnostics')}
+                className={`px-6 py-3 text-sm font-medium transition-colors ${
+                  activeTab === 'diagnostics'
+                    ? 'text-indigo-400 border-b-2 border-indigo-400'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                🔧 Diagnostics
+              </button>
+            </>
+          )}
         </div>
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
+          {activeTab === 'newsletter' && (
+            <div>
+              <h3 className="text-lg font-medium text-slate-100 mb-4">Newsletter Pipeline</h3>
+
+              <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 mb-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div>
+                    <h4 className="text-md font-medium text-slate-200">Status & Actions</h4>
+                    <p className="text-xs text-slate-400">Ingest → Store → Fetch → Chips</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleRunNewsletterAudit}
+                      disabled={isRunningNewsletterAudit}
+                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 text-white text-sm rounded transition-colors flex items-center gap-2"
+                    >
+                      {isRunningNewsletterAudit ? <LoadingSpinner size="sm" /> : '🔎'}
+                      Refresh
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleImportFromBaas}
+                      disabled={isRunningNewsletterAudit || !isAdmin}
+                      className="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-200 text-sm rounded transition-colors"
+                    >
+                      Import
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleEnrichSuggestions}
+                      disabled={isRunningNewsletterAudit || !isAdmin}
+                      className="px-3 py-2 bg-emerald-700/70 hover:bg-emerald-700 disabled:bg-slate-800 disabled:text-slate-500 text-emerald-100 text-sm rounded transition-colors"
+                    >
+                      Enrich Chips
+                    </button>
+                  </div>
+                </div>
+
+                {newsletterAction && (
+                  <div className={`mb-3 px-3 py-2 rounded border text-sm ${
+                    newsletterAction.type === 'success'
+                      ? 'bg-emerald-900/20 border-emerald-700/50 text-emerald-200'
+                      : 'bg-red-900/20 border-red-700/50 text-red-200'
+                  }`}>
+                    {newsletterAction.message}
+                  </div>
+                )}
+
+                {newsletterAudit ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div className="bg-slate-900/40 rounded-lg border border-slate-700 p-3">
+                      <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Firestore</div>
+                      <div className="space-y-1 text-slate-200">
+                        <div><span className="text-slate-400">Fetched:</span> {newsletterAudit.firestore.fetched}</div>
+                        <div><span className="text-slate-400">Latest:</span> {newsletterAudit.firestore.latestId || '—'}</div>
+                        <div><span className="text-slate-400">With Content:</span> {newsletterAudit.firestore.withContent}</div>
+                        <div><span className="text-slate-400">With Movie Chips:</span> {newsletterAudit.firestore.withSuggestedReviews}</div>
+                        <div><span className="text-slate-400">With Research Chips:</span> {newsletterAudit.firestore.withSuggestedTopics}</div>
+                        {!newsletterAudit.firestore.ok && (
+                          <div className="text-red-300">{newsletterAudit.firestore.error}</div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="bg-slate-900/40 rounded-lg border border-slate-700 p-3">
+                      <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">BaaS (D1)</div>
+                      <div className="space-y-1 text-slate-200">
+                        <div><span className="text-slate-400">Latest Date:</span> {newsletterAudit.baas.latestDate || '—'}</div>
+                        <div><span className="text-slate-400">Latest Title:</span> {newsletterAudit.baas.latestTitle || '—'}</div>
+                        <div><span className="text-slate-400">Recent Fetched:</span> {newsletterAudit.baas.recentFetched ?? '—'}</div>
+                        {!newsletterAudit.baas.ok && (
+                          <div className="text-red-300">{newsletterAudit.baas.error}</div>
+                        )}
+                      </div>
+                    </div>
+                    {!isAdmin && (
+                      <div className="md:col-span-2 text-xs text-slate-400">
+                        Import/Enrich actions require an admin account.
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-400">
+                    Click Refresh to check what’s in Firestore and whether chips are present.
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {activeTab === 'keys' && (
             <div>
               <h3 className="text-lg font-medium text-slate-100 mb-6">API Key Configuration</h3>
@@ -147,7 +316,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
 
 
 
-          {activeTab === 'admin' && (
+          {activeTab === 'admin' && showAdvanced && (
             <div>
               {currentUser?.role === 'admin' ? (
                 <div>
@@ -165,7 +334,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
             </div>
           )}
 
-          {activeTab === 'health' && (
+          {activeTab === 'health' && showAdvanced && (
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-lg font-medium text-slate-100">System Health Monitor</h3>
@@ -268,14 +437,9 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
             </div>
           )}
 
-          {activeTab === 'debug' && (
+          {activeTab === 'diagnostics' && showAdvanced && (
             <div>
-              <h3 className="text-lg font-medium text-slate-100 mb-4">Debug Tools</h3>
-              <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4 mb-4">
-                <p className="text-sm text-yellow-200">
-                  <strong>⚠️ Admin Only:</strong> These tools are for troubleshooting and should only be used by technical administrators.
-                </p>
-              </div>
+              <h3 className="text-lg font-medium text-slate-100 mb-4">Diagnostics</h3>
               <GeminiDebugTest />
               <FeatureVerificationTest />
             </div>

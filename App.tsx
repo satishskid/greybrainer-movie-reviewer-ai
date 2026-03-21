@@ -30,28 +30,58 @@ import { GoogleSearchKeyManager } from './components/GoogleSearchKeyManager';
 import { AdminSettings } from './components/AdminSettings';
 
 import { AuthWrapper } from './components/AuthWrapper';
-import { fetchRecentNewsletterSuggestions } from './services/newsletterService';
+import { fetchRecentNewsletterSuggestions, NewsletterPipelineAudit, runNewsletterPipelineAudit } from './services/newsletterService';
 import { GreybrainerUser } from './services/firebaseConfig';
 
 
 const NewsletterSuggestionsLoader: React.FC<{
   authUser: GreybrainerUser | null;
   onLoaded: (data: { movies: MovieSuggestion[]; topics: string[] }) => void;
-}> = ({ authUser, onLoaded }) => {
+  onAuditLoaded: (audit: NewsletterPipelineAudit | null) => void;
+}> = ({ authUser, onLoaded, onAuditLoaded }) => {
   const lastUidRef = useRef<string | null>(null);
 
   useEffect(() => {
     const uid = authUser?.uid || null;
     if (!uid) return;
-    if (lastUidRef.current === uid) return;
-    lastUidRef.current = uid;
 
-    fetchRecentNewsletterSuggestions(14)
-      .then((s) => onLoaded(s))
-      .catch((e) => {
+    const run = async () => {
+      try {
+        const s = await fetchRecentNewsletterSuggestions(14);
+        onLoaded(s);
+        if ((s.movies?.length || 0) === 0 && (s.topics?.length || 0) === 0) {
+          try {
+            const audit = await runNewsletterPipelineAudit(30);
+            onAuditLoaded(audit);
+          } catch {
+            onAuditLoaded(null);
+          }
+        } else {
+          onAuditLoaded(null);
+        }
+      } catch (e) {
         console.error('Failed to load newsletter suggestions:', e);
-      });
-  }, [authUser?.uid, onLoaded]);
+        onLoaded({ movies: [], topics: [] });
+        try {
+          const audit = await runNewsletterPipelineAudit(30);
+          onAuditLoaded(audit);
+        } catch {
+          onAuditLoaded(null);
+        }
+      }
+    };
+
+    if (lastUidRef.current !== uid) {
+      lastUidRef.current = uid;
+      run();
+    }
+
+    const handler = () => run();
+    window.addEventListener('newsletterSuggestions:refresh', handler as EventListener);
+    return () => {
+      window.removeEventListener('newsletterSuggestions:refresh', handler as EventListener);
+    };
+  }, [authUser?.uid, onLoaded, onAuditLoaded]);
 
   return null;
 };
@@ -94,6 +124,7 @@ const App: React.FC = () => {
   const [showTokenDashboard, setShowTokenDashboard] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [newsletterSuggestions, setNewsletterSuggestions] = useState<{ movies: MovieSuggestion[]; topics: string[] }>({ movies: [], topics: [] });
+  const [newsletterAudit, setNewsletterAudit] = useState<NewsletterPipelineAudit | null>(null);
 
   const lastBudgetFetchTitleRef = useRef<string>('');
   const budgetFetchDebounceRef = useRef<number | null>(null);
@@ -490,7 +521,7 @@ const App: React.FC = () => {
     <AuthWrapper>
       {(authUser) => (
         <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-slate-100">
-          <NewsletterSuggestionsLoader authUser={authUser} onLoaded={setNewsletterSuggestions} />
+          <NewsletterSuggestionsLoader authUser={authUser} onLoaded={setNewsletterSuggestions} onAuditLoaded={setNewsletterAudit} />
           <Header
             onToggleTokenDashboard={() => setShowTokenDashboard(prev => !prev)}
           />
@@ -504,12 +535,15 @@ const App: React.FC = () => {
               <div className="flex justify-end mb-6">
                 <button
                   onClick={() => setShowSettings(true)}
+                  type="button"
                   className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2"
                   title="Settings & Configuration"
                 >
                   ⚙️ Settings
                 </button>
               </div>
+
+              <DailyNewsletter logTokenUsage={logTokenUsage} onNewsletterSuggestionsUpdated={handleNewsletterSuggestionsUpdated} />
 
               <EnhancedMovieInputForm
                 movieInput={movieInput}
@@ -522,6 +556,9 @@ const App: React.FC = () => {
                 onFetchBudgetEstimate={() => fetchBudgetEstimate()}
                 onApplyBudgetEstimate={applyBudgetEstimate}
                 newsletterSuggestedMovies={newsletterSuggestions.movies}
+                newsletterSuggestedTopics={newsletterSuggestions.topics}
+                newsletterAudit={newsletterAudit}
+                onOpenSettings={() => setShowSettings(true)}
               />
 
               {overallError && (<div className={`my-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}>{overallError}</div>)}
@@ -558,7 +595,6 @@ const App: React.FC = () => {
 
               <GreybrainerInsights logTokenUsage={logTokenUsage} newsletterSuggestions={newsletterSuggestions} />
               <GreybrainerComparison logTokenUsage={logTokenUsage} />
-              <DailyNewsletter logTokenUsage={logTokenUsage} onNewsletterSuggestionsUpdated={handleNewsletterSuggestionsUpdated} />
               {/* Monthly Scoreboard temporarily disabled due to network issues */}
               {/* <MonthlyMagicScoreboard 
             scoreboardData={monthlyScoreboardData} 
@@ -573,7 +609,6 @@ const App: React.FC = () => {
           /> */}
 
               {/* Admin Dashboard moved to Settings modal */}
-
               <CreativeSparkGenerator genres={COMMON_GENRES} onGenerate={handleGenerateCreativeSpark} isLoading={isGeneratingCreativeSpark || isCurrentlyProcessing} error={creativeSparkError} results={creativeSparkResults} selectedIdea={selectedSparkForUI} onSelectIdea={handleSelectSparkIdea} onEnhanceIdea={handleEnhanceSparkIdea} isEnhancing={isEnhancingSpark || isCurrentlyProcessing} />
 
               <ScriptMagicQuotientAnalyzer genres={COMMON_GENRES} onAnalyze={handleAnalyzeScriptMagicQuotient} isLoading={isAnalyzingMagicQuotient || isCurrentlyProcessing} error={magicQuotientError} analysisResult={magicQuotientResult} />
