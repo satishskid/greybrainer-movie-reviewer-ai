@@ -124,8 +124,37 @@ export const fetchRecentNewsletterSuggestions = async (
 
     querySnapshot.forEach((d) => {
       const data = d.data() as NewsletterEntry;
-      const movies = Array.isArray(data.suggestedReviews) ? data.suggestedReviews : [];
-      const topics = Array.isArray(data.suggestedResearchTopics) ? data.suggestedResearchTopics : [];
+
+      const rawMovies =
+        Array.isArray((data as any).suggestedReviews) ? (data as any).suggestedReviews :
+        Array.isArray((data as any).suggestedMovies) ? (data as any).suggestedMovies :
+        Array.isArray((data as any).suggestedMovieReviews) ? (data as any).suggestedMovieReviews :
+        [];
+
+      const rawTopics =
+        Array.isArray((data as any).suggestedResearchTopics) ? (data as any).suggestedResearchTopics :
+        Array.isArray((data as any).suggestedTopics) ? (data as any).suggestedTopics :
+        Array.isArray((data as any).suggestedResearch) ? (data as any).suggestedResearch :
+        [];
+
+      const movies: MovieSuggestion[] = (rawMovies as any[])
+        .map((m) => {
+          if (typeof m === 'string') return { title: m.trim() };
+          if (!m || typeof m !== 'object') return null;
+          const title = typeof (m as any).title === 'string' ? (m as any).title.trim() : '';
+          if (!title) return null;
+          const yearRaw = (m as any).year;
+          const year = typeof yearRaw === 'string' ? yearRaw.trim() : (typeof yearRaw === 'number' ? String(yearRaw) : undefined);
+          const director = typeof (m as any).director === 'string' ? (m as any).director.trim() : undefined;
+          const type = (m as any).type === 'Movie' || (m as any).type === 'Series' ? (m as any).type : undefined;
+          const description = typeof (m as any).description === 'string' ? (m as any).description.trim() : undefined;
+          return { title, year, director, type, description } as MovieSuggestion;
+        })
+        .filter((m): m is MovieSuggestion => !!m && typeof m.title === 'string' && m.title.length > 0);
+
+      const topics: string[] = (rawTopics as any[])
+        .filter((t) => typeof t === 'string' && t.trim().length > 0)
+        .map((t) => (t as string).trim());
 
       movies.forEach((m) => {
         if (!m || typeof m.title !== 'string') return;

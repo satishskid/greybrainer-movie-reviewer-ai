@@ -31,7 +31,28 @@ import { AdminSettings } from './components/AdminSettings';
 
 import { AuthWrapper } from './components/AuthWrapper';
 import { fetchRecentNewsletterSuggestions } from './services/newsletterService';
+import { GreybrainerUser } from './services/firebaseConfig';
 
+
+const NewsletterSuggestionsLoader: React.FC<{
+  authUser: GreybrainerUser | null;
+  onLoaded: (data: { movies: MovieSuggestion[]; topics: string[] }) => void;
+}> = ({ authUser, onLoaded }) => {
+  const lastUidRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const uid = authUser?.uid || null;
+    if (!uid) return;
+    if (lastUidRef.current === uid) return;
+    lastUidRef.current = uid;
+
+    fetchRecentNewsletterSuggestions(14)
+      .then((s) => onLoaded(s))
+      .catch(() => {});
+  }, [authUser?.uid, onLoaded]);
+
+  return null;
+};
 
 const App: React.FC = () => {
   const [movieInput, setMovieInput] = useState<MovieAnalysisInput>({
@@ -99,10 +120,6 @@ const App: React.FC = () => {
       .sort((a, b) => b.greybrainerScore - a.greybrainerScore)
       .map((item, index) => ({ ...item, ranking: index + 1 }));
     setMonthlyScoreboardData(sortedScoreboardData);
-
-    fetchRecentNewsletterSuggestions(14)
-      .then((s) => setNewsletterSuggestions(s))
-      .catch(() => {});
 
     // User data now comes from AuthWrapper
   }, []);
@@ -471,6 +488,7 @@ const App: React.FC = () => {
     <AuthWrapper>
       {(authUser) => (
         <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-slate-100">
+          <NewsletterSuggestionsLoader authUser={authUser} onLoaded={setNewsletterSuggestions} />
           <Header
             onToggleTokenDashboard={() => setShowTokenDashboard(prev => !prev)}
           />
