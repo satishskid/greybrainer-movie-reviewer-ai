@@ -387,16 +387,19 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
                 </div>
               )}
             </div>
-            {!movieInput.movieTitle.trim() && newsletterSuggestedMovies && newsletterSuggestedMovies.length > 0 ? (
-              <div className="mt-2">
-                <div className="text-xs text-slate-400 mb-1">From Newsletter</div>
+            {newsletterSuggestedMovies && newsletterSuggestedMovies.length > 0 ? (
+              <div className="mt-3 p-3 rounded-lg border border-emerald-500/30 bg-emerald-900/10">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="text-xs font-semibold text-emerald-200 uppercase tracking-wider">Newsletter Picks</div>
+                  <div className="text-[11px] text-slate-300">Click to fill the search</div>
+                </div>
                 <div className="flex flex-wrap gap-2">
-                  {newsletterSuggestedMovies.slice(0, 8).map((m, idx) => (
+                  {newsletterSuggestedMovies.slice(0, 12).map((m, idx) => (
                     <button
                       key={`nl-pick-${idx}-${m.title}`}
                       type="button"
                       onClick={() => handleSuggestionSelect(m)}
-                      className="px-2 py-1 text-xs rounded bg-slate-800 hover:bg-slate-600 text-slate-200 border border-slate-700"
+                      className="px-2.5 py-1.5 text-xs rounded-md bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-100 border border-emerald-500/30 transition-colors"
                       title={m.description || m.title}
                     >
                       {m.year ? `${m.title} (${m.year})` : m.title}
