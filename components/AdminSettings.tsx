@@ -81,6 +81,10 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
     }
   };
 
+  const handleRefreshHomepageChips = () => {
+    window.dispatchEvent(new Event('newsletterSuggestions:refresh'));
+  };
+
   const handleImportFromBaas = async () => {
     setIsRunningNewsletterAudit(true);
     setNewsletterAction(null);
@@ -206,6 +210,28 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
           {activeTab === 'newsletter' && (
             <div>
               <h3 className="text-lg font-medium text-slate-100 mb-4">Newsletter Pipeline</h3>
+
+              <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 mb-4">
+                <div className="text-sm text-slate-300">
+                  This is the back-office for the chips shown on the main screen (Newsletter Picks / Research Chips).
+                </div>
+                <div className="mt-2 flex flex-wrap items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleRefreshHomepageChips}
+                    className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded transition-colors"
+                  >
+                    Refresh chips on homepage
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="px-3 py-2 bg-slate-700/60 hover:bg-slate-700 text-slate-200 text-sm rounded transition-colors"
+                  >
+                    Back to writing
+                  </button>
+                </div>
+              </div>
 
               <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 mb-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
