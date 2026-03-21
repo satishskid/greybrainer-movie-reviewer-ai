@@ -25,6 +25,8 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
   const [newsletterAction, setNewsletterAction] = useState<{ type: string; message: string } | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
+  const isAdmin = AdminService.isAdminSync(currentUser);
+
   const checkSystemHealth = async () => {
     setIsCheckingHealth(true);
     try {
@@ -51,21 +53,20 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
     }
   };
 
-  if (!isOpen) return null;
-
-  const isAdmin = AdminService.isAdminSync(currentUser);
-
   useEffect(() => {
     if (!isOpen) return;
     setActiveTab('newsletter');
   }, [isOpen]);
 
   useEffect(() => {
+    if (!isOpen) return;
     if (showAdvanced) return;
     if (activeTab === 'admin' || activeTab === 'health' || activeTab === 'diagnostics') {
       setActiveTab('newsletter');
     }
-  }, [activeTab, showAdvanced]);
+  }, [activeTab, isOpen, showAdvanced]);
+
+  if (!isOpen) return null;
 
   const handleRunNewsletterAudit = async () => {
     setIsRunningNewsletterAudit(true);
