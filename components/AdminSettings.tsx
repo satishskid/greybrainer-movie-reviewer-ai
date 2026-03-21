@@ -17,7 +17,7 @@ interface AdminSettingsProps {
 }
 
 export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'newsletter' | 'keys' | 'admin' | 'health' | 'diagnostics'>('newsletter');
+  const [activeTab, setActiveTab] = useState<'newsletter' | 'keys' | 'help' | 'admin' | 'health' | 'diagnostics'>('newsletter');
   const [systemHealth, setSystemHealth] = useState<any>(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
   const [newsletterAudit, setNewsletterAudit] = useState<NewsletterPipelineAudit | null>(null);
@@ -168,6 +168,16 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
             }`}
           >
             🔑 Keys
+          </button>
+          <button
+            onClick={() => setActiveTab('help')}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${
+              activeTab === 'help'
+                ? 'text-indigo-400 border-b-2 border-indigo-400'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            📘 Help
           </button>
           {showAdvanced && (
             <>
@@ -336,6 +346,36 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
                   <h4 className="text-md font-medium text-slate-200 mb-3">🔍 Google Search API Key</h4>
                   <p className="text-sm text-slate-400 mb-4">Optional: Enables movie data search and suggestions</p>
                   <GoogleSearchKeyManager />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'help' && (
+            <div>
+              <h3 className="text-lg font-medium text-slate-100 mb-4">Quick Start</h3>
+
+              <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                <div className="text-sm text-slate-300 leading-6 space-y-4">
+                  <div>
+                    <div className="text-slate-100 font-medium mb-1">For content writers</div>
+                    <div>1) Pick a movie from Newsletter Picks (chips) or type a title.</div>
+                    <div>2) Click Analyze Movie Magic.</div>
+                    <div>3) Use the output (layer analysis + final report).</div>
+                  </div>
+
+                  <div>
+                    <div className="text-slate-100 font-medium mb-1">If Newsletter Picks show 0</div>
+                    <div>1) Click Refresh on the main screen (next to Newsletter Picks).</div>
+                    <div>2) If still 0, open Settings → Newsletter and run Enrich Chips (admin), then Refresh on homepage.</div>
+                  </div>
+
+                  <div>
+                    <div className="text-slate-100 font-medium mb-1">What Settings does</div>
+                    <div><span className="text-slate-200">Newsletter:</span> fixes chips by importing/enriching newsletters.</div>
+                    <div><span className="text-slate-200">Keys:</span> stores your personal Gemini/Google Search keys in this browser.</div>
+                    <div><span className="text-slate-200">Admin/Health/Diagnostics:</span> troubleshooting (admins only).</div>
+                  </div>
                 </div>
               </div>
             </div>
