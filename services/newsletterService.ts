@@ -108,13 +108,21 @@ export const fetchRecentNewsletterSuggestions = async (
   days: number = 14
 ): Promise<{ movies: MovieSuggestion[]; topics: string[] }> => {
   try {
-    const q = query(
-      collection(db, NEWSLETTER_COLLECTION),
-      orderBy('id', 'desc'),
-      limit(days)
-    );
+    const runQuery = async (orderField: 'id' | 'createdAt') => {
+      const q = query(
+        collection(db, NEWSLETTER_COLLECTION),
+        orderBy(orderField, 'desc'),
+        limit(days)
+      );
+      return getDocs(q);
+    };
 
-    const querySnapshot = await getDocs(q);
+    let querySnapshot;
+    try {
+      querySnapshot = await runQuery('id');
+    } catch (e) {
+      querySnapshot = await runQuery('createdAt');
+    }
     if (querySnapshot.empty) {
       return { movies: [], topics: [] };
     }

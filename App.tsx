@@ -48,7 +48,9 @@ const NewsletterSuggestionsLoader: React.FC<{
 
     fetchRecentNewsletterSuggestions(14)
       .then((s) => onLoaded(s))
-      .catch(() => {});
+      .catch((e) => {
+        console.error('Failed to load newsletter suggestions:', e);
+      });
   }, [authUser?.uid, onLoaded]);
 
   return null;
