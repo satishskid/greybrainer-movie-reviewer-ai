@@ -2567,9 +2567,23 @@ const extractFirstJsonValue = (text: string): string | null => {
 
 const extractJsonPayloadFromModelText = (responseText: string): string => {
   let cleaned = responseText.trim();
+  
+  // Try to extract from markdown fences first
   const fenced = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (fenced?.[1]) cleaned = fenced[1].trim();
+  if (fenced?.[1]) {
+    cleaned = fenced[1].trim();
+  }
+  
+  // Ensure the string ends properly - sometimes the model cuts off the final closing brace/bracket
+  const lastBraceIndex = cleaned.lastIndexOf('}');
+  const lastBracketIndex = cleaned.lastIndexOf(']');
+  
+  if (lastBraceIndex > -1 || lastBracketIndex > -1) {
+    const lastIndex = Math.max(lastBraceIndex, lastBracketIndex);
+    cleaned = cleaned.substring(0, lastIndex + 1);
+  }
 
+  // Fallback to strict extractor if needed
   const extracted = extractFirstJsonValue(cleaned);
   return (extracted ?? cleaned).trim();
 };
