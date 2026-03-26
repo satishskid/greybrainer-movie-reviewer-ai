@@ -872,7 +872,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                 📊 Research & Trending Engine
               </h3>
               <p className="text-slate-300 text-sm mb-4">
-                <strong>Build your continuous Medium narrative.</strong> Analyze trending topics and create strategic research that connects to your @GreyBrainer audience at https://medium.com/@GreyBrainer/greybrainer. Generate actionable insights that position each post as a chapter in an ongoing story.
+                <strong>Build your continuous narrative.</strong> Analyze trending topics and create strategic research that connects to your audience. Generate actionable insights that position each post as a chapter in an ongoing story.
               </p>
               
               <div className="space-y-3">
@@ -884,21 +884,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                     id="trending-topics"
                     value={trendingTopics}
                     onChange={(e) => setTrendingTopics(e.target.value)}
-                    placeholder="What's dominating Indian cinema conversations RIGHT NOW?&#10;&#10;Examples:&#10;• 'Mardaani 3' trending on Netflix&#10;• 'Dhurandhar 2' massive opening but critic backlash&#10;• 'Toxic' sparking debates&#10;• Box office: Pan-Indian spectacles vs regional darlings&#10;&#10;Include: Platform, release dates, box office numbers, social media buzz"
-                    rows={8}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="past-content" className="block text-sm font-medium text-slate-200 mb-1">
-                    Your Past Content (For Narrative Continuity)
-                  </label>
-                  <textarea
-                    id="past-content"
-                    value={pastContentContext}
-                    onChange={(e) => setPastContentContext(e.target.value)}
-                    placeholder="List your recent database entries or past reviews to create thematic bridges...&#10;&#10;Examples:&#10;• 'Mardaani' franchise - female-led action evolution&#10;• 'Dhurandhar' box office analysis&#10;• Morphokinetic shift in Pan-Indian films&#10;• #MeToo narratives in regional cinema&#10;&#10;The AI will connect current trends to your past analyses, showing evolution."
+                    placeholder="Click the chips above to auto-fill trending topics from your daily newsletter, or type your own here..."
                     rows={6}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   />
@@ -1025,30 +1011,27 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                 ⚖️ Grey Verdict: Cultural Editorial Engine
               </h3>
               <p className="text-slate-300 text-sm mb-4">
-                <strong>Transform film analysis into cultural narratives.</strong> The Grey Verdict isn't a review - it's an editorial that uses specific films as proof of broader industry trends, societal shifts, or business insights. Perfect for thought leadership on <a href="https://medium.com/@GreyBrainer" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 underline">Medium/@GreyBrainer</a>, LinkedIn, or guest posts.
+                <strong>Transform film analysis into cultural narratives.</strong> The Grey Verdict isn't a review - it's an editorial that uses specific films as proof of broader industry trends, societal shifts, or business insights.
               </p>
               
               <div className="space-y-3">
                 <div>
                   <label htmlFor="verdict-movie" className="block text-sm font-medium text-slate-200 mb-1">
-                    Subject Film(s) / Series * <span className="text-purple-400 text-xs">(comma-separated for multiple)</span>
+                    Subject Film(s) / Series * <span className="text-purple-400 text-xs">(Click movie chips above to auto-fill)</span>
                   </label>
                   <input
                     id="verdict-movie"
                     type="text"
                     value={greyVerdictMovieTitle}
                     onChange={(e) => setGreyVerdictMovieTitle(e.target.value)}
-                    placeholder="Enter film(s) you want to analyze - separate with commas for multiple..."
+                    placeholder="Enter film(s) you want to analyze..."
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-                  <p className="text-xs text-slate-400 mt-1">
-                    Single: "Angammal" | Multiple: "Angammal, The Raja Saab, Haq" | Series: "Freedom at Midnight Season 2"
-                  </p>
                 </div>
 
                 <div>
                   <label htmlFor="verdict-trend" className="block text-sm font-medium text-slate-200 mb-1">
-                    Trend / Angle *
+                    Trend / Angle * <span className="text-purple-400 text-xs">(Click research chips above to auto-fill)</span>
                   </label>
                   <input
                     id="verdict-trend"
@@ -1058,24 +1041,6 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                     placeholder="What cultural/industry trend do these films represent?"
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-                  <p className="text-xs text-slate-400 mt-1">Examples: "The Silver Economy", "Anti-War Cinema Wave", "Grey Matriarch Rise", "Divine Action Evolution", "#MeToo Backlash"</p>
-                </div>
-
-                <div>
-                  <label htmlFor="verdict-ecosystem" className="block text-sm font-medium text-slate-200 mb-1">
-                    Newsletter Context / Past Ecosystem <span className="text-purple-400 text-xs">(AI will extract clues)</span>
-                  </label>
-                  <textarea
-                    id="verdict-ecosystem"
-                    value={greyVerdictPastContext}
-                    onChange={(e) => setGreyVerdictPastContext(e.target.value)}
-                    placeholder="Paste your newsletter with trending topics + suggestions, OR list past database analyses for thematic bridges...&#10;&#10;📧 Newsletter Example:&#10;'This week's trend: Female-led action in Bollywood. Suggest Grey Verdict on how recent films reveal audience shifts. Connect to our past analysis of Mardaani...'&#10;&#10;📚 Past Analyses Example:&#10;• 'Mardaani' - Female-led action evolution&#10;• 'Toxic' - Period gangster dynamics&#10;• 'Dhurandhar 2' - Morphokinetic shift in Pan-Indian films&#10;&#10;AI will parse suggestions and create explicit bridges to your past insights."
-                    rows={8}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-slate-400 mt-1">
-                    💡 Tip: Copy-paste your newsletter - AI will intelligently extract trending topics, writing suggestions, and create bridges to past content!
-                  </p>
                 </div>
 
                 <button
