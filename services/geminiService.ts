@@ -2852,7 +2852,12 @@ OUTPUT JSON SHAPE:
       };
 
       if (!pack.primaryKeyword || !pack.slug || !pack.metaTitle || !pack.metaDescription) {
-        throw new Error('Distribution pack JSON missing required fields');
+        console.warn('Distribution pack missing fields, falling back to defaults:', pack);
+        // Fallback defaults so it doesn't crash the UI
+        pack.primaryKeyword = pack.primaryKeyword || 'Greybrainer Analysis';
+        pack.slug = pack.slug || 'greybrainer-analysis-' + Date.now();
+        pack.metaTitle = pack.metaTitle || 'Greybrainer Strategic Insight';
+        pack.metaDescription = pack.metaDescription || 'Strategic insights and analysis from Greybrainer AI.';
       }
       return pack;
     },
@@ -2937,7 +2942,12 @@ OUTPUT JSON SHAPE:
       };
 
       if (!pack.primaryKeyword || !pack.slug || !pack.metaTitle || !pack.metaDescription) {
-        throw new Error('Distribution pack JSON missing required fields');
+        console.warn('Distribution pack missing fields, falling back to defaults:', pack);
+        // Fallback defaults so it doesn't crash the UI
+        pack.primaryKeyword = pack.primaryKeyword || 'Greybrainer Analysis';
+        pack.slug = pack.slug || 'greybrainer-analysis-' + Date.now();
+        pack.metaTitle = pack.metaTitle || 'Greybrainer Strategic Insight';
+        pack.metaDescription = pack.metaDescription || 'Strategic insights and analysis from Greybrainer AI.';
       }
       return pack;
     },
