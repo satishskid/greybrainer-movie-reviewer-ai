@@ -884,7 +884,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                     id="trending-topics"
                     value={trendingTopics}
                     onChange={(e) => setTrendingTopics(e.target.value)}
-                    placeholder="What's dominating Indian cinema conversations RIGHT NOW?&#10;&#10;Examples:&#10;• 'Akhanda 2: Thaandavam' #1 on Netflix - divine action sequel&#10;• 'The Raja Saab' massive opening but critic backlash&#10;• 'Freedom at Midnight S2' sparking Partition debates&#10;• 'Dhurandhar' trending pre-Netflix release Jan 30&#10;• Box office: Pan-Indian spectacles vs regional darlings&#10;&#10;Include: Platform, release dates, box office numbers, social media buzz"
+                    placeholder="What's dominating Indian cinema conversations RIGHT NOW?&#10;&#10;Examples:&#10;• 'Mardaani 3' trending on Netflix&#10;• 'Dhurandhar 2' massive opening but critic backlash&#10;• 'Toxic' sparking debates&#10;• Box office: Pan-Indian spectacles vs regional darlings&#10;&#10;Include: Platform, release dates, box office numbers, social media buzz"
                     rows={8}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   />
@@ -898,7 +898,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                     id="past-content"
                     value={pastContentContext}
                     onChange={(e) => setPastContentContext(e.target.value)}
-                    placeholder="List your recent database entries or past reviews to create thematic bridges...&#10;&#10;Examples:&#10;• 'Angammal' review - women's rights in Tamil cinema&#10;• 'Haq' courtroom drama analysis&#10;• Spy thriller comparison: How 'Dhurandhar' changed the game&#10;• Divine Action genre deep dive (Feb 2026)&#10;• #MeToo narratives in regional cinema&#10;&#10;The AI will connect current trends to your past analyses, showing evolution."
+                    placeholder="List your recent database entries or past reviews to create thematic bridges...&#10;&#10;Examples:&#10;• 'Mardaani' franchise - female-led action evolution&#10;• 'Dhurandhar' box office analysis&#10;• Morphokinetic shift in Pan-Indian films&#10;• #MeToo narratives in regional cinema&#10;&#10;The AI will connect current trends to your past analyses, showing evolution."
                     rows={6}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   />
@@ -1069,7 +1069,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                     id="verdict-ecosystem"
                     value={greyVerdictPastContext}
                     onChange={(e) => setGreyVerdictPastContext(e.target.value)}
-                    placeholder="Paste your newsletter with trending topics + suggestions, OR list past database analyses for thematic bridges...&#10;&#10;📧 Newsletter Example:&#10;'This week's trend: Anti-war fatigue in Bollywood. Suggest Grey Verdict on how recent war films reveal audience backlash. Connect to our past analysis of jingoism in 2024...'&#10;&#10;📚 Past Analyses Example:&#10;• 'KD (A) Karuppudurai' - Joyful elderly rebellion&#10;• 'Haq' - Legal autonomy for women&#10;• 'Pushpa' morphokinetic breakdown - Divine action roots&#10;&#10;AI will parse suggestions and create explicit bridges to your past insights."
+                    placeholder="Paste your newsletter with trending topics + suggestions, OR list past database analyses for thematic bridges...&#10;&#10;📧 Newsletter Example:&#10;'This week's trend: Female-led action in Bollywood. Suggest Grey Verdict on how recent films reveal audience shifts. Connect to our past analysis of Mardaani...'&#10;&#10;📚 Past Analyses Example:&#10;• 'Mardaani' - Female-led action evolution&#10;• 'Toxic' - Period gangster dynamics&#10;• 'Dhurandhar 2' - Morphokinetic shift in Pan-Indian films&#10;&#10;AI will parse suggestions and create explicit bridges to your past insights."
                     rows={8}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
