@@ -2647,8 +2647,7 @@ Your output MUST be a JSON object with this exact structure (no markdown code bl
     prompt,
     {
       temperature: 0.7,
-      maxOutputTokens: 4000,
-      responseMimeType: "application/json"
+      maxOutputTokens: 4000
     },
     (responseText) => {
       try {
