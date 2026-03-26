@@ -402,28 +402,82 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
           Explore patterns and evolution in Indian cinema and OTT content across Story, Orchestration, Performance, and Morphokinetics layers.
         </p>
         
+        {/* Global Chips Section */}
+        {(newsletterSuggestions?.movies?.length || newsletterSuggestions?.topics?.length) ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
+            {/* Newsletter Movie Picks */}
+            <div className="p-3 bg-slate-800/80 rounded-lg border border-teal-500/30">
+              <div className="flex justify-between items-center mb-2">
+                <div className="text-xs font-semibold text-teal-300 uppercase tracking-wider">
+                  Newsletter Picks ({newsletterSuggestions.movies?.length || 0})
+                </div>
+                <div className="text-[10px] text-slate-400">Click to use in active tab</div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {newsletterSuggestions.movies?.map((m, idx) => {
+                  const label = m.year ? `${m.title} (${m.year})` : m.title;
+                  return (
+                    <button
+                      key={`global-movie-${idx}`}
+                      type="button"
+                      onClick={() => {
+                        if (insightMode === 'movie-anchored') {
+                          setSelectedMovie(label);
+                        } else if (insightMode === 'grey-verdict') {
+                          setGreyVerdictMovieTitle(prev => prev ? `${prev}, ${label}` : label);
+                        } else if (insightMode === 'research-trending') {
+                          setTrendingTopics(prev => prev.trim() ? `${prev.trim()}\n• ${label}` : `• ${label}`);
+                        } else if (insightMode === 'on-demand') {
+                          setInsightMode('movie-anchored');
+                          setSelectedMovie(label);
+                        }
+                      }}
+                      className="px-2 py-1.5 text-xs font-medium rounded-md bg-teal-900/40 hover:bg-teal-700 text-teal-100 border border-teal-700/50 transition-colors text-left"
+                      title={m.description || `Use ${label}`}
+                    >
+                      {label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Research Topic Chips */}
+            <div className="p-3 bg-slate-800/80 rounded-lg border border-amber-500/30">
+              <div className="flex justify-between items-center mb-2">
+                <div className="text-xs font-semibold text-amber-300 uppercase tracking-wider">
+                  Research Chips ({newsletterSuggestions.topics?.length || 0})
+                </div>
+                <div className="text-[10px] text-slate-400">Click to use in active tab</div>
+              </div>
+              <div className="flex flex-col gap-2">
+                {newsletterSuggestions.topics?.map((t, idx) => (
+                  <button
+                    key={`global-topic-${idx}`}
+                    type="button"
+                    onClick={() => {
+                      if (insightMode === 'research-trending') {
+                        setTrendingTopics(prev => prev.trim() ? `${prev.trim()}\n• ${t}` : `• ${t}`);
+                      } else if (insightMode === 'grey-verdict') {
+                        setGreyVerdictTrendAngle(t);
+                      } else {
+                        setInsightMode('research-trending');
+                        setTrendingTopics(prev => prev.trim() ? `${prev.trim()}\n• ${t}` : `• ${t}`);
+                      }
+                    }}
+                    className="px-2 py-1.5 text-xs font-medium rounded-md bg-amber-900/30 hover:bg-amber-800/60 text-amber-100 border border-amber-700/50 transition-colors text-left line-clamp-2"
+                    title={t}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        ) : null}
+
         {/* Mode Tabs */}
-        <div className="flex gap-2 my-4 border-b border-slate-700 pb-2">
-          <button
-            onClick={() => setInsightMode('on-demand')}
-            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
-              insightMode === 'on-demand'
-                ? 'bg-amber-500 text-black'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            On-Demand Insight
-          </button>
-          <button
-            onClick={() => setInsightMode('movie-anchored')}
-            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
-              insightMode === 'movie-anchored'
-                ? 'bg-amber-500 text-black'
-                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-            }`}
-          >
-            🎬 Movie-Anchored Insight
-          </button>
+        <div className="flex flex-wrap gap-2 my-4 border-b border-slate-700 pb-2">
           <button
             onClick={() => setInsightMode('research-trending')}
             className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
@@ -443,6 +497,26 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
             }`}
           >
             ⚖️ Grey Verdict
+          </button>
+          <button
+            onClick={() => setInsightMode('on-demand')}
+            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+              insightMode === 'on-demand'
+                ? 'bg-amber-500 text-black'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            On-Demand Insight
+          </button>
+          <button
+            onClick={() => setInsightMode('movie-anchored')}
+            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+              insightMode === 'movie-anchored'
+                ? 'bg-amber-500 text-black'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            🎬 Movie-Anchored Insight
           </button>
         </div>
 
@@ -800,50 +874,6 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
               <p className="text-slate-300 text-sm mb-4">
                 <strong>Build your continuous Medium narrative.</strong> Analyze trending topics and create strategic research that connects to your @GreyBrainer audience at https://medium.com/@GreyBrainer/greybrainer. Generate actionable insights that position each post as a chapter in an ongoing story.
               </p>
-              {(newsletterSuggestions?.movies?.length || newsletterSuggestions?.topics?.length) ? (
-                <div className="mb-4 p-3 bg-slate-800/60 rounded-lg border border-amber-500/20">
-                  <div className="text-xs font-semibold text-amber-200 uppercase tracking-wider mb-2">Newsletter Suggestions</div>
-                  {newsletterSuggestions?.topics?.length ? (
-                    <div className="mb-2">
-                      <div className="text-xs text-slate-400 mb-1">Research Topics</div>
-                      <div className="flex flex-wrap gap-2">
-                        {newsletterSuggestions.topics.slice(0, 10).map((t, idx) => (
-                          <button
-                            key={`nl-topic-${idx}`}
-                            type="button"
-                            onClick={() => setTrendingTopics((prev) => (prev.trim() ? `${prev.trim()}\n• ${t}` : `• ${t}`))}
-                            className="px-2 py-1 text-xs rounded bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700"
-                            title="Add to Trending Topics"
-                          >
-                            {t}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                  {newsletterSuggestions?.movies?.length ? (
-                    <div>
-                      <div className="text-xs text-slate-400 mb-1">Movies / Series</div>
-                      <div className="flex flex-wrap gap-2">
-                        {newsletterSuggestions.movies.slice(0, 10).map((m, idx) => {
-                          const label = m.year ? `${m.title} (${m.year})` : m.title;
-                          return (
-                            <button
-                              key={`nl-movie-trend-${idx}-${m.title}`}
-                              type="button"
-                              onClick={() => setTrendingTopics((prev) => (prev.trim() ? `${prev.trim()}\n• ${label}` : `• ${label}`))}
-                              className="px-2 py-1 text-xs rounded bg-slate-900 hover:bg-slate-700 text-slate-200 border border-slate-700"
-                              title={m.description || 'Add to Trending Topics'}
-                            >
-                              {label}
-                            </button>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
               
               <div className="space-y-3">
                 <div>
