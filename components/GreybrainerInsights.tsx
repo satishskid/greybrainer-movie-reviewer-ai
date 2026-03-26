@@ -56,7 +56,6 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
 
   // Research & Trending state (new)
   const [trendingTopics, setTrendingTopics] = useState<string>('');
-  const [pastContentContext, setPastContentContext] = useState<string>('');
   const [researchReport, setResearchReport] = useState<string | null>(null);
   const [isGeneratingResearch, setIsGeneratingResearch] = useState<boolean>(false);
   const [researchError, setResearchError] = useState<string | null>(null);
@@ -69,7 +68,6 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
   // Grey Verdict state (new)
   const [greyVerdictMovieTitle, setGreyVerdictMovieTitle] = useState<string>('');
   const [greyVerdictTrendAngle, setGreyVerdictTrendAngle] = useState<string>('');
-  const [greyVerdictPastContext, setGreyVerdictPastContext] = useState<string>('');
   const [greyVerdictEditorial, setGreyVerdictEditorial] = useState<string | null>(null);
   const [isGeneratingVerdict, setIsGeneratingVerdict] = useState<boolean>(false);
   const [verdictError, setVerdictError] = useState<string | null>(null);
@@ -267,7 +265,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
     try {
       const report = await generateGreybrainerResearch(
         trendingTopics,
-        pastContentContext || undefined,
+        undefined,
         logTokenUsage
       );
       setResearchReport(report);
@@ -354,7 +352,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
       const editorial = await generateGreyVerdictEditorial(
         greyVerdictMovieTitle,
         greyVerdictTrendAngle,
-        greyVerdictPastContext || undefined,
+        undefined,
         logTokenUsage
       );
       setGreyVerdictEditorial(editorial);
