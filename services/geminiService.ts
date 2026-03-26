@@ -786,7 +786,6 @@ export const getMovieTitleSuggestions = async (
     const model = getGeminiAI().getGenerativeModel({ 
       model: getSelectedGeminiModel(),
       generationConfig: {
-        responseMimeType: "application/json",
         temperature: 0.3,
         topK: 20,
       }
@@ -2725,7 +2724,7 @@ ${newsletter.content.substring(0, 12000)}
   return runGeminiWithFallback(
     'Newsletter Suggestions Extraction',
     prompt,
-    { temperature: 0.2, maxOutputTokens: 2048, responseMimeType: "application/json" },
+    { temperature: 0.2, maxOutputTokens: 2048 },
     (responseText) => {
       const jsonStr = extractJsonPayloadFromModelText(responseText);
       const parsed = JSON.parse(jsonStr) as {
@@ -2801,7 +2800,7 @@ OUTPUT JSON SHAPE:
   return runGeminiWithFallback(
     `Distribution Pack (Newsletter): ${newsletter.title}`,
     prompt,
-    { temperature: 0.4, maxOutputTokens: 2048, responseMimeType: "application/json" },
+    { temperature: 0.4, maxOutputTokens: 2048 },
     (responseText) => {
       const jsonStr = extractJsonPayloadFromModelText(responseText);
       const parsed = JSON.parse(jsonStr) as Partial<DistributionPack>;
@@ -2886,7 +2885,7 @@ OUTPUT JSON SHAPE:
   return runGeminiWithFallback(
     `Distribution Pack (Research)`,
     prompt,
-    { temperature: 0.4, maxOutputTokens: 2048, responseMimeType: "application/json" },
+    { temperature: 0.4, maxOutputTokens: 2048 },
     (responseText) => {
       const jsonStr = extractJsonPayloadFromModelText(responseText);
       const parsed = JSON.parse(jsonStr) as Partial<DistributionPack>;
