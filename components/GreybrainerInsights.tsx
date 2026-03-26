@@ -862,13 +862,13 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
 
                 <div>
                   <label htmlFor="past-content" className="block text-sm font-medium text-slate-200 mb-1">
-                    Your Past @GreyBrainer Posts (For Narrative Continuity)
+                    Your Past Content (For Narrative Continuity)
                   </label>
                   <textarea
                     id="past-content"
                     value={pastContentContext}
                     onChange={(e) => setPastContentContext(e.target.value)}
-                    placeholder="List your recent Medium posts to create thematic bridges...&#10;&#10;Examples:&#10;• 'Angammal' review - women's rights in Tamil cinema&#10;• 'Haq' courtroom drama analysis&#10;• Spy thriller comparison: How 'Dhurandhar' changed the game&#10;• Divine Action genre deep dive (Feb 2025)&#10;• #MeToo narratives in regional cinema&#10;&#10;The AI will connect current trends to your past analyses, showing evolution."
+                    placeholder="List your recent database entries or past reviews to create thematic bridges...&#10;&#10;Examples:&#10;• 'Angammal' review - women's rights in Tamil cinema&#10;• 'Haq' courtroom drama analysis&#10;• Spy thriller comparison: How 'Dhurandhar' changed the game&#10;• Divine Action genre deep dive (Feb 2026)&#10;• #MeToo narratives in regional cinema&#10;&#10;The AI will connect current trends to your past analyses, showing evolution."
                     rows={6}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   />
@@ -1039,12 +1039,12 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                     id="verdict-ecosystem"
                     value={greyVerdictPastContext}
                     onChange={(e) => setGreyVerdictPastContext(e.target.value)}
-                    placeholder="Paste your newsletter with trending topics + suggestions, OR list past analyses for thematic bridges...&#10;&#10;📧 Newsletter Example:&#10;'This week's trend: Anti-war fatigue in Bollywood. Suggest Grey Verdict on how recent war films reveal audience backlash. Connect to our past analysis of jingoism in 2024...'&#10;&#10;📚 Past Analyses Example:&#10;• 'KD (A) Karuppudurai' - Joyful elderly rebellion&#10;• 'Haq' - Legal autonomy for women&#10;• 'Pushpa' morphokinetic breakdown - Divine action roots&#10;&#10;AI will parse suggestions and create explicit bridges to Medium/@GreyBrainer ecosystem."
+                    placeholder="Paste your newsletter with trending topics + suggestions, OR list past database analyses for thematic bridges...&#10;&#10;📧 Newsletter Example:&#10;'This week's trend: Anti-war fatigue in Bollywood. Suggest Grey Verdict on how recent war films reveal audience backlash. Connect to our past analysis of jingoism in 2024...'&#10;&#10;📚 Past Analyses Example:&#10;• 'KD (A) Karuppudurai' - Joyful elderly rebellion&#10;• 'Haq' - Legal autonomy for women&#10;• 'Pushpa' morphokinetic breakdown - Divine action roots&#10;&#10;AI will parse suggestions and create explicit bridges to your past insights."
                     rows={8}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                   <p className="text-xs text-slate-400 mt-1">
-                    💡 Tip: Copy-paste your newsletter - AI will intelligently extract trending topics, writing suggestions, and create bridges to past GreyBrainer content!
+                    💡 Tip: Copy-paste your newsletter - AI will intelligently extract trending topics, writing suggestions, and create bridges to past content!
                   </p>
                 </div>
 

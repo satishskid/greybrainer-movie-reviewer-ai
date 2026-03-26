@@ -1657,7 +1657,7 @@ Use these past posts to create narrative continuity. Show evolution, not repetit
 
 # 🎬 The Greybrainer Pulse: ${today}
 
-*[Write a 2-sentence hook that positions this report as the latest chapter in your ongoing cinema narrative. Example: "For your second week of January 2026, the Indian audience is torn between divine action spectacles and polarizing big-budget misfires. Here's how this week's trends reveal deeper shifts in what we're willing to forgive—and what we're ready to abandon."]*
+*[Write a 2-sentence hook that positions this report as the latest chapter in your ongoing cinema narrative. Example: "For your second week of March 2026, the Indian audience is torn between divine action spectacles and polarizing big-budget misfires. Here's how this week's trends reveal deeper shifts in what we're willing to forgive—and what we're ready to abandon."]*
 
 ---
 
@@ -1667,7 +1667,7 @@ Use these past posts to create narrative continuity. Show evolution, not repetit
 * **The Hook:** [Why is everyone watching this? Star power? Genre novelty? Cultural moment?]
 * **The Numbers:** [Box office figures, trending position, social media buzz]
 * **Grey Analysis:** [What does this success reveal about audience needs? What narrative itch is it scratching?]
-* **🔗 Narrative Bridge:** [Connect to @GreyBrainer's past analysis. Example: "This builds on the 'Divine Action' genre we analyzed in [Past Post Title]. Notice how the mythology is now global, not just regional."]
+* **🔗 Narrative Bridge:** [Connect to past analysis from the provided Ecosystem context. Example: "This builds on the 'Divine Action' genre we analyzed in [Past Post Title]. Notice how the mythology is now global, not just regional."]
 
 *[Repeat for 2-3 Popular items]*
 
@@ -1691,7 +1691,7 @@ Use these past posts to create narrative continuity. Show evolution, not repetit
 * **The Trigger:** [What sparked the debate? Historical accuracy? Representation? #MeToo angle?]
 * **The Stakes:** [Why does this matter beyond the film? What does it reveal about Indian society in 2026?]
 * **The Grey Stance:** [Take a clear position. Your audience expects vulnerability, not fence-sitting.]
-* **🔗 Thematic Thread:** [Connect to @GreyBrainer's broader social cinema analysis. Example: "This refugee crisis debate echoes our Freedom at Midnight essay, where we explored how historical trauma shapes current politics."]
+* **🔗 Thematic Thread:** [Connect to broader social cinema analysis from the provided Ecosystem context. Example: "This refugee crisis debate echoes our Freedom at Midnight essay, where we explored how historical trauma shapes current politics."]
 
 *[Repeat for 2-3 Social items]*
 
@@ -1892,21 +1892,21 @@ Approach:
 ### 3. Thematic Bridges (GreyBrainer Ecosystem)
 
 ${pastEcosystemContext ? 
-`*[Using the provided newsletter/past content, create at least 2 explicit connections. If this is a newsletter with trending topics and suggestions, extract those clues and incorporate them naturally:]*
+`*[Using the provided context, create at least 2 explicit connections. Do not use generic Medium/@GreyBrainer references if context is provided:]*
 
 **Contrast Bridge:** "Unlike the [Approach] we saw in **[Past Analysis]**, ${movieDisplay} choose${movieCount === 1 ? 's' : ''} [Different Approach]. This shift signals..."
 
 **Parallel Bridge:** "This echoes the [Theme] we first identified in **[Past Film/Article Title]**, where [Similar Pattern]..."
 
-**Newsletter Integration:** [If trending topics or suggestions were provided in the context, acknowledge them: "As noted in our recent newsletter about [Topic], ${movieDisplay} exemplif${movieCount === 1 ? 'ies' : 'y'} this exact pattern..."]` 
+**Ecosystem Integration:** [If trending topics or suggestions were provided in the context, acknowledge them: "As noted in our recent database analysis about [Topic], ${movieDisplay} exemplif${movieCount === 1 ? 'ies' : 'y'} this exact pattern..."]` 
 : 
-`*[Create thematic bridges to hypothetical past analyses that feel authentic, or reference the Medium blog https://medium.com/@GreyBrainer:]*
+`*[Create thematic bridges to hypothetical past analyses that feel authentic, focusing on the Greybrainer Insights database:]*
 
-**Example Contrast:** "Unlike the loud spectacles we've analyzed before on Medium/@GreyBrainer, ${movieDisplay} choose${movieCount === 1 ? 's' : ''} restraint - a bold bet in today's market."
+**Example Contrast:** "Unlike the loud spectacles we've analyzed recently in the Greybrainer database, ${movieDisplay} choose${movieCount === 1 ? 's' : ''} restraint - a bold bet in today's market."
 
 **Example Parallel:** "This continues the pattern we identified in regional cinema's rise - authenticity over scale."`}
 
-**The Pattern:** [Summarize the THROUGHLINE connecting ${movieDisplay} to past GreyBrainer analyses (from Medium/@GreyBrainer or provided context) and the broader trend]
+**The Pattern:** [Summarize the THROUGHLINE connecting ${movieDisplay} to past GreyBrainer analyses and the broader trend]
 
 ---
 
