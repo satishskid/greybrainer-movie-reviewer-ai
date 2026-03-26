@@ -36,16 +36,35 @@ export const saveDailyNewsletter = async (
 ): Promise<void> => {
   try {
     const docRef = doc(db, NEWSLETTER_COLLECTION, dateStr);
-    await setDoc(docRef, {
-      id: dateStr,
-      title,
-      themes,
-      content,
-      suggestedReviews: suggestedReviews || [],
-      suggestedResearchTopics: suggestedResearchTopics || [],
-      ...(distributionPack ? { distributionPack } : {}),
-      createdAt: Timestamp.now()
+    
+    // Clean up undefined values before saving to Firestore
+    const cleanSuggestedReviews = (suggestedReviews || []).map(review => {
+      const cleanReview = { ...review };
+      Object.keys(cleanReview).forEach(key => {
+        if (cleanReview[key as keyof MovieSuggestion] === undefined) {
+          delete cleanReview[key as keyof MovieSuggestion];
+        }
+      });
+      return cleanReview;
     });
+    
+    const newsletterData: any = {
+      id: dateStr,
+      title: title || '',
+      themes: themes || '',
+      content: content || '',
+      suggestedReviews: cleanSuggestedReviews,
+      suggestedResearchTopics: suggestedResearchTopics || [],
+      createdAt: Timestamp.now()
+    };
+    
+    if (distributionPack) {
+      // Clean distribution pack of undefined values
+      const cleanPack = JSON.parse(JSON.stringify(distributionPack));
+      newsletterData.distributionPack = cleanPack;
+    }
+    
+    await setDoc(docRef, newsletterData);
     console.log(`Saved newsletter for ${dateStr}`);
   } catch (error) {
     console.error('Error saving newsletter:', error);
