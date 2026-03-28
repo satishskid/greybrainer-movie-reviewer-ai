@@ -2650,6 +2650,7 @@ Your output MUST be a JSON object with this exact structure (no markdown code bl
 *(End with a bold take on today's landscape and pose a thought-provoking question to the readers to drive engagement/comments.)*
 
 **CRITICAL CONSTRAINTS:**
+- **FACTUAL ACCURACY:** Do not hallucinate. Only report news, trends, and release dates that you have explicitly verified using the Google Search tool. If the search results are ambiguous, be honest about the uncertainty.
 - **Zero Repetition:** Do not re-explain concepts we covered in the Past Context. 
 - **SEO Optimization:** Naturally weave the keywords into the H2 headers and body text.
 - **Skimmability:** Use bullet points, bold text for emphasis.
