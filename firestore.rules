@@ -84,7 +84,7 @@ service cloud.firestore {
         'satish@skids.health',
         'satish.rath@gmail.com', 
         'dr.satish@greybrain.ai',
-        'social@skits.health'
+        'social@skids.health'
       ];
     }
     
