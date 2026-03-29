@@ -37,21 +37,21 @@ export async function runGeminiWithFallback<T>(
   const modelsToTry = [
     modelConfigService.getSelectedModel(),
     modelConfigService.getFallbackModel(),
-    modelConfigService.getLegacyModel()
-  ];
+    modelConfigService.getLegacyModel(),
+    'gemini-2.5-flash-lite' // Ultimate stable fallback
+  ].filter(Boolean);
 
   let lastError: any;
 
+  // First pass: Try all models with tools if provided
   for (const modelName of modelsToTry) {
-    if (!modelName) continue;
-    
     try {
-      console.log(`🤖 [${operationName}] Attempting with model: ${modelName}`);
+      console.log(`🤖 [${operationName}] Attempting with model: ${modelName}${tools ? ' (with tools)' : ''}`);
       
       const genAI = getGeminiAI();
       const modelInfo = modelConfigService.getModelInfo(modelName);
       
-      // Use v1beta for tools like googleSearch, or if explicitly requested
+      // Force v1beta if tools are present
       const apiVersion = (tools && tools.length > 0) || modelInfo?.apiVersion === 'v1beta' ? 'v1beta' : 'v1';
       
       const model = genAI.getGenerativeModel(
@@ -63,9 +63,8 @@ export async function runGeminiWithFallback<T>(
         { apiVersion }
       );
 
-      // Add timeout for better reliability
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 35000); // Slightly longer timeout
       
       try {
         const response = await model.generateContent(prompt);
@@ -84,10 +83,9 @@ export async function runGeminiWithFallback<T>(
       const isModelError = errorMsg.includes('404') || 
                          error.status === 404 || 
                          errorMsg.includes('not found') ||
-                         errorMsg.includes('unsupported model') ||
-                         errorMsg.includes('not available');
+                         errorMsg.includes('unsupported model');
                          
-      const isToolError = errorMsg.includes('tool') || errorMsg.includes('search');
+      const isToolError = errorMsg.includes('tool') || errorMsg.includes('400') || errorMsg.includes('search');
       const isQuotaError = error.status === 429 || errorMsg.includes('429') || errorMsg.includes('quota');
                    
       if (isModelError || isQuotaError || (isToolError && tools && tools.length > 0)) {
@@ -96,13 +94,30 @@ export async function runGeminiWithFallback<T>(
         continue;
       }
       
-      // Rethrow other errors (auth, quota, etc.)
       console.error(`❌ [${operationName}] Permanent error with model ${modelName}:`, error);
       throw error;
     }
   }
 
-  throw new Error(`[${operationName}] All configured Gemini models failed. Last error: ${lastError?.message || 'Unknown error'}`);
+  // Second pass: If all failed and we had tools, retry WITHOUT tools as a last resort
+  if (tools && tools.length > 0) {
+    console.warn(`⚠️ [${operationName}] All tool-enabled models failed. Retrying WITHOUT tools.`);
+    try {
+      const genAI = getGeminiAI();
+      const model = genAI.getGenerativeModel({ 
+        model: modelsToTry[0], 
+        generationConfig 
+      });
+      const response = await model.generateContent(prompt);
+      const responseText = response.response.text();
+      logTokenUsage?.(`${operationName} (No Tools)`, prompt.length, responseText.length);
+      return parser(responseText, response);
+    } catch (retryError) {
+      console.error(`❌ [${operationName}] Ultimate fallback failed:`, retryError);
+    }
+  }
+
+  throw new Error(`[${operationName}] All Gemini attempts failed. Last error: ${lastError?.message || 'Unknown error'}`);
 }
 
 // Simple movie title suggestions using Gemini API
@@ -847,7 +862,7 @@ export const fetchMovieFinancialsWithGemini = async (
       }
     },
     logTokenUsage,
-    [{ googleSearchRetrieval: {} }] // Enable Google Search for financials
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] // Enable Google Search for financials
   );
 };
 
@@ -969,7 +984,7 @@ Generate insight:
     },
     (responseText) => responseText.trim(),
     logTokenUsage,
-    [{ googleSearchRetrieval: {} }] as any[] // Using as any[] to bypass Tool type definition limitations
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[] // Using as any[] to bypass Tool type definition limitations
   );
 };
 
@@ -1095,7 +1110,7 @@ Generate the full publication-ready article now:
     },
     (responseText) => responseText.trim(),
     logTokenUsage,
-    [{ googleSearchRetrieval: {} }] as any[] // Using as any[] to bypass Tool type definition limitations
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[] // Using as any[] to bypass Tool type definition limitations
   );
 };
 
@@ -1168,7 +1183,7 @@ Generate insight:
     },
     (responseText) => responseText.trim(),
     logTokenUsage,
-    [{ googleSearchRetrieval: {} }] as any[] // Using as any[] to bypass Tool type definition limitations
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[] // Using as any[] to bypass Tool type definition limitations
   );
 };
 
@@ -1230,7 +1245,7 @@ export const analyzeLayerWithGemini = async (
       };
     },
     logTokenUsage,
-    [{ googleSearchRetrieval: {} }] // Enable Google Search for layer analysis
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] // Enable Google Search for layer analysis
   );
 };
 
@@ -1365,7 +1380,7 @@ export const generateFinalReportWithGemini = async (
     { temperature: 0.7 },
     (responseText) => parseFinalReportAndMore(responseText.trim(), financialData),
     logTokenUsage,
-    [{ googleSearchRetrieval: {} }] as any[]
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[]
   );
 };
 
@@ -1981,7 +1996,7 @@ Begin your analysis:
       };
     },
     logTokenUsage,
-    [{ googleSearchRetrieval: {} }] // Enable Google Search for personnel analysis
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] // Enable Google Search for personnel analysis
   );
 };
 
@@ -2458,7 +2473,7 @@ Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
       }
     },
     logTokenUsage,
-    [{ googleSearchRetrieval: {} }] as any[]
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[]
   ).catch(async () => {
     // Custom catch for searchMovies to provide its own fallback to suggestMovieTitles
     try {
@@ -2670,7 +2685,7 @@ Your output MUST be a valid JSON object with this exact structure:
       }
     },
     logTokenUsage,
-    [{ googleSearchRetrieval: {} }] as any[]
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[]
   );
 };
 

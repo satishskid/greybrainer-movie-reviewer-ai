@@ -76,7 +76,7 @@ export default {
       const model = genAI.getGenerativeModel(
         { 
           model: "gemini-2.5-flash",
-          tools: [{ googleSearch: {} }] as any
+          tools: [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any
         },
         { apiVersion: 'v1beta' }
       );
