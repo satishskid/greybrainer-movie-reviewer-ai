@@ -70,11 +70,16 @@ class ModelConfigurationService {
     const envFallback = import.meta.env.VITE_GEMINI_FALLBACK_MODEL;
     const envLegacy = import.meta.env.VITE_GEMINI_LEGACY_MODEL;
 
+    const availableModels = modelConfig.availableModels as GeminiModelConfig[];
+    
+    // Validate that environment variables point to existing models
+    const isValidModel = (id: string) => availableModels.some(m => m.id === id);
+
     return {
-      preferredModel: envPreferred || modelConfig.defaultModels.preferred,
-      fallbackModel: envFallback || modelConfig.defaultModels.fallback,
-      legacyModel: envLegacy || modelConfig.defaultModels.legacy,
-      availableModels: modelConfig.availableModels as GeminiModelConfig[],
+      preferredModel: (envPreferred && isValidModel(envPreferred)) ? envPreferred : modelConfig.defaultModels.preferred,
+      fallbackModel: (envFallback && isValidModel(envFallback)) ? envFallback : modelConfig.defaultModels.fallback,
+      legacyModel: (envLegacy && isValidModel(envLegacy)) ? envLegacy : modelConfig.defaultModels.legacy,
+      availableModels,
       discoveredModels: [],
       validationResults: {},
       lastDiscovery: null,
