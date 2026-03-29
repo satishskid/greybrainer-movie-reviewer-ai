@@ -9,16 +9,18 @@ import { ClipboardIcon } from './icons/ClipboardIcon';
 import { DownloadIcon } from './icons/DownloadIcon';
 import { ReadMoreLess } from './ReadMoreLess'; // For potentially long detailed reports
 import GeminiCanvasExport from './GeminiCanvasExport';
-import { FileText, Newspaper, Share2, Sparkles, FileCode } from 'lucide-react';
+import { FileText, Newspaper, Share2, Sparkles, FileCode, Target, Globe, BarChart2, Shield } from 'lucide-react';
 import { DistributionPack, MovieSuggestion } from '../types';
 import { SocialDistributionDashboard } from './SocialDistributionDashboard';
+import { trendIntelligenceService } from '../services/trendIntelligenceService';
+import { hasFirecrawlApiKey } from '../utils/firecrawlKeyStorage';
 
 interface GreybrainerInsightsProps {
   logTokenUsage?: LogTokenUsageFn;
   newsletterSuggestions?: { movies: MovieSuggestion[]; topics: string[] };
 }
 
-type InsightMode = 'on-demand' | 'movie-anchored' | 'research-trending' | 'grey-verdict';
+type InsightMode = 'on-demand' | 'movie-anchored' | 'research-trending' | 'grey-verdict' | 'competitive-intelligence';
 type AnalysisLayer = 'story' | 'orchestration' | 'performance' | 'morphokinetics' | 'random';
 
 export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTokenUsage, newsletterSuggestions }) => {
@@ -73,6 +75,12 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
   const [isGeneratingVerdict, setIsGeneratingVerdict] = useState<boolean>(false);
   const [verdictError, setVerdictError] = useState<string | null>(null);
   const [copiedVerdict, setCopiedVerdict] = useState<boolean>(false);
+
+  // Competitive Intelligence state
+  const [trendReport, setTrendReport] = useState<any>(null);
+  const [isGeneratingTrendAnalysis, setIsGeneratingTrendAnalysis] = useState<boolean>(false);
+  const [trendAnalysisError, setTrendAnalysisError] = useState<string | null>(null);
+  const [scrapedUrls, setScrapedUrls] = useState<string>('');
 
   const fetchDynamicInsight = useCallback(async () => {
     setIsFetchingDynamicInsight(true);
@@ -386,6 +394,22 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
     URL.revokeObjectURL(url);
   };
 
+  // Competitive Intelligence handlers
+  const handleRunTrendAnalysis = async () => {
+    if (isGeneratingTrendAnalysis) return;
+    setIsGeneratingTrendAnalysis(true);
+    setTrendAnalysisError(null);
+    try {
+      const urls = scrapedUrls.split('\n').map(u => u.trim()).filter(Boolean);
+      const report = await trendIntelligenceService.runAnalysisCycle(urls.length > 0 ? urls : undefined);
+      setTrendReport(report);
+    } catch (err) {
+      setTrendAnalysisError(err instanceof Error ? err.message : "Failed to run trend intelligence analysis.");
+    } finally {
+      setIsGeneratingTrendAnalysis(false);
+    }
+  };
+
 
   return (
     <div className="mt-12 p-6 bg-slate-800/70 rounded-xl shadow-2xl border border-slate-700">
@@ -496,6 +520,16 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
             }`}
           >
             ⚖️ Grey Verdict
+          </button>
+          <button
+            onClick={() => setInsightMode('competitive-intelligence')}
+            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+              insightMode === 'competitive-intelligence'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            🎯 Trend Intelligence
           </button>
           <button
             onClick={() => setInsightMode('on-demand')}
@@ -1074,6 +1108,149 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                     initialVisibleLines={30}
                     className="text-slate-100 whitespace-pre-wrap leading-relaxed text-sm gb-content-area prose prose-invert max-w-none"
                   />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Competitive Intelligence Mode */}
+        {insightMode === 'competitive-intelligence' && (
+          <div className="mt-4 space-y-6 animate-fadeIn">
+            <div className="p-4 bg-indigo-900/20 rounded-xl border border-indigo-500/30">
+              <div className="flex items-center mb-4">
+                <Target className="w-6 h-6 text-indigo-400 mr-3" />
+                <h3 className="text-lg font-bold text-white tracking-tight">Trend Intelligence Engine</h3>
+              </div>
+              
+              <p className="text-sm text-slate-300 mb-4 leading-relaxed">
+                Scrape competitor cinematic blogs and industry news to identify strategic "content gaps" and trending viral hooks.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    Target URLs (One per line)
+                  </label>
+                  <textarea
+                    value={scrapedUrls}
+                    onChange={(e) => setScrapedUrls(e.target.value)}
+                    placeholder="https://variety.com/v/film/&#10;https://www.filmcompanion.in/&#10;..."
+                    className="w-full h-32 px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs"
+                  />
+                  <p className="mt-2 text-[10px] text-slate-500 italic">
+                    Leave empty to use default industry-leading sources.
+                  </p>
+                </div>
+
+                {!hasFirecrawlApiKey() ? (
+                  <div className="p-4 bg-amber-900/20 border border-amber-500/30 rounded-xl flex items-start">
+                    <Shield className="w-5 h-5 text-amber-400 mr-3 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs text-amber-200 leading-relaxed">
+                      <strong>Firecrawl API Key Required:</strong> To enable deep web scraping, please add your Firecrawl API key in the <strong>Settings &rarr; Keys</strong> tab.
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleRunTrendAnalysis}
+                    disabled={isGeneratingTrendAnalysis}
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-900/40 flex items-center justify-center disabled:opacity-50"
+                  >
+                    {isGeneratingTrendAnalysis ? (
+                      <>
+                        <LoadingSpinner size="sm" />
+                        <span className="ml-3">Scraping & Analyzing Competitors...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="w-5 h-5 mr-2" />
+                        Run Trend Analysis Cycle
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {trendAnalysisError && (
+              <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-xl text-xs text-red-300 leading-relaxed">
+                <strong>Analysis Failed:</strong> {trendAnalysisError}
+              </div>
+            )}
+
+            {trendReport && !isGeneratingTrendAnalysis && (
+              <div className="space-y-6 animate-fadeIn">
+                {/* Primary Trends */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {trendReport.primaryTrends.map((trend: any, i: number) => (
+                    <div key={i} className="p-4 bg-slate-900/40 rounded-xl border border-slate-700 hover:border-indigo-500/50 transition-colors group">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${
+                          trend.impact === 'high' ? 'bg-red-900/30 text-red-400' : 
+                          trend.impact === 'medium' ? 'bg-amber-900/30 text-amber-400' : 
+                          'bg-blue-900/30 text-blue-400'
+                        }`}>
+                          {trend.impact} Impact
+                        </span>
+                        <div className="text-[10px] text-slate-500 font-mono">{(trend.confidence * 100).toFixed(0)}% Conf.</div>
+                      </div>
+                      <h4 className="text-sm font-bold text-white mb-2 group-hover:text-indigo-300 transition-colors">{trend.title}</h4>
+                      <p className="text-xs text-slate-400 leading-relaxed">{trend.description}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Competitor Insights */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center px-1">
+                      <BarChart2 className="w-4 h-4 mr-2 text-emerald-400" />
+                      Competitor Strategy Gaps
+                    </h4>
+                    <div className="space-y-3">
+                      {trendReport.competitorInsights.map((insight: any, i: number) => (
+                        <div key={i} className="p-4 bg-slate-900/60 rounded-xl border border-slate-700">
+                          <div className="text-xs font-bold text-emerald-400 mb-1">{insight.competitor}</div>
+                          <div className="text-[11px] text-slate-300 mb-2 italic">"{insight.latestStrategy}"</div>
+                          <div className="text-xs text-slate-400">
+                            <span className="text-indigo-300 font-semibold">GreyBrainer Opportunity:</span> {insight.opportunity}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Viral Hooks & Hashtags */}
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center px-1">
+                        <Sparkles className="w-4 h-4 mr-2 text-indigo-400" />
+                        Suggested Viral Hooks
+                      </h4>
+                      <div className="space-y-2">
+                        {trendReport.suggestedHooks.map((hook: string, i: number) => (
+                          <div key={i} className="p-3 bg-indigo-900/10 rounded-lg border border-indigo-500/20 text-xs text-indigo-100 flex items-start">
+                            <span className="mr-3 text-indigo-500 font-bold">{i+1}.</span>
+                            {hook}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center px-1">
+                        <Share2 className="w-4 h-4 mr-2 text-purple-400" />
+                        Optimized Hashtags
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {trendReport.optimizedHashtags.map((tag: string, i: number) => (
+                          <span key={i} className="px-3 py-1.5 bg-slate-800 text-purple-300 text-[11px] rounded-full border border-slate-700">
+                            {tag.startsWith('#') ? tag : `#${tag}`}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}

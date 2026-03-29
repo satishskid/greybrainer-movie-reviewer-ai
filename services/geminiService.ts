@@ -26,7 +26,7 @@ const getGeminiAI = (): GoogleGenerativeAI => {
 
 export type LogTokenUsageFn = (operation: string, inputChars: number, outputChars: number) => void;
 
-async function runGeminiWithFallback<T>(
+export async function runGeminiWithFallback<T>(
   operationName: string,
   prompt: string,
   generationConfig: any,
@@ -2565,7 +2565,7 @@ const extractFirstJsonValue = (text: string): string | null => {
   return null;
 };
 
-const extractJsonPayloadFromModelText = (responseText: string): string => {
+export const extractJsonPayloadFromModelText = (responseText: string): string => {
   let cleaned = responseText.trim();
   
   // Try to extract from markdown fences first

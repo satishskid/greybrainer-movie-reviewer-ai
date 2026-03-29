@@ -4,6 +4,7 @@ import { FeatureVerificationTest } from './FeatureVerificationTest';
 import { FirebaseAdminDashboard } from './FirebaseAdminDashboard';
 import { GeminiKeyManager } from './GeminiKeyManager';
 import { GoogleSearchKeyManager } from './GoogleSearchKeyManager';
+import { FirecrawlKeyManager } from './FirecrawlKeyManager';
 import { getSelectedGeminiModel, getModelInfo } from '../utils/geminiModelStorage';
 import { hasGeminiApiKey } from '../utils/geminiKeyStorage';
 import { LoadingSpinner } from './LoadingSpinner';
@@ -346,6 +347,13 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, onClose, c
                   <h4 className="text-md font-medium text-slate-200 mb-3">🔍 Google Search API Key</h4>
                   <p className="text-sm text-slate-400 mb-4">Optional: Enables movie data search and suggestions</p>
                   <GoogleSearchKeyManager />
+                </div>
+
+                {/* Firecrawl API Key */}
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                  <h4 className="text-md font-medium text-slate-200 mb-3">🕸️ Firecrawl API Key</h4>
+                  <p className="text-sm text-slate-400 mb-4">Optional: Enables deep web scraping for competitive intelligence</p>
+                  <FirecrawlKeyManager />
                 </div>
               </div>
             </div>
