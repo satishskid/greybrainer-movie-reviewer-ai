@@ -2568,33 +2568,30 @@ const extractFirstJsonValue = (text: string): string | null => {
 export const extractJsonPayloadFromModelText = (responseText: string): string => {
   let cleaned = responseText.trim();
   
-  // Try to extract from markdown fences first
+  // Try to find the first '{' and the last '}'
+  // This is often more robust than markdown fences
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    const jsonCandidate = cleaned.substring(firstBrace, lastBrace + 1);
+    // Use the stack-based extractor to verify it's a complete JSON object
+    const extracted = extractFirstJsonValue(jsonCandidate);
+    if (extracted) {
+      // Common repair: The model sometimes outputs literal newlines inside JSON strings
+      return extracted.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (match) => {
+        return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+      });
+    }
+  }
+
+  // Fallback to markdown fence extraction
   const fenced = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
   if (fenced?.[1]) {
     cleaned = fenced[1].trim();
   }
-
-  // Common repair: The model sometimes outputs literal newlines inside JSON strings
-  // This is a common cause of SyntaxError: Unexpected token in JSON at position...
-  // We'll try to find strings and escape any literal newlines within them
-  // This is a simple regex that might help for most cases
-  cleaned = cleaned.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (match) => {
-    // Replace literal newlines with \n escape sequence inside the quoted string
-    return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
-  });
   
-  // Ensure the string ends properly - sometimes the model cuts off the final closing brace/bracket
-  const lastBraceIndex = cleaned.lastIndexOf('}');
-  const lastBracketIndex = cleaned.lastIndexOf(']');
-  
-  if (lastBraceIndex > -1 || lastBracketIndex > -1) {
-    const lastIndex = Math.max(lastBraceIndex, lastBracketIndex);
-    cleaned = cleaned.substring(0, lastIndex + 1);
-  }
-
-  // Fallback to strict extractor if needed
-  const extracted = extractFirstJsonValue(cleaned);
-  return (extracted ?? cleaned).trim();
+  return cleaned;
 };
 
 /**
@@ -2755,7 +2752,11 @@ ${newsletter.content.substring(0, 12000)}
   return runGeminiWithFallback(
     'Newsletter Suggestions Extraction',
     prompt,
-    { temperature: 0.2, maxOutputTokens: 2048 },
+    { 
+      temperature: 0.2, 
+      maxOutputTokens: 2048,
+      responseMimeType: 'application/json'
+    },
     (responseText) => {
       const jsonStr = extractJsonPayloadFromModelText(responseText);
       const parsed = JSON.parse(jsonStr) as {
@@ -2822,7 +2823,7 @@ Convert the newsletter content into a high-performance Distribution Pack for our
    - **Instagram**: Hook-first caption, emoji-rich but professional.
 3. **IST Windows**: All times in IST.
 
-**OUTPUT JSON SHAPE (Strict valid JSON only):**
+**OUTPUT JSON SHAPE (Strict valid JSON only - DO NOT use markdown code blocks or backticks):**
 {
   "primaryKeyword": "string",
   "secondaryKeywords": ["string"],
@@ -2853,7 +2854,11 @@ Convert the newsletter content into a high-performance Distribution Pack for our
   return runGeminiWithFallback(
     `Distribution Pack (Newsletter): ${newsletter.title}`,
     prompt,
-    { temperature: 0.4, maxOutputTokens: 3500 },
+    { 
+      temperature: 0.4, 
+      maxOutputTokens: 3500,
+      responseMimeType: 'application/json'
+    },
     (responseText) => {
       const jsonStr = extractJsonPayloadFromModelText(responseText);
       const parsed = JSON.parse(jsonStr) as Partial<DistributionPack>;
@@ -2931,7 +2936,8 @@ INPUT:
 - Research Report excerpt: ${trendInput.researchReport.substring(0, 4000)}
 
 OUTPUT REQUIREMENTS:
-- Output MUST be valid JSON only (no markdown fences).
+- Output MUST be valid JSON only. 
+- DO NOT use markdown code blocks, backticks, or any text before/after the JSON.
 - Use IST time windows in bestTimeLocal (e.g. "09:00-11:00 IST").
 
 OUTPUT JSON SHAPE:
@@ -2961,7 +2967,11 @@ OUTPUT JSON SHAPE:
   return runGeminiWithFallback(
     `Distribution Pack (Research)`,
     prompt,
-    { temperature: 0.4, maxOutputTokens: 2048 },
+    { 
+      temperature: 0.4, 
+      maxOutputTokens: 2048,
+      responseMimeType: 'application/json'
+    },
     (responseText) => {
       const jsonStr = extractJsonPayloadFromModelText(responseText);
       const parsed = JSON.parse(jsonStr) as Partial<DistributionPack>;
