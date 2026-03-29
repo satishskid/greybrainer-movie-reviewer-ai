@@ -653,7 +653,8 @@ export const enhanceCreativeSpark = async (
       ],
       "mindMapMarkdown": "${MIND_MAP_PROMPT_STRUCTURE.replace(/\n/g, "\\n").replace(/"/g, '\\"')}" 
     }
-    Ensure the JSON is valid. The mindMapMarkdown should reflect the *enhanced* story.
+    Ensure the JSON is valid and all double quotes within string values are escaped as \\\" (e.g., "he said \"hello\"").
+    The entire output must be a single, valid JSON object.
   `;
 
   return runGeminiWithFallback(
@@ -661,14 +662,8 @@ export const enhanceCreativeSpark = async (
     prompt,
     { temperature: 0.8 },
     (responseText) => {
-      let jsonStr = responseText.trim();
-      const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-      const match = jsonStr.match(fenceRegex);
-      if (match && match[2]) {
-        jsonStr = match[2].trim();
-      }
-
       try {
+        const jsonStr = extractJsonPayloadFromModelText(responseText);
         const parsedData = JSON.parse(jsonStr) as CreativeSparkResult;
         if (!parsedData.logline || !parsedData.synopsis || !Array.isArray(parsedData.characterIdeas) || !Array.isArray(parsedData.sceneIdeas)) {
           throw new Error("Generated JSON for enhancement is missing required fields.");
@@ -714,7 +709,9 @@ export const analyzeIdeaMagicQuotient = async (
       },
       "generatedDisclaimer": "This analysis is AI-generated, subjective, and not a guarantee of success or failure. Real-world outcomes depend on many factors beyond the initial concept. Use as a creative brainstorming tool."
     }
-    Focus on providing insightful, constructive feedback. Ensure all scores are integers between 1 and 10. The entire output must be a single, valid JSON object.
+    Focus on providing insightful, constructive feedback. Ensure all scores are integers between 1 and 10.
+    The entire output must be a single, valid JSON object.
+    CRITICAL: All double quotes within the JSON values must be escaped as \\\" (e.g., "he said \"hello\"").
   `;
 
   return runGeminiWithFallback(
@@ -722,14 +719,8 @@ export const analyzeIdeaMagicQuotient = async (
     prompt,
     { temperature: 0.7 },
     (responseText) => {
-      let jsonStr = responseText.trim();
-      const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-      const match = jsonStr.match(fenceRegex);
-      if (match && match[2]) {
-        jsonStr = match[2].trim();
-      }
-
       try {
+        const jsonStr = extractJsonPayloadFromModelText(responseText);
         const parsedData = JSON.parse(jsonStr) as MagicQuotientAnalysis;
         if (!parsedData.overallAssessment || !Array.isArray(parsedData.strengths) || !parsedData.subjectiveScores) {
           throw new Error("Generated JSON for magic quotient is missing required fields.");
@@ -794,14 +785,8 @@ export const getMovieTitleSuggestions = async (
     const responseText = response.response.text().trim();
     logTokenUsage?.(`Movie Title Suggestions (Gemini): ${currentTitle}`, prompt.length, responseText.length);
 
-    let jsonStr = responseText;
-    const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-    const match = jsonStr.match(fenceRegex);
-    if (match && match[2]) {
-      jsonStr = match[2].trim();
-    }
-
     try {
+      const jsonStr = extractJsonPayloadFromModelText(responseText);
       const parsedData = JSON.parse(jsonStr) as string[];
       if (!Array.isArray(parsedData)) {
         console.warn("Parsed movie title suggestions is not an array:", parsedData, "\nRaw response:", responseText);
@@ -843,14 +828,8 @@ export const fetchMovieFinancialsWithGemini = async (
     prompt,
     { temperature: 0.2 },
     (responseText, response) => {
-      let jsonStr = responseText.trim();
-      const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-      const match = jsonStr.match(fenceRegex);
-      if (match && match[2]) {
-        jsonStr = match[2].trim();
-      }
-      
       try {
+        const jsonStr = extractJsonPayloadFromModelText(responseText);
         const parsed = JSON.parse(jsonStr);
         const budgetValue = parsed.budget ? Number(parsed.budget) : undefined;
 
@@ -2468,23 +2447,9 @@ Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
     prompt,
     { temperature: 0.3 },
     (responseText) => {
-      // Extract JSON from response - model may wrap in markdown or return plain JSON
-      let cleanJson = responseText.trim();
-      
-      // Try to extract JSON from markdown code blocks
-      const jsonBlockMatch = cleanJson.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
-      if (jsonBlockMatch) {
-        cleanJson = jsonBlockMatch[1];
-      } else {
-        // Try to find raw JSON array
-        const jsonArrayMatch = cleanJson.match(/\[[\s\S]*\]/);
-        if (jsonArrayMatch) {
-          cleanJson = jsonArrayMatch[0];
-        }
-      }
-      
       try {
-        const suggestions: MovieSuggestion[] = JSON.parse(cleanJson.trim());
+        const cleanJson = extractJsonPayloadFromModelText(responseText);
+        const suggestions: MovieSuggestion[] = JSON.parse(cleanJson);
         return suggestions;
       } catch (e) {
         console.error('Failed to parse search JSON:', e);
@@ -2504,99 +2469,75 @@ Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
   });
 };
 
-const extractFirstJsonValue = (text: string): string | null => {
-  const input = text.trim();
-  const starts: Array<'{' | '['> = ['{', '['];
-  const startIndexes: number[] = [];
-  for (let i = 0; i < input.length; i++) {
-    const ch = input[i] as '{' | '[' | string;
-    if (starts.includes(ch as any)) startIndexes.push(i);
-  }
-
-  for (const start of startIndexes) {
-    const stack: string[] = [];
-    let inString = false;
-    let escape = false;
-    const startCh = input[start];
-    stack.push(startCh === '{' ? '}' : ']');
-
-    for (let i = start + 1; i < input.length; i++) {
-      const ch = input[i];
-
-      if (inString) {
-        if (escape) {
-          escape = false;
-          continue;
-        }
-        if (ch === '\\') {
-          escape = true;
-          continue;
-        }
-        if (ch === '"') {
-          inString = false;
-        }
-        continue;
-      }
-
-      if (ch === '"') {
-        inString = true;
-        continue;
-      }
-
-      if (ch === '{') {
-        stack.push('}');
-        continue;
-      }
-      if (ch === '[') {
-        stack.push(']');
-        continue;
-      }
-
-      const expectedClose = stack[stack.length - 1];
-      if (expectedClose && ch === expectedClose) {
-        stack.pop();
-        if (stack.length === 0) {
-          return input.slice(start, i + 1);
-        }
-      }
-    }
-  }
-
-  return null;
-};
-
 export const extractJsonPayloadFromModelText = (responseText: string): string => {
+  if (!responseText) return '';
   let cleaned = responseText.trim();
   
-  // First, strip out any markdown fences if they exist
-  // Even in JSON mode, models sometimes inexplicably add them
-  const fenced = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (fenced?.[1]) {
-    cleaned = fenced[1].trim();
+  // 1. Remove ANY markdown code blocks (not just at start/end)
+  // This handles cases where the model puts text before/after, or multiple blocks
+  const blockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/ig;
+  let match;
+  let foundBlock = false;
+  
+  // If there's a complete markdown block, use its content
+  if ((match = blockRegex.exec(cleaned)) !== null) {
+    cleaned = match[1];
+    foundBlock = true;
+  }
+  
+  // If we didn't find a complete block, try stripping start/end backticks just in case it's truncated
+  if (!foundBlock) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '');
+    cleaned = cleaned.replace(/\s*```$/i, '');
   }
 
-  // Try to find the first '{' and the last '}'
-  // This is often more robust than markdown fences
+  // 2. Find the JSON object or array boundaries
   const firstBrace = cleaned.indexOf('{');
+  const firstBracket = cleaned.indexOf('[');
+  let first = -1;
+  if (firstBrace !== -1 && firstBracket !== -1) {
+    first = Math.min(firstBrace, firstBracket);
+  } else {
+    first = Math.max(firstBrace, firstBracket);
+  }
+
   const lastBrace = cleaned.lastIndexOf('}');
-  
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    const jsonCandidate = cleaned.substring(firstBrace, lastBrace + 1);
-    // Use the stack-based extractor to verify it's a complete JSON object
-    const extracted = extractFirstJsonValue(jsonCandidate);
-    if (extracted) {
-      // Common repair: The model sometimes outputs literal newlines inside JSON strings
-      return extracted.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (match) => {
-        return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
-      });
-    }
-    // If extractFirstJsonValue fails, fallback to the substring we found
-    // and try the newline repair on it
-    return jsonCandidate.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (match) => {
-      return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
-    });
+  const lastBracket = cleaned.lastIndexOf(']');
+  let last = -1;
+  if (lastBrace !== -1 && lastBracket !== -1) {
+    last = Math.max(lastBrace, lastBracket);
+  } else {
+    last = Math.max(lastBrace, lastBracket);
   }
   
+  // 3. Extract the JSON portion
+  if (first !== -1) {
+    if (last !== -1 && last >= first) {
+      cleaned = cleaned.substring(first, last + 1);
+    } else {
+      // Truncated JSON - no matching closing brace/bracket
+      cleaned = cleaned.substring(first);
+    }
+  }
+
+  // 4. Repair common JSON errors from LLMs
+  // A. Attempt to fix unescaped double quotes inside string values
+  // This looks for "key": " ... " ... " patterns and escapes the internal quotes
+  cleaned = cleaned.replace(/(": "\s*)([\s\S]*?)("\s*[,}\]])/g, (match, p1, p2, p3) => {
+    // Escape any unescaped quotes in the content portion (p2)
+    // We look for " that is not preceded by \
+    const fixedContent = p2.replace(/(?<!\\)"/g, '\\"');
+    return p1 + fixedContent + p3;
+  });
+
+  // B. Escape literal newlines inside strings
+  cleaned = cleaned.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (m) => {
+    return m.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+  });
+
+  // C. Remove trailing commas in objects or arrays before closing braces
+  cleaned = cleaned.replace(/,\s*}/g, '}').replace(/,\s*\]/g, ']');
+
   return cleaned;
 };
 
@@ -2646,10 +2587,11 @@ Your output MUST be a valid JSON object with this exact structure:
 }
 
 **IMPORTANT JSON RULES:**
-1. The entire response must be a single JSON object.
-2. The "content" field is a single string containing Markdown. You MUST escape all newlines as \\n and all double quotes as \\\".
+1. The entire response must be a single, valid JSON object.
+2. The "content" field is a single string containing Markdown. 
+   CRITICAL: You MUST escape all internal double quotes within the markdown string as \\\" (e.g., "he said \"hello\"") and all newlines as \\n.
 3. Do not include any text before or after the JSON object.
-4. If you use the googleSearch tool, ensure the search results are synthesized into the JSON fields correctly.
+4. If you fail to escape internal double quotes, the JSON will be invalid and the system will fail.
 
 **THE NEWSLETTER CONTENT FORMAT (Markdown)**
 # [The H1 Title Again]
@@ -2672,7 +2614,7 @@ Your output MUST be a valid JSON object with this exact structure:
 - **Zero Repetition:** Do not re-explain concepts we covered in the Past Context. 
 - **SEO Optimization:** Naturally weave the keywords into the H2 headers and body text.
 - **Skimmability:** Use bullet points, bold text for emphasis.
-- **Strict JSON:** You must output ONLY valid JSON, parseable by JSON.parse().`;
+- **Strict JSON:** You must output ONLY valid JSON, parseable by JSON.parse(). Ensure all double quotes in "content" are escaped.`;
 
   return runGeminiWithFallback(
     'Daily Newsletter Engine',
@@ -2828,6 +2770,7 @@ Convert the newsletter content into a high-performance Distribution Pack for our
    - **LinkedIn**: Thought-leadership style, focusing on the "Critical View" and "Industry Impact."
    - **Instagram**: Hook-first caption, emoji-rich but professional.
 3. **IST Windows**: All times in IST.
+4. **CRITICAL**: You MUST escape all internal double quotes within the JSON values as \\\" (e.g., "he said \"hello\"").
 
 **OUTPUT JSON SHAPE (Strict valid JSON only - DO NOT use markdown code blocks or backticks):**
 {
@@ -2944,6 +2887,7 @@ INPUT:
 OUTPUT REQUIREMENTS:
 - Output MUST be valid JSON only. 
 - DO NOT use markdown code blocks, backticks, or any text before/after the JSON.
+- CRITICAL: All double quotes within the JSON values must be escaped as \\\" (e.g., "he said \"hello\"").
 - Use IST time windows in bestTimeLocal (e.g. "09:00-11:00 IST").
 
 OUTPUT JSON SHAPE:

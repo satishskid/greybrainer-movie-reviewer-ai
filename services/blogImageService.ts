@@ -7,6 +7,7 @@
 import { GoogleGenerativeAI } from '@google/generative-ai';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
 import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
+import { extractJsonPayloadFromModelText } from './geminiService';
 
 // Initialize Gemini AI (same pattern as geminiService.ts)
 const getGeminiAI = (): GoogleGenerativeAI => {
@@ -155,12 +156,12 @@ Generate the enhanced blog post now in valid JSON format:`;
     }
 
     // Parse JSON response
-    const jsonMatch = text.match(/\{[\s\S]*\}/);
-    if (!jsonMatch) {
+    const jsonStr = extractJsonPayloadFromModelText(text);
+    if (!jsonStr) {
       throw new Error('No valid JSON found in response');
     }
 
-    const enhancedData = JSON.parse(jsonMatch[0]) as EnhancedBlogPost;
+    const enhancedData = JSON.parse(jsonStr) as EnhancedBlogPost;
     return enhancedData;
   } catch (error: any) {
     console.error('Error generating enhanced blog post:', error);

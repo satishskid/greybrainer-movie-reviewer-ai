@@ -9,18 +9,22 @@ export interface FirecrawlKeyInfo {
 }
 
 /**
- * Check if Firecrawl API key exists in localStorage
+ * Check if Firecrawl API key exists in localStorage or environment variables
  */
 export const hasFirecrawlApiKey = (): boolean => {
-  const apiKey = localStorage.getItem(FIRECRAWL_API_KEY_STORAGE_KEY);
+  const apiKey = getFirecrawlApiKey();
   return !!apiKey && apiKey.trim().length > 0;
 };
 
 /**
- * Get the Firecrawl API key from localStorage
+ * Get the Firecrawl API key from localStorage or environment variables
  */
 export const getFirecrawlApiKey = (): string | null => {
-  return localStorage.getItem(FIRECRAWL_API_KEY_STORAGE_KEY);
+  const storedKey = localStorage.getItem(FIRECRAWL_API_KEY_STORAGE_KEY);
+  if (storedKey && storedKey.trim().length > 0) return storedKey;
+  
+  // Fallback to environment variable if available (e.g. during development)
+  return import.meta.env.VITE_FIRECRAWL_API_KEY || null;
 };
 
 /**

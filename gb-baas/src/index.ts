@@ -3,6 +3,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai';
 export interface Env {
   DB: D1Database;
   GOOGLE_API_KEY: string;
+  FIRECRAWL_API_KEY: string;
   ADMIN_SECRET: string;
   PRIVATE_JWK: string;
   PUBLIC_JWK_JSON: string;
