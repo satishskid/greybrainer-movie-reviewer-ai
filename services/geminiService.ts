@@ -88,9 +88,10 @@ export async function runGeminiWithFallback<T>(
                          errorMsg.includes('not available');
                          
       const isToolError = errorMsg.includes('tool') || errorMsg.includes('search');
+      const isQuotaError = error.status === 429 || errorMsg.includes('429') || errorMsg.includes('quota');
                    
-      if (isModelError || (isToolError && tools && tools.length > 0)) {
-        console.warn(`⚠️ [${operationName}] Model ${modelName} error (${isToolError ? 'tool issue' : 'not found'}), trying next fallback...`);
+      if (isModelError || isQuotaError || (isToolError && tools && tools.length > 0)) {
+        console.warn(`⚠️ [${operationName}] Model ${modelName} error (${isToolError ? 'tool issue' : isQuotaError ? 'quota' : 'not found'}), trying next fallback...`);
         lastError = error;
         continue;
       }
@@ -846,7 +847,7 @@ export const fetchMovieFinancialsWithGemini = async (
       }
     },
     logTokenUsage,
-    [{ googleSearch: {} }] // Enable Google Search for financials
+    [{ googleSearchRetrieval: {} }] // Enable Google Search for financials
   );
 };
 
@@ -968,7 +969,7 @@ Generate insight:
     },
     (responseText) => responseText.trim(),
     logTokenUsage,
-    [{ googleSearch: {} }] as any[] // Using as any[] to bypass Tool type definition limitations
+    [{ googleSearchRetrieval: {} }] as any[] // Using as any[] to bypass Tool type definition limitations
   );
 };
 
@@ -1094,7 +1095,7 @@ Generate the full publication-ready article now:
     },
     (responseText) => responseText.trim(),
     logTokenUsage,
-    [{ googleSearch: {} }] as any[] // Using as any[] to bypass Tool type definition limitations
+    [{ googleSearchRetrieval: {} }] as any[] // Using as any[] to bypass Tool type definition limitations
   );
 };
 
@@ -1167,7 +1168,7 @@ Generate insight:
     },
     (responseText) => responseText.trim(),
     logTokenUsage,
-    [{ googleSearch: {} }] as any[] // Using as any[] to bypass Tool type definition limitations
+    [{ googleSearchRetrieval: {} }] as any[] // Using as any[] to bypass Tool type definition limitations
   );
 };
 
@@ -1229,7 +1230,7 @@ export const analyzeLayerWithGemini = async (
       };
     },
     logTokenUsage,
-    [{ googleSearch: {} }] // Enable Google Search for layer analysis
+    [{ googleSearchRetrieval: {} }] // Enable Google Search for layer analysis
   );
 };
 
@@ -1364,7 +1365,7 @@ export const generateFinalReportWithGemini = async (
     { temperature: 0.7 },
     (responseText) => parseFinalReportAndMore(responseText.trim(), financialData),
     logTokenUsage,
-    [{ googleSearch: {} }] as any[]
+    [{ googleSearchRetrieval: {} }] as any[]
   );
 };
 
@@ -1980,7 +1981,7 @@ Begin your analysis:
       };
     },
     logTokenUsage,
-    [{ googleSearch: {} }] // Enable Google Search for personnel analysis
+    [{ googleSearchRetrieval: {} }] // Enable Google Search for personnel analysis
   );
 };
 
@@ -2457,7 +2458,7 @@ Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
       }
     },
     logTokenUsage,
-    [{ googleSearch: {} }] as any[]
+    [{ googleSearchRetrieval: {} }] as any[]
   ).catch(async () => {
     // Custom catch for searchMovies to provide its own fallback to suggestMovieTitles
     try {
@@ -2669,7 +2670,7 @@ Your output MUST be a valid JSON object with this exact structure:
       }
     },
     logTokenUsage,
-    [{ googleSearch: {} }] as any[]
+    [{ googleSearchRetrieval: {} }] as any[]
   );
 };
 

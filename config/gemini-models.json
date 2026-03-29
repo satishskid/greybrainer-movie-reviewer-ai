@@ -6,7 +6,7 @@
   },
   "defaultModels": {
     "preferred": "gemini-2.5-flash",
-    "fallback": "gemini-2.5-pro",
+    "fallback": "gemini-1.5-flash",
     "experimental": "gemini-3.1-flash-lite-preview",
     "legacy": "gemini-2.0-flash-lite"
   },
@@ -92,6 +92,23 @@
       "costTier": "economy",
       "lastVerified": "2026-03-29",
       "useCase": "Recommended stable production model",
+      "apiVersion": "v1",
+      "supportedMethods": [
+        "generateContent",
+        "countTokens"
+      ]
+    },
+    {
+      "id": "gemini-1.5-flash",
+      "name": "Greybrainer Standard (1.5 Flash)",
+      "description": "Stable Gemini 1.5 Flash - high reliability",
+      "category": "standard",
+      "isRecommended": false,
+      "isStable": true,
+      "maxTokens": 1048576,
+      "costTier": "economy",
+      "lastVerified": "2026-03-29",
+      "useCase": "Stable production fallback model",
       "apiVersion": "v1",
       "supportedMethods": [
         "generateContent",
