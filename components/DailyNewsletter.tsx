@@ -6,6 +6,8 @@ import { Newspaper, Copy, Download, FileCode } from 'lucide-react';
 import { ReadMoreLess } from './ReadMoreLess';
 import { DistributionPack, MovieSuggestion } from '../types';
 
+import { SocialDistributionDashboard } from './SocialDistributionDashboard';
+
 interface DailyNewsletterProps {
   logTokenUsage?: LogTokenUsageFn;
   onNewsletterSuggestionsUpdated?: (data: { movies: MovieSuggestion[]; topics: string[] }) => void;
@@ -273,72 +275,28 @@ export const DailyNewsletter: React.FC<DailyNewsletterProps> = ({ logTokenUsage,
               )}
 
               {distributionPack && (
-                <div className="mb-6 p-4 bg-slate-900/60 rounded-xl border border-emerald-500/20">
-                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
-                    <div>
-                      <div className="text-sm font-semibold text-emerald-200">SEO + Social Distribution Pack</div>
-                      <div className="text-xs text-slate-400">
-                        Primary keyword: <span className="text-slate-200">{distributionPack.primaryKeyword}</span> • Slug: <span className="text-slate-200">{distributionPack.slug}</span>
-                      </div>
+                <div className="mt-8 animate-fadeIn">
+                  <div className="mb-4 flex items-center justify-between">
+                    <div className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                      <FileCode className="w-4 h-4 mr-2 text-indigo-400" />
+                      Social Distribution Pack
                     </div>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex space-x-2">
                       <button
                         onClick={handleCopyPackJson}
-                        className="flex items-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-md shadow transition-colors"
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-md transition-colors border border-slate-700"
                       >
-                        <Copy className="w-3 h-3 mr-1.5" />
                         {copiedPack === 'json' ? 'Copied JSON!' : 'Copy JSON'}
                       </button>
                       <button
-                        onClick={handleCopyLinkedIn}
-                        className="flex items-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-md shadow transition-colors"
-                      >
-                        <Copy className="w-3 h-3 mr-1.5" />
-                        {copiedPack === 'li' ? 'Copied LinkedIn!' : 'Copy LinkedIn'}
-                      </button>
-                      <button
-                        onClick={handleCopyTwitterThread}
-                        className="flex items-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-md shadow transition-colors"
-                      >
-                        <Copy className="w-3 h-3 mr-1.5" />
-                        {copiedPack === 'x' ? 'Copied Thread!' : 'Copy X Thread'}
-                      </button>
-                      <button
                         onClick={handleDownloadPackJson}
-                        className="flex items-center px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-md transition-colors border border-slate-700"
                       >
-                        <Download className="w-3 h-3 mr-1.5" />
-                        Download JSON
+                        Download
                       </button>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                    <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700">
-                      <div className="text-xs font-semibold text-slate-300 mb-2">Headlines</div>
-                      <ul className="list-disc list-inside text-sm text-slate-200 space-y-1">
-                        {distributionPack.headlines.slice(0, 5).map((h, i) => <li key={`h-${i}`}>{h}</li>)}
-                      </ul>
-                    </div>
-                    <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700">
-                      <div className="text-xs font-semibold text-slate-300 mb-2">Hashtags</div>
-                      <div className="text-sm text-slate-200 whitespace-pre-wrap">
-                        {distributionPack.hashtags.slice(0, 12).join(' ')}
-                      </div>
-                    </div>
-                    <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700 lg:col-span-2">
-                      <div className="text-xs font-semibold text-slate-300 mb-2">Posting Plan</div>
-                      <div className="space-y-2">
-                        {distributionPack.postingPlan.slice(0, 6).map((p, i) => (
-                          <div key={`pp-${i}`} className="text-sm text-slate-200">
-                            <span className="text-emerald-200 font-semibold">{p.platform}</span>
-                            <span className="text-slate-400"> • {p.bestTimeLocal}</span>
-                            <div className="text-xs text-slate-300">{p.postType} — {p.goal}</div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
+                  <SocialDistributionDashboard distributionPack={distributionPack} />
                 </div>
               )}
 

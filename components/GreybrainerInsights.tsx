@@ -9,8 +9,9 @@ import { ClipboardIcon } from './icons/ClipboardIcon';
 import { DownloadIcon } from './icons/DownloadIcon';
 import { ReadMoreLess } from './ReadMoreLess'; // For potentially long detailed reports
 import GeminiCanvasExport from './GeminiCanvasExport';
-import { FileText, Newspaper } from 'lucide-react';
+import { FileText, Newspaper, Share2, Sparkles, FileCode } from 'lucide-react';
 import { DistributionPack, MovieSuggestion } from '../types';
+import { SocialDistributionDashboard } from './SocialDistributionDashboard';
 
 interface GreybrainerInsightsProps {
   logTokenUsage?: LogTokenUsageFn;
@@ -943,43 +944,28 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({ logTok
                   </div>
                 )}
                 {researchDistributionPack && (
-                  <div className="mb-4 p-4 bg-slate-900/60 rounded-lg border border-amber-500/20">
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-3">
-                      <div className="text-sm text-slate-200">
-                        <span className="text-amber-200 font-semibold">Distribution Pack</span>
-                        <span className="text-slate-400"> • {researchDistributionPack.primaryKeyword} • {researchDistributionPack.slug}</span>
+                  <div className="mt-8 animate-fadeIn">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                        <FileCode className="w-4 h-4 mr-2 text-indigo-400" />
+                        Research Distribution Pack
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex space-x-2">
                         <button
                           onClick={handleCopyResearchPackJson}
-                          className="flex items-center px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium rounded-md shadow transition-colors"
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-md transition-colors border border-slate-700"
                         >
-                          <ClipboardIcon className="w-3 h-3 mr-1.5" />
                           {copiedResearchPack === 'json' ? 'Copied JSON!' : 'Copy JSON'}
                         </button>
                         <button
                           onClick={handleDownloadResearchPackJson}
-                          className="flex items-center px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-md transition-colors border border-slate-700"
                         >
-                          <DownloadIcon className="w-3 h-3 mr-1.5" />
-                          Download JSON
+                          Download
                         </button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-                      <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700">
-                        <div className="text-xs font-semibold text-slate-300 mb-2">Headlines</div>
-                        <ul className="list-disc list-inside text-sm text-slate-200 space-y-1">
-                          {researchDistributionPack.headlines.slice(0, 5).map((h, i) => <li key={`rh-${i}`}>{h}</li>)}
-                        </ul>
-                      </div>
-                      <div className="p-3 bg-slate-800/60 rounded-lg border border-slate-700">
-                        <div className="text-xs font-semibold text-slate-300 mb-2">Hashtags</div>
-                        <div className="text-sm text-slate-200 whitespace-pre-wrap">
-                          {researchDistributionPack.hashtags.slice(0, 12).join(' ')}
-                        </div>
-                      </div>
-                    </div>
+                    <SocialDistributionDashboard distributionPack={researchDistributionPack} />
                   </div>
                 )}
                 <div className="p-4 bg-slate-900/60 rounded-lg border border-amber-500/30">
