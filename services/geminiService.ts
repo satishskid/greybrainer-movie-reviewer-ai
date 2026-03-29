@@ -2568,6 +2568,13 @@ const extractFirstJsonValue = (text: string): string | null => {
 export const extractJsonPayloadFromModelText = (responseText: string): string => {
   let cleaned = responseText.trim();
   
+  // First, strip out any markdown fences if they exist
+  // Even in JSON mode, models sometimes inexplicably add them
+  const fenced = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
+  if (fenced?.[1]) {
+    cleaned = fenced[1].trim();
+  }
+
   // Try to find the first '{' and the last '}'
   // This is often more robust than markdown fences
   const firstBrace = cleaned.indexOf('{');
@@ -2583,12 +2590,11 @@ export const extractJsonPayloadFromModelText = (responseText: string): string =>
         return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
       });
     }
-  }
-
-  // Fallback to markdown fence extraction
-  const fenced = cleaned.match(/```(?:json)?\s*([\s\S]*?)\s*```/i);
-  if (fenced?.[1]) {
-    cleaned = fenced[1].trim();
+    // If extractFirstJsonValue fails, fallback to the substring we found
+    // and try the newline repair on it
+    return jsonCandidate.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (match) => {
+      return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+    });
   }
   
   return cleaned;
