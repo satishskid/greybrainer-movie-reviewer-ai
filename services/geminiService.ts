@@ -2776,23 +2776,37 @@ export const generateDistributionPackForNewsletter = async (
   newsletter: { title: string; themes: string; content: string; suggestedReviews?: MovieSuggestion[]; suggestedResearchTopics?: string[] },
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<DistributionPack> => {
-  const prompt = `You are a distribution specialist for @GreyBrainer.
+  const prompt = `**ROLE**
+You are the Head of Growth & Social Strategy for @GreyBrainer. Your brand voice is "Cinematic Academic" — high-brow, data-driven, yet punchy and provocative.
 
-Your job: convert the content below into a complete SEO + social distribution pack that drives momentum.
+**OBJECTIVE**
+Convert the newsletter content into a high-performance Distribution Pack for our social ecosystem:
+- X (Twitter): @GreyBrainer
+- LinkedIn: GreyBrainer AI
+- Instagram: @greybrainer.ai
+- YouTube: GreyBrainer AI (Community)
 
-INPUT:
+**VOICE DNA (INJECT THIS)**
+- Sentences: Mix of short, punchy hooks and deep, insightful follow-ups.
+- Tone: "The Post-Weekend Pulse" style — analytical, objective, but with a "Social Spark."
+- Vocabulary: Use terms like "Morphokinetic," "Legacy Closure," "Franchise Bloat," and "Digital Fences."
+
+**INPUT:**
 - Title: ${newsletter.title}
 - Themes/SEO keywords: ${newsletter.themes}
 - Suggested Reviews: ${(newsletter.suggestedReviews || []).map(m => (m.year ? `${m.title} (${m.year})` : m.title)).join(', ')}
 - Suggested Research Topics: ${(newsletter.suggestedResearchTopics || []).join(' | ')}
-- Content (markdown excerpt): ${newsletter.content.substring(0, 3500)}
+- Content (markdown excerpt): ${newsletter.content.substring(0, 4500)}
 
-OUTPUT REQUIREMENTS:
-- Output MUST be valid JSON only (no markdown fences).
-- Keep everything actionable and short, optimized for shareability + search.
-- Use IST time windows in bestTimeLocal (e.g. "09:00-11:00 IST").
+**OUTPUT REQUIREMENTS:**
+1. **Carousel Plan (Instagram/LinkedIn)**: 7-10 slides. Each slide needs a headline, body text, and a specific Visual Prompt for an AI image generator (e.g., Midjourney/DALL-E) to ensure visual continuity.
+2. **Platform-Native Copy**:
+   - **X (Thread)**: 5-7 tweets. Strong hook on Tweet 1.
+   - **LinkedIn**: Thought-leadership style, focusing on the "Critical View" and "Industry Impact."
+   - **Instagram**: Hook-first caption, emoji-rich but professional.
+3. **IST Windows**: All times in IST.
 
-OUTPUT JSON SHAPE:
+**OUTPUT JSON SHAPE (Strict valid JSON only):**
 {
   "primaryKeyword": "string",
   "secondaryKeywords": ["string"],
@@ -2807,15 +2821,19 @@ OUTPUT JSON SHAPE:
   "hashtags": ["#tag"],
   "quoteCards": ["string"],
   "internalLinksPlan": ["string"],
+  "voiceDNA": "Cinematic Academic with focus on [today's primary theme]",
+  "carouselPlan": [
+    { "slideNumber": 1, "headline": "string", "bodyText": "string", "visualPrompt": "string", "overlayStyle": "string" }
+  ],
   "postingPlan": [
-    { "platform": "Medium|LinkedIn|X|Instagram|YouTube|Newsletter|Other", "postType": "string", "copy": "string", "bestTimeLocal": "string", "goal": "string" }
+    { "platform": "Medium|LinkedIn|X|Instagram|YouTube|Newsletter|Other", "handle": "@GreyBrainer|GreyBrainer AI|@greybrainer.ai", "postType": "string", "copy": "string", "bestTimeLocal": "string (IST)", "goal": "string" }
   ]
 }`;
 
   return runGeminiWithFallback(
     `Distribution Pack (Newsletter): ${newsletter.title}`,
     prompt,
-    { temperature: 0.4, maxOutputTokens: 2048 },
+    { temperature: 0.4, maxOutputTokens: 3500 },
     (responseText) => {
       const jsonStr = extractJsonPayloadFromModelText(responseText);
       const parsed = JSON.parse(jsonStr) as Partial<DistributionPack>;
@@ -2823,11 +2841,23 @@ OUTPUT JSON SHAPE:
       const toStringArray = (v: unknown): string[] =>
         Array.isArray(v) ? v.filter((x) => typeof x === 'string').map((x) => (x as string).trim()).filter(Boolean) : [];
 
+      const carouselPlan = Array.isArray(parsed.carouselPlan) ? parsed.carouselPlan : [];
+      const normalizedCarouselPlan = carouselPlan
+        .filter((s: any) => s && typeof s === 'object')
+        .map((s: any) => ({
+          slideNumber: Number(s.slideNumber) || 0,
+          headline: typeof s.headline === 'string' ? s.headline.trim() : '',
+          bodyText: typeof s.bodyText === 'string' ? s.bodyText.trim() : '',
+          visualPrompt: typeof s.visualPrompt === 'string' ? s.visualPrompt.trim() : '',
+          overlayStyle: typeof s.overlayStyle === 'string' ? s.overlayStyle.trim() : 'center-bold',
+        }));
+
       const postingPlan = Array.isArray((parsed as any).postingPlan) ? (parsed as any).postingPlan : [];
       const normalizedPostingPlan = postingPlan
         .filter((p: any) => p && typeof p === 'object')
         .map((p: any) => ({
           platform: p.platform,
+          handle: typeof p.handle === 'string' ? p.handle.trim() : '',
           postType: typeof p.postType === 'string' ? p.postType.trim() : '',
           copy: typeof p.copy === 'string' ? p.copy.trim() : '',
           bestTimeLocal: typeof p.bestTimeLocal === 'string' ? p.bestTimeLocal.trim() : '',
@@ -2849,12 +2879,13 @@ OUTPUT JSON SHAPE:
         hashtags: toStringArray(parsed.hashtags),
         quoteCards: toStringArray(parsed.quoteCards),
         internalLinksPlan: toStringArray(parsed.internalLinksPlan),
+        carouselPlan: normalizedCarouselPlan,
+        voiceDNA: typeof parsed.voiceDNA === 'string' ? parsed.voiceDNA.trim() : '',
         postingPlan: normalizedPostingPlan as any,
       };
 
       if (!pack.primaryKeyword || !pack.slug || !pack.metaTitle || !pack.metaDescription) {
         console.warn('Distribution pack missing fields, falling back to defaults:', pack);
-        // Fallback defaults so it doesn't crash the UI
         pack.primaryKeyword = pack.primaryKeyword || 'Greybrainer Analysis';
         pack.slug = pack.slug || 'greybrainer-analysis-' + Date.now();
         pack.metaTitle = pack.metaTitle || 'Greybrainer Strategic Insight';

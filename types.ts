@@ -3,6 +3,14 @@ export interface SocialSnippets {
   linkedin?: string;
 }
 
+export interface CarouselSlide {
+  slideNumber: number;
+  headline: string;
+  bodyText: string;
+  visualPrompt: string; // Instructions for AI image generation
+  overlayStyle?: string; // e.g. "top-right", "center-bold"
+}
+
 export interface DistributionPack {
   primaryKeyword: string;
   secondaryKeywords: string[];
@@ -17,12 +25,15 @@ export interface DistributionPack {
   hashtags: string[];
   quoteCards: string[];
   internalLinksPlan: string[];
+  carouselPlan?: CarouselSlide[]; // Added for Instagram/LinkedIn carousels
+  voiceDNA?: string; // Summary of brand voice used for this pack
   postingPlan: Array<{
     platform: 'Medium' | 'LinkedIn' | 'X' | 'Instagram' | 'YouTube' | 'Newsletter' | 'Other';
     postType: string;
     copy: string;
     bestTimeLocal: string;
     goal: string;
+    handle?: string; // Target handle for the platform
   }>;
 }
 
