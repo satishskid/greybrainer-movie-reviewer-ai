@@ -2825,6 +2825,10 @@ Convert the newsletter content into a high-performance Distribution Pack for our
   "carouselPlan": [
     { "slideNumber": 1, "headline": "string", "bodyText": "string", "visualPrompt": "string", "overlayStyle": "string" }
   ],
+  "abTesting": {
+    "versionA": { "strategy": "Educational", "copy": "string", "hook": "string" },
+    "versionB": { "strategy": "Contrarian/Provocative", "copy": "string", "hook": "string" }
+  },
   "postingPlan": [
     { "platform": "Medium|LinkedIn|X|Instagram|YouTube|Newsletter|Other", "handle": "@GreyBrainer|GreyBrainer AI|@greybrainer.ai", "postType": "string", "copy": "string", "bestTimeLocal": "string (IST)", "goal": "string" }
   ]
@@ -2881,6 +2885,7 @@ Convert the newsletter content into a high-performance Distribution Pack for our
         internalLinksPlan: toStringArray(parsed.internalLinksPlan),
         carouselPlan: normalizedCarouselPlan,
         voiceDNA: typeof parsed.voiceDNA === 'string' ? parsed.voiceDNA.trim() : '',
+        abTesting: parsed.abTesting,
         postingPlan: normalizedPostingPlan as any,
       };
 
@@ -2928,6 +2933,10 @@ OUTPUT JSON SHAPE:
   "hashtags": ["#tag"],
   "quoteCards": ["string"],
   "internalLinksPlan": ["string"],
+  "abTesting": {
+    "versionA": { "strategy": "Educational", "copy": "string", "hook": "string" },
+    "versionB": { "strategy": "Contrarian/Provocative", "copy": "string", "hook": "string" }
+  },
   "postingPlan": [
     { "platform": "Medium|LinkedIn|X|Instagram|YouTube|Newsletter|Other", "postType": "string", "copy": "string", "bestTimeLocal": "string", "goal": "string" }
   ]
@@ -2970,6 +2979,7 @@ OUTPUT JSON SHAPE:
         hashtags: toStringArray(parsed.hashtags),
         quoteCards: toStringArray(parsed.quoteCards),
         internalLinksPlan: toStringArray(parsed.internalLinksPlan),
+        abTesting: parsed.abTesting,
         postingPlan: normalizedPostingPlan as any,
       };
 

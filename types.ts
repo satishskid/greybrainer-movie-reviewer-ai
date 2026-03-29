@@ -27,6 +27,18 @@ export interface DistributionPack {
   internalLinksPlan: string[];
   carouselPlan?: CarouselSlide[]; // Added for Instagram/LinkedIn carousels
   voiceDNA?: string; // Summary of brand voice used for this pack
+  abTesting?: {
+    versionA: {
+      strategy: string; // e.g. "Educational"
+      copy: string;
+      hook: string;
+    };
+    versionB: {
+      strategy: string; // e.g. "Contrarian"
+      copy: string;
+      hook: string;
+    };
+  };
   postingPlan: Array<{
     platform: 'Medium' | 'LinkedIn' | 'X' | 'Instagram' | 'YouTube' | 'Newsletter' | 'Other';
     postType: string;

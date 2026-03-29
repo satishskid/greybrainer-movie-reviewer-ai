@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Copy, Twitter, Linkedin, Instagram, Youtube, Layout, Share2, Sparkles, MessageSquare, Clock, Target, ExternalLink, Image as ImageIcon, ChevronRight, ChevronLeft } from 'lucide-react';
+import { Copy, Twitter, Linkedin, Instagram, Youtube, Layout, Share2, Sparkles, MessageSquare, Clock, Target, ExternalLink, Image as ImageIcon, ChevronRight, ChevronLeft, Split } from 'lucide-react';
 import { DistributionPack, CarouselSlide } from '../types';
 
 interface SocialDistributionDashboardProps {
@@ -40,14 +40,17 @@ export const SocialDistributionDashboard: React.FC<SocialDistributionDashboardPr
         {/* Sidebar Navigation */}
         <div className="lg:col-span-3 border-r border-slate-700 bg-slate-900/20">
           <div className="p-2 space-y-1">
-            {['X', 'LinkedIn', 'Instagram', 'YouTube', 'Carousel'].map((platform) => {
+            {['X', 'LinkedIn', 'Instagram', 'YouTube', 'Carousel', 'A/B Testing'].map((platform) => {
               const Icon = platform === 'X' ? Twitter : 
                            platform === 'LinkedIn' ? Linkedin : 
                            platform === 'Instagram' ? Instagram : 
-                           platform === 'YouTube' ? Youtube : Layout;
+                           platform === 'YouTube' ? Youtube : 
+                           platform === 'A/B Testing' ? Split : Layout;
               
               const isAvailable = platform === 'Carousel' 
                 ? !!distributionPack.carouselPlan?.length 
+                : platform === 'A/B Testing'
+                ? !!distributionPack.abTesting
                 : distributionPack.postingPlan.some(p => p.platform === platform);
 
               if (!isAvailable) return null;
@@ -74,6 +77,8 @@ export const SocialDistributionDashboard: React.FC<SocialDistributionDashboardPr
         <div className="lg:col-span-9 p-6 bg-slate-900/10">
           {activePlatform === 'Carousel' && distributionPack.carouselPlan ? (
             <CarouselPreview slides={distributionPack.carouselPlan} onCopy={handleCopy} copiedStates={copiedStates} />
+          ) : activePlatform === 'A/B Testing' && distributionPack.abTesting ? (
+            <ABTestingView abTesting={distributionPack.abTesting} onCopy={handleCopy} copiedStates={copiedStates} />
           ) : currentPost ? (
             <div className="space-y-6 animate-fadeIn">
               {/* Post Header */}
@@ -145,6 +150,89 @@ export const SocialDistributionDashboard: React.FC<SocialDistributionDashboardPr
               <p className="text-sm">Select a platform to view strategy</p>
             </div>
           )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface ABTestingViewProps {
+  abTesting: NonNullable<DistributionPack['abTesting']>;
+  onCopy: (text: string, key: string) => void;
+  copiedStates: Record<string, boolean>;
+}
+
+const ABTestingView: React.FC<ABTestingViewProps> = ({ abTesting, onCopy, copiedStates }) => {
+  return (
+    <div className="space-y-8 animate-fadeIn text-slate-200">
+      <div className="flex items-center mb-6">
+        <div className="p-2 bg-purple-600/20 rounded-lg border border-purple-500/30 mr-3">
+          <Split className="w-5 h-5 text-purple-400" />
+        </div>
+        <div>
+          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Content Experimentation</div>
+          <h3 className="text-sm font-bold text-slate-100">A/B Testing Variants</h3>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Version A */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="px-3 py-1 bg-blue-500/10 border border-blue-500/30 rounded-full text-xs font-bold text-blue-400 uppercase tracking-widest">
+              Variant A: {abTesting.versionA.strategy}
+            </div>
+            <button
+              onClick={() => onCopy(abTesting.versionA.copy, 'variant-a')}
+              className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold uppercase tracking-widest flex items-center"
+            >
+              <Copy className="w-3 h-3 mr-1" />
+              {copiedStates['variant-a'] ? 'Copied' : 'Copy Copy'}
+            </button>
+          </div>
+          
+          <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-700 space-y-4">
+            <div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Hook</div>
+              <div className="text-sm font-bold text-white italic">"{abTesting.versionA.hook}"</div>
+            </div>
+            <div className="pt-4 border-t border-slate-800 text-xs leading-relaxed whitespace-pre-wrap text-slate-300">
+              {abTesting.versionA.copy}
+            </div>
+          </div>
+        </div>
+
+        {/* Version B */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div className="px-3 py-1 bg-amber-500/10 border border-amber-500/30 rounded-full text-xs font-bold text-amber-400 uppercase tracking-widest">
+              Variant B: {abTesting.versionB.strategy}
+            </div>
+            <button
+              onClick={() => onCopy(abTesting.versionB.copy, 'variant-b')}
+              className="text-[10px] text-indigo-400 hover:text-indigo-300 font-bold uppercase tracking-widest flex items-center"
+            >
+              <Copy className="w-3 h-3 mr-1" />
+              {copiedStates['variant-b'] ? 'Copied' : 'Copy Copy'}
+            </button>
+          </div>
+          
+          <div className="p-4 bg-slate-900/60 rounded-xl border border-slate-700 space-y-4">
+            <div>
+              <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-1">Hook</div>
+              <div className="text-sm font-bold text-white italic">"{abTesting.versionB.hook}"</div>
+            </div>
+            <div className="pt-4 border-t border-slate-800 text-xs leading-relaxed whitespace-pre-wrap text-slate-300">
+              {abTesting.versionB.copy}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="p-4 bg-slate-800/40 rounded-xl border border-slate-700/50 flex items-start">
+        <Sparkles className="w-4 h-4 text-indigo-400 mr-3 mt-0.5" />
+        <div className="text-xs text-slate-400 leading-relaxed">
+          <strong>Strategic Tip:</strong> Publish Variant A to your primary audience and Variant B to a secondary segment or at a different peak time. Track the CTR and engagement rates to refine your Brand Voice DNA for future generations.
         </div>
       </div>
     </div>
