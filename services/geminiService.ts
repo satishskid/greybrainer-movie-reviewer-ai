@@ -2573,6 +2573,15 @@ export const extractJsonPayloadFromModelText = (responseText: string): string =>
   if (fenced?.[1]) {
     cleaned = fenced[1].trim();
   }
+
+  // Common repair: The model sometimes outputs literal newlines inside JSON strings
+  // This is a common cause of SyntaxError: Unexpected token in JSON at position...
+  // We'll try to find strings and escape any literal newlines within them
+  // This is a simple regex that might help for most cases
+  cleaned = cleaned.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (match) => {
+    // Replace literal newlines with \n escape sequence inside the quoted string
+    return match.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+  });
   
   // Ensure the string ends properly - sometimes the model cuts off the final closing brace/bracket
   const lastBraceIndex = cleaned.lastIndexOf('}');
@@ -2615,11 +2624,11 @@ ${pastContentContext}
 *(Note: If the past context mentions a movie or trend, DO NOT repeat the same analysis. Instead, build upon it extending the narrative.)*
 
 **OUTPUT STRUCTURE**
-Your output MUST be a JSON object with this exact structure (no markdown code blocks, just raw JSON):
+Your output MUST be a valid JSON object with this exact structure:
 {
   "title": "[Catchy, SEO-Friendly Newsletter Title]",
   "themes": "[Comma-separated SEO keywords/themes covered in this issue]",
-  "content": "[The full newsletter content in clean Markdown string]",
+  "content": "[The full newsletter content in clean Markdown string. CRITICAL: Use \\n for newlines and escape all double quotes with \\\" within this string.]",
   "suggestedReviews": [
     {
       "title": "Movie or Series Title",
@@ -2632,6 +2641,12 @@ Your output MUST be a JSON object with this exact structure (no markdown code bl
     "Short research angle/topic phrased as a headline"
   ]
 }
+
+**IMPORTANT JSON RULES:**
+1. The entire response must be a single JSON object.
+2. The "content" field is a single string containing Markdown. You MUST escape all newlines as \\n and all double quotes as \\\".
+3. Do not include any text before or after the JSON object.
+4. If you use the googleSearch tool, ensure the search results are synthesized into the JSON fields correctly.
 
 **THE NEWSLETTER CONTENT FORMAT (Markdown)**
 # [The H1 Title Again]
@@ -2661,7 +2676,8 @@ Your output MUST be a JSON object with this exact structure (no markdown code bl
     prompt,
     {
       temperature: 0.7,
-      maxOutputTokens: 4000
+      maxOutputTokens: 4000,
+      responseMimeType: 'application/json'
     },
     (responseText) => {
       try {
