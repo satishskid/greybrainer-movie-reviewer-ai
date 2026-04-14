@@ -204,7 +204,7 @@ Output must be valid JSON with this schema:
 async function callGemini(client: Client, env: Env, prompt: string) {
   let apiKey = null;
   let activeKeyId: string | null = null;
-  let selectedModel = env.GEMINI_MODEL ?? "gemini-pro-latest";
+  let selectedModel = env.GEMINI_MODEL ?? DEFAULT_MODEL;
   if (env.SOCIAL_TOKEN_ENCRYPTION_KEY) {
     const defaultKey = await getDefaultAiKey(client, "gemini");
     if (defaultKey) {
@@ -358,6 +358,12 @@ export async function generateDailyBrief(
   const pastArticles = await listKnowledgeBriefs(client, 6);
   const prompt = buildPrompt({ dateLabel, pastArticles });
   const generated = await callGemini(client, env, prompt);
+  const generatedKeywords = "keywords" in generated && Array.isArray(generated.keywords)
+    ? generated.keywords
+    : undefined;
+  const generatedSummaryHook = "summary_hook" in generated && typeof generated.summary_hook === "string"
+    ? generated.summary_hook
+    : "";
   if (!generated.blog_markdown.includes("[[LENS_NARRATIVE:")) {
     const tagBlock = `[[LENS_NARRATIVE:\n🎬 Today's Morning Brief: ${dateLabel}\n\nTrending Now\n- TBD (Platform): Brief summary.\n\nCritical View\n- TBD (Platform): Why it matters.\n\nThe Social Spark\n- TBD: One or two lines.\n]]\n\n`;
     generated.blog_markdown = `${tagBlock}${generated.blog_markdown}`;
@@ -366,10 +372,10 @@ export async function generateDailyBrief(
     generated.blog_markdown = `${generated.blog_markdown}\n\n> Fallback note for editor: This draft was scaffolded with Workers AI because the current Gemini key hit quota limits. Please run a premium pass when a fresh Gemini key is available.\n`;
   }
   // Extract keywords and summary hook from AI output (with fallbacks)
-  const keywords = Array.isArray(generated.keywords) && generated.keywords.length
-    ? generated.keywords.slice(0, 10)
+  const keywords = generatedKeywords?.length
+    ? generatedKeywords.slice(0, 10)
     : extractKeywordsFromMarkdown(generated.blog_markdown);
-  const summaryHook = (generated.summary_hook ?? "").slice(0, 160) || extractSummaryHook(generated.blog_markdown);
+  const summaryHook = generatedSummaryHook.slice(0, 160) || extractSummaryHook(generated.blog_markdown);
   const sectionAnchors = parseSectionAnchors(generated.blog_markdown);
   const readingMetadata = {
     estimatedReadTime: estimateReadTime(generated.blog_markdown),

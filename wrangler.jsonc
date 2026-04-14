@@ -21,7 +21,7 @@
     "DAILY_BRIEF_ENABLED": "true",
     "DAILY_BRIEF_TIMEZONE": "Asia/Kolkata",
     "DRAFT_STORAGE_MODE": "r2",
-    "GEMINI_MODEL": "gemini-2.5-flash",
+    "GEMINI_MODEL": "gemini-pro-latest",
     "KNOWLEDGE_STORAGE_MODE": "r2",
     "OMNICHANNEL_API_VERSION": "2026-03-11",
     "WEBSITE_BASE_URL": "https://cinema.greybrain.ai",
