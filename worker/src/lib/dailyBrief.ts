@@ -29,7 +29,7 @@ interface DailyBriefOptions {
 }
 
 const DEFAULT_TIMEZONE = "Asia/Kolkata";
-const DEFAULT_MODEL = "gemini-2.5-flash";
+const DEFAULT_MODEL = "gemini-pro-latest";
 const DEFAULT_WORKERS_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
 function nowIso() {
@@ -204,7 +204,7 @@ Output must be valid JSON with this schema:
 async function callGemini(client: Client, env: Env, prompt: string) {
   let apiKey = null;
   let activeKeyId: string | null = null;
-  let selectedModel = env.GEMINI_MODEL ?? DEFAULT_MODEL;
+  let selectedModel = env.GEMINI_MODEL ?? "gemini-pro-latest";
   if (env.SOCIAL_TOKEN_ENCRYPTION_KEY) {
     const defaultKey = await getDefaultAiKey(client, "gemini");
     if (defaultKey) {
@@ -228,18 +228,39 @@ async function callGemini(client: Client, env: Env, prompt: string) {
   const requestConfig = getGeminiRequestConfig(env, selectedModel, apiKey);
   const usedAt = nowIso();
 
+  const greybrain_system_prompt = `Act as the Lead Editor for "Greybrain Lens," an elite daily newsletter that fuses biological cinematic intuition with AI-driven analysis. 
+
+Strict Constraints (Zero Hallucination Policy):
+1. Do NOT invent movies, cast members, release dates, box office numbers, or OTT platforms. 
+2. Explicitly state the correct OTT platform (Netflix, Prime, JioCinema, etc.).
+3. Do not include rumors unless explicitly labeled as "Industry Speculation."
+
+Structure:
+1. [HEADER] Headline and macro-view.
+2. [THE SPOTLIGHT] 2 major mainstream movies/series.
+3. [THE SIGNAL] 2 Hidden Gems (indie/regional/docs).
+4. [THE ALGORITHM] (Current Trends) 2 viral trends & the "Morphokinetic Shift" behind them. (Place trends down here so they do not crowd the top).
+5. [GREYBRAINER ENGINE FUEL] (Movie/Topic Chips) 3 highly specific research prompts or movie tags. NOTE: Always put these chips/topics at the very end of the newsletter.`;
+
   const response = await fetch(requestConfig.url, {
     method: "POST",
     headers: requestConfig.headers,
     body: JSON.stringify({
+      systemInstruction: {
+        parts: [{ text: greybrain_system_prompt }],
+      },
       contents: [
         {
           role: "user",
           parts: [{ text: prompt }],
         },
       ],
+      tools: [
+        { googleSearch: {} }
+      ],
       generationConfig: {
-        temperature: 0.7,
+        temperature: 1.0,
+        thinkingConfig: { thinkingLevel: "HIGH" },
         responseMimeType: "application/json",
       },
     }),
