@@ -9,6 +9,8 @@ Our platform is built upon the **"Greybrainer Movie Magic Theory,"** a systemati
 ## Table of Contents
 - [Core Philosophy](#core-philosophy-the-greybrainer-movie-magic-theory)
 - [Key Features](#key-features--capabilities)
+- [Daily Newsletter Workflow](#daily-newsletter-workflow)
+- [Settings (What It Is)](#settings-what-it-is)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
 - [Getting Started (Local Development)](#getting-started-local-development)
@@ -58,6 +60,41 @@ The Greybrainer methodology posits that cinematic impact is primarily derived fr
     *   Uncover the dynamic "motion" of a film: its emotional arc, pacing strategy, tension-building, and timeline structure, complete with visualizations.
 *   👤 **Personnel "Magic Factor" Insights:**
     *   Provides an AI-generated analysis of the signature style and unique impact of identified directors or key actors.
+
+## Daily Newsletter Workflow
+
+This is the fastest, non-technical workflow for a content writer: open the app, pick a movie from the chips, run analysis, use the output.
+
+### Writer Flow (2 things: search + output)
+1.  **Pick what to review**
+    *   Use **Newsletter Picks** (movie chips) to fill the title quickly, or type a title in the search box.
+2.  **Generate output**
+    *   Click **Analyze Movie Magic** to generate the multi-layer analysis.
+    *   When available, click **Generate Complete Report** for the final consolidated output.
+
+### If Newsletter Picks show “0”
+1.  Click **Refresh** next to Newsletter Picks.
+2.  If still 0, open **Settings → Newsletter** and run **Enrich Chips** (admin), then come back and **Refresh** again.
+
+## Settings (What It Is)
+
+Settings is intentionally a small “control panel” for two things:
+
+### 1) Newsletter Chips Maintenance
+These controls exist because newsletter content and “chip suggestions” are stored in Firestore, and sometimes older newsletters need backfilling.
+
+*   **Refresh (Audit):** Checks whether newsletters exist and whether they contain chip fields.
+*   **Import (Admin):** Pulls newsletters from the BaaS source into Firestore.
+*   **Enrich Chips (Admin):** Extracts movie picks + research topics from newsletter content and saves them back to Firestore.
+*   **Refresh chips on homepage:** Forces the homepage chips UI to reload.
+
+### 2) API Keys (BYOK)
+Keys are stored in the browser (localStorage) for a “Bring Your Own Key” setup.
+
+*   **Gemini Key:** Enables deeper analysis and certain AI features.
+*   **Google Search Key:** Optional; improves search/suggestions.
+
+There is also an always-available **Help** tab inside Settings with the quick start and troubleshooting steps for new users.
 
 ## Tech Stack
 
@@ -159,6 +196,7 @@ These platforms make deploying frontend applications incredibly simple.
 4.  **Set Environment Variables:** This is the most important step for deployment. In your project's settings on Vercel/Netlify, add the following environment variable:
     *   `VITE_GROQ_API_KEY`: Your Groq API Key.
 5.  **Deploy:** Trigger a new deployment. The platform will build your project and deploy the contents of the `dist` folder.
+6.  **Auto-deploy:** Future changes deploy automatically when you push commits to the connected Git branch.
 
 ## AI Engine: Dual-Engine Architecture with BYOK System
 

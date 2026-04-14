@@ -2,28 +2,34 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
 import { LoadingSpinner } from './LoadingSpinner';
-import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, generateMovieAnchoredInsightWithGemini, generateExpandedPublicationInsight, generateGreybrainerResearch, generateGreyVerdictEditorial, LogTokenUsageFn } from '../services/geminiService';
+import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, generateMovieAnchoredInsightWithGemini, generateExpandedPublicationInsight, generateGreybrainerResearch, generateGreyVerdictEditorial, generateDistributionPackForResearch, LogTokenUsageFn } from '../services/geminiService';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon'; // New Icon for detailed report
 import { ClipboardIcon } from './icons/ClipboardIcon';
 import { DownloadIcon } from './icons/DownloadIcon';
 import { ReadMoreLess } from './ReadMoreLess'; // For potentially long detailed reports
 import GeminiCanvasExport from './GeminiCanvasExport';
-import { FileText, Newspaper } from 'lucide-react';
+import { FileText, Newspaper, Share2, Sparkles, FileCode, Target, Globe, BarChart2, Shield } from 'lucide-react';
 import { DailyBriefStudio } from './DailyBriefStudio';
+import { DistributionPack, MovieSuggestion } from '../types';
+import { SocialDistributionDashboard } from './SocialDistributionDashboard';
+import { trendIntelligenceService } from '../services/trendIntelligenceService';
+import { hasFirecrawlApiKey } from '../utils/firecrawlKeyStorage';
 
 interface GreybrainerInsightsProps {
   currentUserEmail?: string | null;
   logTokenUsage?: LogTokenUsageFn;
+  newsletterSuggestions?: { movies: MovieSuggestion[]; topics: string[] };
 }
 
 type WorkflowMode = 'daily-adaptive' | 'deep-research';
-type InsightMode = 'on-demand' | 'movie-anchored' | 'research-trending' | 'grey-verdict';
+type InsightMode = 'on-demand' | 'movie-anchored' | 'research-trending' | 'grey-verdict' | 'competitive-intelligence';
 type AnalysisLayer = 'story' | 'orchestration' | 'performance' | 'morphokinetics' | 'random';
 
 export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
   currentUserEmail,
   logTokenUsage,
+  newsletterSuggestions,
 }) => {
   const [workflowMode, setWorkflowMode] = useState<WorkflowMode>('daily-adaptive');
   // Deep research mode selection
@@ -61,21 +67,28 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
 
   // Research & Trending state (new)
   const [trendingTopics, setTrendingTopics] = useState<string>('');
-  const [pastContentContext, setPastContentContext] = useState<string>('');
   const [researchReport, setResearchReport] = useState<string | null>(null);
   const [isGeneratingResearch, setIsGeneratingResearch] = useState<boolean>(false);
   const [researchError, setResearchError] = useState<string | null>(null);
   const [copiedResearch, setCopiedResearch] = useState<boolean>(false);
+  const [researchDistributionPack, setResearchDistributionPack] = useState<DistributionPack | null>(null);
+  const [isGeneratingResearchPack, setIsGeneratingResearchPack] = useState<boolean>(false);
+  const [researchPackError, setResearchPackError] = useState<string | null>(null);
+  const [copiedResearchPack, setCopiedResearchPack] = useState<string | null>(null);
 
   // Grey Verdict state (new)
   const [greyVerdictMovieTitle, setGreyVerdictMovieTitle] = useState<string>('');
   const [greyVerdictTrendAngle, setGreyVerdictTrendAngle] = useState<string>('');
-  const [greyVerdictPastContext, setGreyVerdictPastContext] = useState<string>('');
   const [greyVerdictEditorial, setGreyVerdictEditorial] = useState<string | null>(null);
   const [isGeneratingVerdict, setIsGeneratingVerdict] = useState<boolean>(false);
   const [verdictError, setVerdictError] = useState<string | null>(null);
   const [copiedVerdict, setCopiedVerdict] = useState<boolean>(false);
 
+  // Competitive Intelligence state
+  const [trendReport, setTrendReport] = useState<any>(null);
+  const [isGeneratingTrendAnalysis, setIsGeneratingTrendAnalysis] = useState<boolean>(false);
+  const [trendAnalysisError, setTrendAnalysisError] = useState<string | null>(null);
+  const [scrapedUrls, setScrapedUrls] = useState<string>('');
 
   const fetchDynamicInsight = useCallback(async () => {
     setIsFetchingDynamicInsight(true);
@@ -263,11 +276,13 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
     setIsGeneratingResearch(true);
     setResearchError(null);
     setResearchReport(null);
+    setResearchDistributionPack(null);
+    setResearchPackError(null);
     
     try {
       const report = await generateGreybrainerResearch(
         trendingTopics,
-        pastContentContext || undefined,
+        undefined,
         logTokenUsage
       );
       setResearchReport(report);
@@ -277,6 +292,47 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
     } finally {
       setIsGeneratingResearch(false);
     }
+  };
+
+  const setCopiedResearchPackState = (type: string) => {
+    setCopiedResearchPack(type);
+    setTimeout(() => setCopiedResearchPack(null), 2500);
+  };
+
+  const handleGenerateResearchDistributionPack = async () => {
+    if (!researchReport || isGeneratingResearchPack) return;
+    setIsGeneratingResearchPack(true);
+    setResearchPackError(null);
+    try {
+      const pack = await generateDistributionPackForResearch({ trendingTopics, researchReport }, logTokenUsage);
+      setResearchDistributionPack(pack);
+    } catch (err) {
+      console.error('Failed to generate research distribution pack:', err);
+      setResearchPackError(err instanceof Error ? err.message : 'An unknown error occurred while generating the distribution pack.');
+    } finally {
+      setIsGeneratingResearchPack(false);
+    }
+  };
+
+  const handleCopyResearchPackJson = () => {
+    if (!researchDistributionPack) return;
+    navigator.clipboard.writeText(JSON.stringify(researchDistributionPack, null, 2)).then(() => {
+      setCopiedResearchPackState('json');
+    }).catch(err => console.error('Failed to copy research pack json: ', err));
+  };
+
+  const handleDownloadResearchPackJson = () => {
+    if (!researchDistributionPack) return;
+    const blob = new Blob([JSON.stringify(researchDistributionPack, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    const today = new Date().toISOString().split('T')[0];
+    link.download = `research_distribution_pack_${today}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   };
 
   const handleCopyResearch = () => {
@@ -313,7 +369,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
       const editorial = await generateGreyVerdictEditorial(
         greyVerdictMovieTitle,
         greyVerdictTrendAngle,
-        greyVerdictPastContext || undefined,
+        undefined,
         logTokenUsage
       );
       setGreyVerdictEditorial(editorial);
@@ -346,6 +402,22 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  // Competitive Intelligence handlers
+  const handleRunTrendAnalysis = async () => {
+    if (isGeneratingTrendAnalysis) return;
+    setIsGeneratingTrendAnalysis(true);
+    setTrendAnalysisError(null);
+    try {
+      const urls = scrapedUrls.split('\n').map(u => u.trim()).filter(Boolean);
+      const report = await trendIntelligenceService.runAnalysisCycle(urls.length > 0 ? urls : undefined);
+      setTrendReport(report);
+    } catch (err) {
+      setTrendAnalysisError(err instanceof Error ? err.message : "Failed to run trend intelligence analysis.");
+    } finally {
+      setIsGeneratingTrendAnalysis(false);
+    }
+  };
+
 
   return (
     <div className="mt-12 p-6 bg-slate-800/70 rounded-xl shadow-2xl border border-slate-700">
@@ -361,7 +433,6 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
           Greybrainer now runs two clear workflows: one adaptive daily editorial draft that is generated automatically,
           and one human-initiated deep research studio for movie-led analysis and publication development.
         </p>
-
         <div className="my-5 grid gap-3 md:grid-cols-2">
           <button
             onClick={() => setWorkflowMode('daily-adaptive')}
@@ -406,7 +477,108 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
               Everything below is editor-initiated. Nothing here runs on an automatic schedule.
             </div>
 
+            {(newsletterSuggestions?.movies?.length || newsletterSuggestions?.topics?.length) ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
+                <div className="p-3 bg-slate-800/80 rounded-lg border border-teal-500/30">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="text-xs font-semibold text-teal-300 uppercase tracking-wider">
+                      Newsletter Picks ({newsletterSuggestions?.movies?.length || 0})
+                    </div>
+                    <div className="text-[10px] text-slate-400">Click to use in active tab</div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {newsletterSuggestions?.movies?.map((movie, index) => {
+                      const label = movie.year ? `${movie.title} (${movie.year})` : movie.title;
+                      return (
+                        <button
+                          key={`global-movie-${index}`}
+                          type="button"
+                          onClick={() => {
+                            if (insightMode === 'movie-anchored') {
+                              setSelectedMovie(label);
+                            } else if (insightMode === 'grey-verdict') {
+                              setGreyVerdictMovieTitle(prev => prev ? `${prev}, ${label}` : label);
+                            } else if (insightMode === 'research-trending') {
+                              setTrendingTopics(prev => prev.trim() ? `${prev.trim()}\n• ${label}` : `• ${label}`);
+                            } else {
+                              setInsightMode('movie-anchored');
+                              setSelectedMovie(label);
+                            }
+                          }}
+                          className="px-2 py-1.5 text-xs font-medium rounded-md bg-teal-900/40 hover:bg-teal-700 text-teal-100 border border-teal-700/50 transition-colors text-left"
+                          title={movie.description || `Use ${label}`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="p-3 bg-slate-800/80 rounded-lg border border-amber-500/30">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="text-xs font-semibold text-amber-300 uppercase tracking-wider">
+                      Research Chips ({newsletterSuggestions?.topics?.length || 0})
+                    </div>
+                    <div className="text-[10px] text-slate-400">Click to use in active tab</div>
+                  </div>
+                  <div className="flex flex-col gap-2">
+                    {newsletterSuggestions?.topics?.map((topic, index) => (
+                      <button
+                        key={`global-topic-${index}`}
+                        type="button"
+                        onClick={() => {
+                          if (insightMode === 'grey-verdict') {
+                            setGreyVerdictTrendAngle(topic);
+                          } else {
+                            if (insightMode !== 'research-trending') {
+                              setInsightMode('research-trending');
+                            }
+                            setTrendingTopics(prev => prev.trim() ? `${prev.trim()}\n• ${topic}` : `• ${topic}`);
+                          }
+                        }}
+                        className="px-2 py-1.5 text-xs font-medium rounded-md bg-amber-900/30 hover:bg-amber-800/60 text-amber-100 border border-amber-700/50 transition-colors text-left line-clamp-2"
+                        title={topic}
+                      >
+                        {topic}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             <div className="flex flex-wrap gap-2 my-4 border-b border-slate-700 pb-2">
+              <button
+                onClick={() => setInsightMode('research-trending')}
+                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+                  insightMode === 'research-trending'
+                    ? 'bg-amber-500 text-black'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                📊 Research & Trending
+              </button>
+              <button
+                onClick={() => setInsightMode('grey-verdict')}
+                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+                  insightMode === 'grey-verdict'
+                    ? 'bg-purple-500 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                ⚖️ Grey Verdict
+              </button>
+              <button
+                onClick={() => setInsightMode('competitive-intelligence')}
+                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+                  insightMode === 'competitive-intelligence'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                🎯 Trend Intelligence
+              </button>
               <button
                 onClick={() => setInsightMode('on-demand')}
                 className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
@@ -631,6 +803,24 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                 className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-amber-500 focus:outline-none"
               />
               <p className="text-xs text-slate-400 mt-1">Enter a recent Indian film or OTT show that's fresh in audience's mind</p>
+              {newsletterSuggestions?.movies?.length ? (
+                <div className="mt-2">
+                  <div className="text-xs text-slate-400 mb-1">Suggested from Newsletter</div>
+                  <div className="flex flex-wrap gap-2">
+                    {newsletterSuggestions.movies.slice(0, 10).map((m, idx) => (
+                      <button
+                        key={`nl-movie-${idx}-${m.title}`}
+                        type="button"
+                        onClick={() => setSelectedMovie(m.year ? `${m.title} (${m.year})` : m.title)}
+                        className="px-2 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
+                        title={m.description || m.title}
+                      >
+                        {m.year ? `${m.title} (${m.year})` : m.title}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             {/* Layer Selection */}
@@ -782,7 +972,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                 📊 Research & Trending Engine
               </h3>
               <p className="text-slate-300 text-sm mb-4">
-                <strong>Build your continuous Medium narrative.</strong> Analyze trending topics and create strategic research that connects to your @GreyBrainer audience at https://medium.com/@GreyBrainer/greybrainer. Generate actionable insights that position each post as a chapter in an ongoing story.
+                <strong>Build your continuous narrative.</strong> Analyze trending topics and create strategic research that connects to your audience. Generate actionable insights that position each post as a chapter in an ongoing story.
               </p>
               
               <div className="space-y-3">
@@ -794,21 +984,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                     id="trending-topics"
                     value={trendingTopics}
                     onChange={(e) => setTrendingTopics(e.target.value)}
-                    placeholder="What's dominating Indian cinema conversations RIGHT NOW?&#10;&#10;Examples:&#10;• 'Akhanda 2: Thaandavam' #1 on Netflix - divine action sequel&#10;• 'The Raja Saab' massive opening but critic backlash&#10;• 'Freedom at Midnight S2' sparking Partition debates&#10;• 'Dhurandhar' trending pre-Netflix release Jan 30&#10;• Box office: Pan-Indian spectacles vs regional darlings&#10;&#10;Include: Platform, release dates, box office numbers, social media buzz"
-                    rows={8}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label htmlFor="past-content" className="block text-sm font-medium text-slate-200 mb-1">
-                    Your Past @GreyBrainer Posts (For Narrative Continuity)
-                  </label>
-                  <textarea
-                    id="past-content"
-                    value={pastContentContext}
-                    onChange={(e) => setPastContentContext(e.target.value)}
-                    placeholder="List your recent Medium posts to create thematic bridges...&#10;&#10;Examples:&#10;• 'Angammal' review - women's rights in Tamil cinema&#10;• 'Haq' courtroom drama analysis&#10;• Spy thriller comparison: How 'Dhurandhar' changed the game&#10;• Divine Action genre deep dive (Feb 2025)&#10;• #MeToo narratives in regional cinema&#10;&#10;The AI will connect current trends to your past analyses, showing evolution."
+                    placeholder="Click the chips above to auto-fill trending topics from your daily newsletter, or type your own here..."
                     rows={6}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   />
@@ -838,6 +1014,14 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                   </h3>
                   <div className="flex gap-2">
                     <button
+                      onClick={handleGenerateResearchDistributionPack}
+                      disabled={isGeneratingResearchPack}
+                      className="flex items-center px-3 py-1.5 bg-amber-700 hover:bg-amber-600 text-white text-xs font-medium rounded-md shadow transition-colors disabled:opacity-50"
+                      title="Generate SEO + Social distribution pack"
+                    >
+                      {isGeneratingResearchPack ? '✨ Packing...' : '🚀 SEO + Social Pack'}
+                    </button>
+                    <button
                       onClick={handleCopyResearch}
                       className="flex items-center px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium rounded-md shadow transition-colors"
                       title="Copy research report"
@@ -855,6 +1039,36 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                     </button>
                   </div>
                 </div>
+                {researchPackError && (
+                  <div className="mb-3 p-3 bg-red-900/30 border border-red-500 rounded-lg text-red-200 text-sm">
+                    <strong>Error:</strong> {researchPackError}
+                  </div>
+                )}
+                {researchDistributionPack && (
+                  <div className="mt-8 animate-fadeIn">
+                    <div className="mb-4 flex items-center justify-between">
+                      <div className="text-sm font-bold text-slate-400 uppercase tracking-widest flex items-center">
+                        <FileCode className="w-4 h-4 mr-2 text-indigo-400" />
+                        Research Distribution Pack
+                      </div>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={handleCopyResearchPackJson}
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-md transition-colors border border-slate-700"
+                        >
+                          {copiedResearchPack === 'json' ? 'Copied JSON!' : 'Copy JSON'}
+                        </button>
+                        <button
+                          onClick={handleDownloadResearchPackJson}
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-medium rounded-md transition-colors border border-slate-700"
+                        >
+                          Download
+                        </button>
+                      </div>
+                    </div>
+                    <SocialDistributionDashboard distributionPack={researchDistributionPack} />
+                  </div>
+                )}
                 <div className="p-4 bg-slate-900/60 rounded-lg border border-amber-500/30">
                   <ReadMoreLess
                     text={researchReport}
@@ -882,30 +1096,27 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                 ⚖️ Grey Verdict: Cultural Editorial Engine
               </h3>
               <p className="text-slate-300 text-sm mb-4">
-                <strong>Transform film analysis into cultural narratives.</strong> The Grey Verdict isn't a review - it's an editorial that uses specific films as proof of broader industry trends, societal shifts, or business insights. Perfect for thought leadership on <a href="https://medium.com/@GreyBrainer" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 underline">Medium/@GreyBrainer</a>, LinkedIn, or guest posts.
+                <strong>Transform film analysis into cultural narratives.</strong> The Grey Verdict isn't a review - it's an editorial that uses specific films as proof of broader industry trends, societal shifts, or business insights.
               </p>
               
               <div className="space-y-3">
                 <div>
                   <label htmlFor="verdict-movie" className="block text-sm font-medium text-slate-200 mb-1">
-                    Subject Film(s) / Series * <span className="text-purple-400 text-xs">(comma-separated for multiple)</span>
+                    Subject Film(s) / Series * <span className="text-purple-400 text-xs">(Click movie chips above to auto-fill)</span>
                   </label>
                   <input
                     id="verdict-movie"
                     type="text"
                     value={greyVerdictMovieTitle}
                     onChange={(e) => setGreyVerdictMovieTitle(e.target.value)}
-                    placeholder="Enter film(s) you want to analyze - separate with commas for multiple..."
+                    placeholder="Enter film(s) you want to analyze..."
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-                  <p className="text-xs text-slate-400 mt-1">
-                    Single: "Angammal" | Multiple: "Angammal, The Raja Saab, Haq" | Series: "Freedom at Midnight Season 2"
-                  </p>
                 </div>
 
                 <div>
                   <label htmlFor="verdict-trend" className="block text-sm font-medium text-slate-200 mb-1">
-                    Trend / Angle *
+                    Trend / Angle * <span className="text-purple-400 text-xs">(Click research chips above to auto-fill)</span>
                   </label>
                   <input
                     id="verdict-trend"
@@ -915,24 +1126,6 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                     placeholder="What cultural/industry trend do these films represent?"
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
-                  <p className="text-xs text-slate-400 mt-1">Examples: "The Silver Economy", "Anti-War Cinema Wave", "Grey Matriarch Rise", "Divine Action Evolution", "#MeToo Backlash"</p>
-                </div>
-
-                <div>
-                  <label htmlFor="verdict-ecosystem" className="block text-sm font-medium text-slate-200 mb-1">
-                    Newsletter Context / Past Ecosystem <span className="text-purple-400 text-xs">(AI will extract clues)</span>
-                  </label>
-                  <textarea
-                    id="verdict-ecosystem"
-                    value={greyVerdictPastContext}
-                    onChange={(e) => setGreyVerdictPastContext(e.target.value)}
-                    placeholder="Paste your newsletter with trending topics + suggestions, OR list past analyses for thematic bridges...&#10;&#10;📧 Newsletter Example:&#10;'This week's trend: Anti-war fatigue in Bollywood. Suggest Grey Verdict on how recent war films reveal audience backlash. Connect to our past analysis of jingoism in 2024...'&#10;&#10;📚 Past Analyses Example:&#10;• 'KD (A) Karuppudurai' - Joyful elderly rebellion&#10;• 'Haq' - Legal autonomy for women&#10;• 'Pushpa' morphokinetic breakdown - Divine action roots&#10;&#10;AI will parse suggestions and create explicit bridges to Medium/@GreyBrainer ecosystem."
-                    rows={8}
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-slate-400 mt-1">
-                    💡 Tip: Copy-paste your newsletter - AI will intelligently extract trending topics, writing suggestions, and create bridges to past GreyBrainer content!
-                  </p>
                 </div>
 
                 <button
@@ -988,10 +1181,153 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
           </div>
         )}
 
-            <p className="mt-4 pt-4 border-t border-slate-700">
-              These research outputs can now stay inside Greybrainer instead of being copied around manually. Drafts,
-              versions, and publication state can move through the Cloudflare workflow after the editor is satisfied.
-            </p>
+        {/* Competitive Intelligence Mode */}
+        {insightMode === 'competitive-intelligence' && (
+          <div className="mt-4 space-y-6 animate-fadeIn">
+            <div className="p-4 bg-indigo-900/20 rounded-xl border border-indigo-500/30">
+              <div className="flex items-center mb-4">
+                <Target className="w-6 h-6 text-indigo-400 mr-3" />
+                <h3 className="text-lg font-bold text-white tracking-tight">Trend Intelligence Engine</h3>
+              </div>
+              
+              <p className="text-sm text-slate-300 mb-4 leading-relaxed">
+                Scrape competitor cinematic blogs and industry news to identify strategic "content gaps" and trending viral hooks.
+              </p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-2">
+                    Target URLs (One per line)
+                  </label>
+                  <textarea
+                    value={scrapedUrls}
+                    onChange={(e) => setScrapedUrls(e.target.value)}
+                    placeholder="https://variety.com/v/film/&#10;https://www.filmcompanion.in/&#10;..."
+                    className="w-full h-32 px-4 py-3 bg-slate-900/60 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-600 focus:outline-none focus:ring-2 focus:ring-indigo-500 font-mono text-xs"
+                  />
+                  <p className="mt-2 text-[10px] text-slate-500 italic">
+                    Leave empty to use default industry-leading sources.
+                  </p>
+                </div>
+
+                {!hasFirecrawlApiKey() ? (
+                  <div className="p-4 bg-amber-900/20 border border-amber-500/30 rounded-xl flex items-start">
+                    <Shield className="w-5 h-5 text-amber-400 mr-3 mt-0.5 flex-shrink-0" />
+                    <div className="text-xs text-amber-200 leading-relaxed">
+                      <strong>Firecrawl API Key Required:</strong> To enable deep web scraping, please add your Firecrawl API key in the <strong>Settings &rarr; Keys</strong> tab.
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={handleRunTrendAnalysis}
+                    disabled={isGeneratingTrendAnalysis}
+                    className="w-full py-4 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-xl transition-all shadow-lg shadow-indigo-900/40 flex items-center justify-center disabled:opacity-50"
+                  >
+                    {isGeneratingTrendAnalysis ? (
+                      <>
+                        <LoadingSpinner size="sm" />
+                        <span className="ml-3">Scraping & Analyzing Competitors...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Globe className="w-5 h-5 mr-2" />
+                        Run Trend Analysis Cycle
+                      </>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {trendAnalysisError && (
+              <div className="p-4 bg-red-900/20 border border-red-500/30 rounded-xl text-xs text-red-300 leading-relaxed">
+                <strong>Analysis Failed:</strong> {trendAnalysisError}
+              </div>
+            )}
+
+            {trendReport && !isGeneratingTrendAnalysis && (
+              <div className="space-y-6 animate-fadeIn">
+                {/* Primary Trends */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {trendReport.primaryTrends.map((trend: any, i: number) => (
+                    <div key={i} className="p-4 bg-slate-900/40 rounded-xl border border-slate-700 hover:border-indigo-500/50 transition-colors group">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-widest ${
+                          trend.impact === 'high' ? 'bg-red-900/30 text-red-400' : 
+                          trend.impact === 'medium' ? 'bg-amber-900/30 text-amber-400' : 
+                          'bg-blue-900/30 text-blue-400'
+                        }`}>
+                          {trend.impact} Impact
+                        </span>
+                        <div className="text-[10px] text-slate-500 font-mono">{(trend.confidence * 100).toFixed(0)}% Conf.</div>
+                      </div>
+                      <h4 className="text-sm font-bold text-white mb-2 group-hover:text-indigo-300 transition-colors">{trend.title}</h4>
+                      <p className="text-xs text-slate-400 leading-relaxed">{trend.description}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* Competitor Insights */}
+                  <div className="space-y-4">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center px-1">
+                      <BarChart2 className="w-4 h-4 mr-2 text-emerald-400" />
+                      Competitor Strategy Gaps
+                    </h4>
+                    <div className="space-y-3">
+                      {trendReport.competitorInsights.map((insight: any, i: number) => (
+                        <div key={i} className="p-4 bg-slate-900/60 rounded-xl border border-slate-700">
+                          <div className="text-xs font-bold text-emerald-400 mb-1">{insight.competitor}</div>
+                          <div className="text-[11px] text-slate-300 mb-2 italic">"{insight.latestStrategy}"</div>
+                          <div className="text-xs text-slate-400">
+                            <span className="text-indigo-300 font-semibold">GreyBrainer Opportunity:</span> {insight.opportunity}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Viral Hooks & Hashtags */}
+                  <div className="space-y-6">
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center px-1">
+                        <Sparkles className="w-4 h-4 mr-2 text-indigo-400" />
+                        Suggested Viral Hooks
+                      </h4>
+                      <div className="space-y-2">
+                        {trendReport.suggestedHooks.map((hook: string, i: number) => (
+                          <div key={i} className="p-3 bg-indigo-900/10 rounded-lg border border-indigo-500/20 text-xs text-indigo-100 flex items-start">
+                            <span className="mr-3 text-indigo-500 font-bold">{i+1}.</span>
+                            {hook}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-widest flex items-center px-1">
+                        <Share2 className="w-4 h-4 mr-2 text-purple-400" />
+                        Optimized Hashtags
+                      </h4>
+                      <div className="flex flex-wrap gap-2">
+                        {trendReport.optimizedHashtags.map((tag: string, i: number) => (
+                          <span key={i} className="px-3 py-1.5 bg-slate-800 text-purple-300 text-[11px] rounded-full border border-slate-700">
+                            {tag.startsWith('#') ? tag : `#${tag}`}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        <p className="mt-4 pt-4 border-t border-slate-700">
+          These research outputs can stay inside Greybrainer instead of being copied around manually. Drafts, versions,
+          and publication state can move through the Cloudflare workflow after the editor is satisfied. Learn more about our <a href="mailto:consultancy@greybrainer.ai" className="text-indigo-400 hover:underline">consultancy services</a>.
+        </p>
           </>
         )}
       </div>

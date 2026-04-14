@@ -22,6 +22,7 @@ export class AdminService {
         'satish.rath@gmail.com',
         'dr.satish@greybrain.ai',
         'digi.social@greybrain.ai',
+        'social@skids.health',
         'support@skids.health'
       ];
       
@@ -86,6 +87,7 @@ export class AdminService {
       'satish.rath@gmail.com',
       'dr.satish@greybrain.ai',
       'digi.social@greybrain.ai',
+      'social@skids.health',
       'support@skids.health'
     ];
     

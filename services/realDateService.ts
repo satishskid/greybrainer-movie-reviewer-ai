@@ -1,3 +1,5 @@
+import { extractJsonPayloadFromModelText } from './geminiService';
+
 /**
  * Service to get real current date from external APIs
  * Handles cases where system date might be incorrect or LLM training data is outdated
@@ -134,13 +136,7 @@ export class RealDateService {
       const responseText = response.response.text().trim();
       
       // Parse JSON response
-      let jsonStr = responseText;
-      const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-      const match = jsonStr.match(fenceRegex);
-      if (match && match[2]) {
-        jsonStr = match[2].trim();
-      }
-      
+      const jsonStr = extractJsonPayloadFromModelText(responseText);
       const parsedDate = JSON.parse(jsonStr);
       const monthIndex = this.MONTH_NAMES.indexOf(parsedDate.month);
       

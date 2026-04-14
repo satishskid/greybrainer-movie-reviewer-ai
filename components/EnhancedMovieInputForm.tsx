@@ -1,6 +1,6 @@
 // Simplified movie input form with basic search and IMDb ID lookup
 import React, { useState, useEffect, useCallback } from 'react';
-import { ReviewStage, MovieAnalysisInput, MovieSuggestion } from '../types';
+import { FinancialAnalysisData, ReviewStage, MovieAnalysisInput, MovieSuggestion } from '../types';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { LoadingSpinner } from './LoadingSpinner';
 import { LightBulbIcon } from './icons/LightBulbIcon';
@@ -13,6 +13,28 @@ interface EnhancedMovieInputFormProps {
   onAnalyze: () => void;
   isAnalyzing: boolean;
   onGetSuggestions?: (title: string) => Promise<MovieSuggestion[]>;
+  financialAnalysisData?: FinancialAnalysisData | null;
+  onFetchBudgetEstimate?: () => void;
+  onApplyBudgetEstimate?: (budgetUsd: number) => void;
+  newsletterSuggestedMovies?: MovieSuggestion[];
+  newsletterSuggestedTopics?: string[];
+  newsletterAudit?: {
+    firestore: {
+      ok: boolean;
+      fetched: number;
+      latestId: string | null;
+      withContent: number;
+      withSuggestedReviews: number;
+      withSuggestedTopics: number;
+    };
+    baas: {
+      ok: boolean;
+      latestDate: string | null;
+      latestTitle: string | null;
+      recentFetched: number | null;
+    };
+  } | null;
+  onOpenSettings?: () => void;
 }
 
 export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
@@ -22,6 +44,13 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
   onAnalyze,
   isAnalyzing,
   onGetSuggestions,
+  financialAnalysisData,
+  onFetchBudgetEstimate,
+  onApplyBudgetEstimate,
+  newsletterSuggestedMovies,
+  newsletterSuggestedTopics,
+  newsletterAudit,
+  onOpenSettings,
 }) => {
   const [inputMode, setInputMode] = useState<'search' | 'id'>('search');
   const [idInput, setIdInput] = useState('');
@@ -29,6 +58,8 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
   const [foundTitle, setFoundTitle] = useState<string>('');
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [idError, setIdError] = useState('');
+  const [copiedTopic, setCopiedTopic] = useState<string | null>(null);
+  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   
   // Original search states
   const [suggestions, setSuggestions] = useState<MovieSuggestion[]>([]);
@@ -213,6 +244,21 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
     setShowSuggestions(false);
   };
 
+  const handleTopicPick = (topic: string) => {
+    const cleaned = topic.trim();
+    if (!cleaned) return;
+    navigator.clipboard.writeText(cleaned).then(() => {
+      setCopiedTopic(cleaned);
+      window.setTimeout(() => setCopiedTopic(null), 2000);
+    }).catch(() => {});
+  };
+
+  useEffect(() => {
+    if (!showAdvancedOptions && inputMode === 'id') {
+      setInputMode('search');
+    }
+  }, [showAdvancedOptions, inputMode]);
+
   // Handle key down for keyboard navigation
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (!showSuggestions || suggestions.length === 0) return;
@@ -246,6 +292,62 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
     }
   };
 
+  const renderNewsletterEmptyState = () => {
+    const fs = newsletterAudit?.firestore;
+    const baas = newsletterAudit?.baas;
+    if (!fs || !fs.ok) {
+      return (
+        <div className="text-xs text-slate-300">
+          No picks yet. Click Refresh to fetch. If still empty, open Settings and run Enrich Chips.
+        </div>
+      );
+    }
+
+    if (fs.fetched === 0) {
+      return (
+        <div className="text-xs text-slate-300">
+          No newsletters found in Firestore. Import from BaaS, or generate today’s Daily Editorial.
+          {baas?.ok && (baas.latestDate || baas.latestTitle) && (
+            <div className="mt-1 text-[11px] text-slate-400">
+              BaaS latest: {baas.latestDate || '—'} {baas.latestTitle ? `• ${baas.latestTitle}` : ''}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    if (fs.withSuggestedReviews === 0 && fs.withContent > 0) {
+      return (
+        <div className="text-xs text-slate-300">
+          Newsletters found ({fs.fetched}) but no movie picks yet. Open Settings and run Enrich Chips, then Refresh.
+        </div>
+      );
+    }
+
+    return (
+      <div className="text-xs text-slate-300">
+        No picks yet. Click Refresh to fetch. If still empty, open Settings and run Enrich Chips.
+      </div>
+    );
+  };
+
+  const renderResearchEmptyState = () => {
+    const fs = newsletterAudit?.firestore;
+    if (fs?.ok && fs.fetched > 0 && fs.withSuggestedTopics === 0 && fs.withContent > 0) {
+      return (
+        <div className="text-xs text-slate-300">
+          Newsletters found ({fs.fetched}) but no research picks yet. Open Settings and run Enrich Chips, then Refresh.
+        </div>
+      );
+    }
+
+    return (
+      <div className="text-xs text-slate-300">
+        No research picks yet. Click Refresh to fetch. If still empty, open Settings and run Enrich Chips.
+      </div>
+    );
+  };
+
   return (
     <div className="p-6 bg-slate-800/70 rounded-xl shadow-2xl mb-8 border border-slate-700">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 items-start">
@@ -254,7 +356,8 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
           <label className="block text-sm font-medium text-indigo-300 mb-2">
             Input Method
           </label>
-          <div className="flex space-x-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex space-x-4">
             <button
               type="button"
               onClick={() => setInputMode('search')}
@@ -266,22 +369,138 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
             >
               🔍 Search by Title
             </button>
+            {showAdvancedOptions && (
+              <button
+                type="button"
+                onClick={() => setInputMode('id')}
+                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                  inputMode === 'id'
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                🆔 Enter Movie ID
+              </button>
+            )}
+            </div>
             <button
               type="button"
-              onClick={() => setInputMode('id')}
-              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                inputMode === 'id'
-                  ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-              }`}
+              onClick={() => setShowAdvancedOptions((v) => !v)}
+              className="px-3 py-2 rounded-lg text-sm font-medium bg-slate-700 text-slate-300 hover:bg-slate-600 transition-colors"
             >
-              🆔 Enter Movie ID
+              {showAdvancedOptions ? 'Hide options' : 'More options'}
             </button>
           </div>
         </div>
 
+        <div className="md:col-span-2 lg:col-span-3">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-900/10">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-semibold text-emerald-200 uppercase tracking-wider">
+                  Newsletter Picks
+                  <span className="ml-2 text-[11px] text-slate-300 normal-case tracking-normal">
+                    ({newsletterSuggestedMovies?.length || 0})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {(newsletterSuggestedMovies && newsletterSuggestedMovies.length > 0) ? (
+                    <div className="text-[11px] text-slate-300">Click to fill title</div>
+                  ) : (
+                    <div className="text-[11px] text-slate-300">—</div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new Event('newsletterSuggestions:refresh'))}
+                    className="px-2 py-1 text-[11px] rounded bg-slate-700/60 hover:bg-slate-700 text-slate-200 border border-slate-500/30 transition-colors"
+                  >
+                    Refresh
+                  </button>
+                  {onOpenSettings && (
+                    <button
+                      type="button"
+                      onClick={onOpenSettings}
+                      className="px-2 py-1 text-[11px] rounded bg-emerald-700/30 hover:bg-emerald-700/45 text-emerald-100 border border-emerald-500/30 transition-colors"
+                    >
+                      Setup
+                    </button>
+                  )}
+                </div>
+              </div>
+              {(newsletterSuggestedMovies && newsletterSuggestedMovies.length > 0) ? (
+                <div className="flex flex-wrap gap-2">
+                  {newsletterSuggestedMovies.slice(0, 12).map((m, idx) => (
+                    <button
+                      key={`nl-pick-${idx}-${m.title}`}
+                      type="button"
+                      onClick={() => handleSuggestionSelect(m)}
+                      className="px-2.5 py-1.5 text-xs rounded-md bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-100 border border-emerald-500/30 transition-colors"
+                      title={m.description || m.title}
+                    >
+                      {m.year ? `${m.title} (${m.year})` : m.title}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                renderNewsletterEmptyState()
+              )}
+            </div>
+
+            <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-900/10">
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-semibold text-amber-200 uppercase tracking-wider">
+                  Research Chips
+                  <span className="ml-2 text-[11px] text-slate-300 normal-case tracking-normal">
+                    ({newsletterSuggestedTopics?.length || 0})
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {(newsletterSuggestedTopics && newsletterSuggestedTopics.length > 0) ? (
+                    <div className="text-[11px] text-slate-300">{copiedTopic ? 'Copied!' : 'Click to copy'}</div>
+                  ) : (
+                    <div className="text-[11px] text-slate-300">—</div>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => window.dispatchEvent(new Event('newsletterSuggestions:refresh'))}
+                    className="px-2 py-1 text-[11px] rounded bg-slate-700/60 hover:bg-slate-700 text-slate-200 border border-slate-500/30 transition-colors"
+                  >
+                    Refresh
+                  </button>
+                  {onOpenSettings && (
+                    <button
+                      type="button"
+                      onClick={onOpenSettings}
+                      className="px-2 py-1 text-[11px] rounded bg-amber-700/30 hover:bg-amber-700/45 text-amber-100 border border-amber-500/30 transition-colors"
+                    >
+                      Setup
+                    </button>
+                  )}
+                </div>
+              </div>
+              {(newsletterSuggestedTopics && newsletterSuggestedTopics.length > 0) ? (
+                <div className="flex flex-wrap gap-2">
+                  {newsletterSuggestedTopics.slice(0, 12).map((t, idx) => (
+                    <button
+                      key={`nl-topic-pick-${idx}`}
+                      type="button"
+                      onClick={() => handleTopicPick(t)}
+                      className="px-2.5 py-1.5 text-xs rounded-md bg-amber-600/20 hover:bg-amber-600/35 text-amber-100 border border-amber-500/30 transition-colors"
+                      title={t}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                renderResearchEmptyState()
+              )}
+            </div>
+          </div>
+        </div>
+
         {/* ID Input Mode */}
-        {inputMode === 'id' && (
+        {showAdvancedOptions && inputMode === 'id' && (
           <div className="md:col-span-2 lg:col-span-3">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
@@ -438,33 +657,48 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
         )}
 
         {/* Rest of the form fields (same as original) */}
-        <div className="md:col-span-1">
-          <label htmlFor="reviewStage" className="block text-sm font-medium text-indigo-300 mb-1">
-            Review Stage
-          </label>
-          <select
-            id="reviewStage"
-            name="reviewStage"
-            value={movieInput.reviewStage}
-            onChange={handleInputChange}
-            className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-slate-100"
-            aria-label="Review Stage Selector"
-          >
-            {reviewStages.map(stage => (
-              <option key={stage.value} value={stage.value} className="bg-slate-700 text-slate-100">
-                {stage.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {showAdvancedOptions && (
+          <div className="md:col-span-1">
+            <label htmlFor="reviewStage" className="block text-sm font-medium text-indigo-300 mb-1">
+              Review Stage
+            </label>
+            <select
+              id="reviewStage"
+              name="reviewStage"
+              value={movieInput.reviewStage}
+              onChange={handleInputChange}
+              className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-slate-100"
+              aria-label="Review Stage Selector"
+            >
+              {reviewStages.map(stage => (
+                <option key={stage.value} value={stage.value} className="bg-slate-700 text-slate-100">
+                  {stage.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         
         {/* Budget and ROI fields (same as original) */}
+        {showAdvancedOptions && (
         <div className="md:col-span-2 lg:col-span-1">
           <div className="flex items-center justify-between mb-1">
             <label htmlFor="productionBudget" className="text-sm font-medium text-indigo-300">
               Est. Production Budget (USD)
             </label>
             <div className="flex items-center space-x-2">
+              <button
+                type="button"
+                onClick={() => setMovieInput({ ...movieInput, enableROIAnalysis: !movieInput.enableROIAnalysis })}
+                className={`flex items-center space-x-1 px-2 py-1 rounded text-xs transition-colors ${
+                  movieInput.enableROIAnalysis
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+                }`}
+              >
+                <span>💰</span>
+                <span>ROI</span>
+              </button>
               <button
                 type="button"
                 onClick={() => setShowBudgetEstimates(!showBudgetEstimates)}
@@ -492,6 +726,63 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
             className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-slate-100 placeholder-slate-400"
             aria-label="Production Budget Input"
           />
+          {movieInput.enableROIAnalysis && (
+            <div className="mt-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs text-slate-400 flex-1">
+                  {financialAnalysisData?.isLoadingBudget
+                    ? 'Fetching budget estimate via Gemini grounding...'
+                    : financialAnalysisData?.fetchedBudget
+                      ? `AI found ~${financialAnalysisData.fetchedBudget.toLocaleString()} ${financialAnalysisData.fetchedBudgetCurrency || 'USD'}`
+                      : financialAnalysisData?.errorBudget
+                        ? `Budget fetch failed: ${financialAnalysisData.errorBudget}`
+                        : 'No AI budget estimate yet.'}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onFetchBudgetEstimate}
+                    disabled={!onFetchBudgetEstimate || !!financialAnalysisData?.isLoadingBudget || !movieInput.movieTitle.trim()}
+                    className="px-2 py-1 text-xs rounded bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Fetch
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const budget = financialAnalysisData?.fetchedBudget;
+                      const currency = (financialAnalysisData?.fetchedBudgetCurrency || 'USD').toUpperCase();
+                      if (budget && onApplyBudgetEstimate && currency === 'USD') {
+                        onApplyBudgetEstimate(budget);
+                      }
+                    }}
+                    disabled={
+                      !onApplyBudgetEstimate ||
+                      !financialAnalysisData?.fetchedBudget ||
+                      ((financialAnalysisData?.fetchedBudgetCurrency || 'USD').toUpperCase() !== 'USD')
+                    }
+                    className="px-2 py-1 text-xs rounded bg-indigo-700 hover:bg-indigo-600 text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Use
+                  </button>
+                </div>
+              </div>
+              {financialAnalysisData?.fetchedBudgetSources && financialAnalysisData.fetchedBudgetSources.length > 0 && (
+                <div className="mt-2 text-xs">
+                  <div className="text-slate-500 mb-1">Sources:</div>
+                  <ul className="list-disc list-inside ml-3 space-y-0.5">
+                    {financialAnalysisData.fetchedBudgetSources.slice(0, 3).map((s, i) => (
+                      <li key={`budget-src-${i}`}>
+                        <a href={s.uri} target="_blank" rel="noopener noreferrer" className="text-sky-400 hover:underline">
+                          {s.title || s.uri}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          )}
           {showBudgetEstimates && (
             <div className="mt-2 p-3 bg-slate-700/50 rounded-lg border border-slate-600">
               <div className="text-xs text-slate-300 space-y-1">
@@ -503,6 +794,7 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
             </div>
           )}
         </div>
+        )}
       </div>
 
       {/* Analyze Button */}

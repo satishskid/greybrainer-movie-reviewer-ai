@@ -1,8 +1,9 @@
 import { GoogleGenerativeAI, GenerateContentResult } from "@google/generative-ai";
-import { ReviewLayer, ReviewStage, LayerAnalysisData, GroundingChunkWeb, GroundingMetadata, PersonnelData, SummaryReportData, CreativeSparkResult, VonnegutShapeData, PlotPoint, ScriptIdeaInput, MagicQuotientAnalysis, MorphokineticsAnalysis, FinancialAnalysisData, SocialSnippets, MovieSuggestion } from '../types';
+import { ReviewLayer, ReviewStage, LayerAnalysisData, GroundingChunkWeb, GroundingMetadata, PersonnelData, SummaryReportData, CreativeSparkResult, VonnegutShapeData, PlotPoint, ScriptIdeaInput, MagicQuotientAnalysis, MorphokineticsAnalysis, FinancialAnalysisData, SocialSnippets, MovieSuggestion, DistributionPack } from '../types';
 import { MAX_SCORE, MAGIC_QUOTIENT_DISCLAIMER } from '../constants';
 import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
+import { modelConfigService } from './modelConfigService';
 
 // --- IP PROTECTION & COMMERCIAL SERVICE NOTE ---
 // For a commercial application requiring IP protection and robust user management/metering:
@@ -22,6 +23,102 @@ const getGeminiAI = (): GoogleGenerativeAI => {
   }
   return new GoogleGenerativeAI(apiKey);
 };
+
+export type LogTokenUsageFn = (operation: string, inputChars: number, outputChars: number) => void;
+
+export async function runGeminiWithFallback<T>(
+  operationName: string,
+  prompt: string,
+  generationConfig: any,
+  parser: (responseText: string, fullResponse: GenerateContentResult) => T,
+  logTokenUsage?: LogTokenUsageFn,
+  tools?: any[]
+): Promise<T> {
+  const modelsToTry = [
+    modelConfigService.getSelectedModel(),
+    modelConfigService.getFallbackModel(),
+    modelConfigService.getLegacyModel(),
+    'gemini-2.5-flash-lite' // Ultimate stable fallback
+  ].filter(Boolean);
+
+  let lastError: any;
+
+  // First pass: Try all models with tools if provided
+  for (const modelName of modelsToTry) {
+    try {
+      console.log(`🤖 [${operationName}] Attempting with model: ${modelName}${tools ? ' (with tools)' : ''}`);
+      
+      const genAI = getGeminiAI();
+      const modelInfo = modelConfigService.getModelInfo(modelName);
+      
+      // Force v1beta if tools are present
+      const apiVersion = (tools && tools.length > 0) || modelInfo?.apiVersion === 'v1beta' ? 'v1beta' : 'v1';
+      
+      const model = genAI.getGenerativeModel(
+        { 
+          model: modelName,
+          generationConfig,
+          tools
+        },
+        { apiVersion }
+      );
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 35000); // Slightly longer timeout
+      
+      try {
+        const response = await model.generateContent(prompt);
+        clearTimeout(timeoutId);
+        
+        const responseText = response.response.text();
+        logTokenUsage?.(operationName, prompt.length, responseText.length);
+        
+        return parser(responseText, response);
+      } catch (innerError) {
+        clearTimeout(timeoutId);
+        throw innerError;
+      }
+    } catch (error: any) {
+      const errorMsg = error.message?.toLowerCase() || '';
+      const isModelError = errorMsg.includes('404') || 
+                         error.status === 404 || 
+                         errorMsg.includes('not found') ||
+                         errorMsg.includes('unsupported model');
+                         
+      const isToolError = errorMsg.includes('tool') || errorMsg.includes('400') || errorMsg.includes('search');
+      const isQuotaError = error.status === 429 || errorMsg.includes('429') || errorMsg.includes('quota');
+                   
+      if (isModelError || isQuotaError || (isToolError && tools && tools.length > 0)) {
+        console.warn(`⚠️ [${operationName}] Model ${modelName} error (${isToolError ? 'tool issue' : isQuotaError ? 'quota' : 'not found'}), trying next fallback...`);
+        lastError = error;
+        continue;
+      }
+      
+      console.error(`❌ [${operationName}] Permanent error with model ${modelName}:`, error);
+      throw error;
+    }
+  }
+
+  // Second pass: If all failed and we had tools, retry WITHOUT tools as a last resort
+  if (tools && tools.length > 0) {
+    console.warn(`⚠️ [${operationName}] All tool-enabled models failed. Retrying WITHOUT tools.`);
+    try {
+      const genAI = getGeminiAI();
+      const model = genAI.getGenerativeModel({ 
+        model: modelsToTry[0], 
+        generationConfig 
+      });
+      const response = await model.generateContent(prompt);
+      const responseText = response.response.text();
+      logTokenUsage?.(`${operationName} (No Tools)`, prompt.length, responseText.length);
+      return parser(responseText, response);
+    } catch (retryError) {
+      console.error(`❌ [${operationName}] Ultimate fallback failed:`, retryError);
+    }
+  }
+
+  throw new Error(`[${operationName}] All Gemini attempts failed. Last error: ${lastError?.message || 'Unknown error'}`);
+}
 
 // Simple movie title suggestions using Gemini API
 export const suggestMovieTitles = async (
@@ -159,8 +256,6 @@ Look up: ${imdbId}
   return null; // Fallback return
 };
 
-export type LogTokenUsageFn = (operation: string, inputChars: number, outputChars: number) => void;
-
 // Simple error handling without quota monitoring
 const handleGeminiError = (error: Error, operation: string): never => {
   const errorMessage = error.message.toLowerCase();
@@ -259,120 +354,6 @@ export interface ParsedROIAnalysis {
 
 
 
-const generatePromptForLayer = (
-  movieTitle: string, 
-  reviewStage: ReviewStage, 
-  layer: ReviewLayer, 
-  layerTitle: string, 
-  layerDescription: string,
-): string => {
-  // This prompt engineering is a core part of the IP.
-  // In a production system, this function would be on the backend.
-  
-  // Get current date for release validation
-  const { currentDate } = getDynamicDateRange();
-  
-  let context = "";
-  let releaseStatusNote = "";
-  
-  switch (reviewStage) {
-    case ReviewStage.IDEA_ANNOUNCEMENT:
-      context = `The movie/series "${movieTitle}" has just been announced.`;
-      releaseStatusNote = "This appears to be an announced project that may not have been released yet.";
-      break;
-    case ReviewStage.TRAILER:
-      context = `A trailer for the movie/series "${movieTitle}" has been released.`;
-      releaseStatusNote = "Based on the trailer stage, this content is likely upcoming or recently released.";
-      break;
-    case ReviewStage.MOVIE_RELEASED:
-      context = `The movie/series "${movieTitle}" has been released.`;
-      releaseStatusNote = "This content should be available to audiences. Focus on analyzing the released work.";
-      break;
-  }
-
-  let specificInstructions = "";
-  let searchInstructions = "";
-  let castingAnalysisInstructions = "";
-  let vonnegutAnalysisInstruction = "";
-  let scoreSuggestionInstruction = `Based on your qualitative analysis, conclude with a suggested score for this layer out of ${MAX_SCORE} (e.g., "Suggested Score: 7.5/${MAX_SCORE}"). This score should reflect the strengths and weaknesses identified.`;
-  let enhancementInstruction = `After the main analysis and score suggestion, add a section titled "Potential Enhancements:" followed by 1-3 concise bullet points (50-100 words total) suggesting how this specific layer could have been improved or areas for future consideration. Use standard bullet points (e.g., - item, * item, or • item).`;
-
-
-  if (layer === ReviewLayer.CONCEPTUALIZATION) {
-    searchInstructions = `Using your search capabilities, please try to identify the director of "${movieTitle}". If found, state it clearly in your response, for example: "Director: [Name found]".`;
-    castingAnalysisInstructions = `
-    Within your analysis of "Magic of Conceptualization," pay specific attention to the casting choices. 
-    Evaluate whether the casting appears to be:
-    - Character-centric, Star-centric, Predictable, or Inspired ("Magic in Casting").
-    Please include your assessment of the casting approach clearly within your main analysis text for this layer.
-    `;
-  } else if (layer === ReviewLayer.PERFORMANCE) {
-    searchInstructions = `Using your search capabilities, please try to identify up to 3-4 key main cast members of "${movieTitle}". If found, list them clearly: "Main Cast: [Actor 1, Actor 2, Actor 3]".`;
-  }
-
-  if (layer === ReviewLayer.STORY) {
-    specificInstructions = `
-    When analyzing the "Magic of Story/Script", provide a comprehensive analysis (250-350 words) covering:
-    1.  Plot Structure & Pacing.
-    2.  Character Development (arcs, relatability).
-    3.  Dialogue (quality, naturalness, contribution).
-    4.  Thematic Depth.
-    5.  Originality & Genre Conventions (usage, subversion, similarity to existing works - approx 50 words on this).
-    6.  World-Building (if relevant).
-    This detailed assessment should be integrated into your overall analysis of the story's uniqueness and creative merit.`;
-
-    vonnegutAnalysisInstruction = `
-    Additionally, analyze the story's narrative structure using Kurt Vonnegut's story shapes theory.
-    1. Identify which of Vonnegut's common story shapes it most closely resembles (e.g., Man in Hole, Boy Meets Girl, Cinderella, From Bad to Worse, Which Way is Up?).
-    2. Provide a brief (2-3 sentences) justification for why this shape is appropriate for "${movieTitle}".
-    3. Provide 3-5 key plot points that map this trajectory. For each point, give:
-       - Time: A normalized value from 0.0 (beginning) to 1.0 (end).
-       - Fortune: A normalized value from -1.0 (ill fortune) to 1.0 (good fortune).
-       - Description: A brief (5-15 words) description of the plot event at this point.
-    Format this information clearly, after the main analysis, score, and enhancements, as:
-    ---VONNEGUT STORY SHAPE START---
-    Vonnegut Shape: [Shape Name]
-    Shape Justification: [Your justification text here.]
-    Plot Points: [(time1, fortune1, 'description1'), (time2, fortune2, 'description2'), ...]
-    ---VONNEGUT STORY SHAPE END---
-    Example:
-    ---VONNEGUT STORY SHAPE START---
-    Vonnegut Shape: Man in Hole
-    Shape Justification: The protagonist starts in a decent position, faces a significant downturn, but eventually climbs out to an even better state. This mirrors the classic "Man in Hole" arc.
-    Plot Points: [(0.0, 0.2, 'Starts content'), (0.3, -0.8, 'Major crisis hits'), (0.7, -0.1, 'Begins recovery'), (1.0, 0.6, 'Ends in better state')]
-    ---VONNEGUT STORY SHAPE END---
-    `;
-  }
-
-
-  return `
-    You are an expert film and television critic using the "Greybrainer" methodology.
-    
-    IMPORTANT: Analyze ONLY the content provided for "${movieTitle}" (${reviewStage}). Do NOT make assumptions about whether this movie/series exists, has been released, or is announced. Focus ONLY on analyzing the creative content as presented to you.
-    
-    RELEASE STATUS GUIDANCE: ${releaseStatusNote}
-    Current Date: ${currentDate}. 
-    CONTEXT: The user is primarily interested in Indian cinema (Bollywood, Tollywood, etc.) and recent global releases. If the title is ambiguous, prioritize Indian movies or recent releases from late 2024/2025.
-    
-    Analyze "${movieTitle}" (${reviewStage}) focusing on "${layerTitle}" (${layerDescription}).
-    ${context}
-    ${searchInstructions} 
-    ${castingAnalysisInstructions}
-
-    Provide a concise (150-250 words total for most layers, see Story for specific length) insightful analysis of the **originality and potential impact** of this layer.
-    ${specificInstructions}
-    Consider unique elements, innovations, and overall effectiveness.
-    Your tone: analytical, academic, engaging. Highlight standout or derivative aspects.
-    If director/cast info found, present clearly.
-    
-    ${scoreSuggestionInstruction}
-
-    ${enhancementInstruction}
-
-    ${vonnegutAnalysisInstruction}
-  `;
-};
-
 const parseDirector = (text: string): string | undefined => {
   const match = text.match(/Director:\s*(.*)/i);
   return match?.[1]?.trim().split('\n')[0]; 
@@ -393,21 +374,7 @@ const getDynamicDateRange = () => {
   };
 };
 
-/* const isValidReleaseYear = (year?: string): boolean => {
-  if (!year || !/^\d{4}$/.test(year)) return true;
-  
-  try {
-    const currentYear = new Date().getFullYear();
-    const releaseYear = parseInt(year, 10);
-    
-    // Consider anything from previous years as valid/released
-    // For current year, assume it's valid (could be released or upcoming)
-    return releaseYear <= currentYear;
-  } catch (error) {
-    console.error('Error validating release year:', error);
-    return true;
-  }
-}; */
+
 
 const parseMainCast = (text: string): string[] | undefined => {
   const match = text.match(/Main Cast:\s*([\w\s,]+)/i);
@@ -676,7 +643,6 @@ export const enhanceCreativeSpark = async (
   enhancementPrompt: string,
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<CreativeSparkResult> => {
-  // In a backend model, this function receives params from your API endpoint.
   const prompt = `
     You are a creative screenwriter and story editor.
     You are enhancing an existing story concept.
@@ -703,49 +669,35 @@ export const enhanceCreativeSpark = async (
       ],
       "mindMapMarkdown": "${MIND_MAP_PROMPT_STRUCTURE.replace(/\n/g, "\\n").replace(/"/g, '\\"')}" 
     }
-    Ensure the JSON is valid. The mindMapMarkdown should reflect the *enhanced* story.
+    Ensure the JSON is valid and all double quotes within string values are escaped as \\\" (e.g., "he said \"hello\"").
+    The entire output must be a single, valid JSON object.
   `;
 
-  try {
-    // This getGeminiAI().models.generateContent call happens on your backend.
-    const model = getGeminiAI().getGenerativeModel({ model: getSelectedGeminiModel() });
-    const response: GenerateContentResult = await model.generateContent(prompt);
-    
-    const responseText = response.response.text().trim();
-    logTokenUsage?.('Creative Spark Enhancement (Gemini)', prompt.length, responseText.length);
-
-    let jsonStr = responseText;
-    const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-    const match = jsonStr.match(fenceRegex);
-    if (match && match[2]) {
-      jsonStr = match[2].trim();
-    }
-
-    try {
-      const parsedData = JSON.parse(jsonStr) as CreativeSparkResult;
-      if (!parsedData.logline || !parsedData.synopsis || !Array.isArray(parsedData.characterIdeas) || !Array.isArray(parsedData.sceneIdeas)) {
-        throw new Error("Generated JSON for enhancement is missing required fields.");
+  return runGeminiWithFallback(
+    'Creative Spark Enhancement',
+    prompt,
+    { temperature: 0.8 },
+    (responseText) => {
+      try {
+        const jsonStr = extractJsonPayloadFromModelText(responseText);
+        const parsedData = JSON.parse(jsonStr) as CreativeSparkResult;
+        if (!parsedData.logline || !parsedData.synopsis || !Array.isArray(parsedData.characterIdeas) || !Array.isArray(parsedData.sceneIdeas)) {
+          throw new Error("Generated JSON for enhancement is missing required fields.");
+        }
+        return {
+          ...parsedData,
+          id: `${Date.now()}-enhanced`, 
+          characterIdeas: parsedData.characterIdeas || [],
+          sceneIdeas: parsedData.sceneIdeas || [],
+          isFallbackResult: false
+        };
+      } catch (e) {
+        console.error("Failed to parse JSON response for Spark Enhancement:", e, "\nRaw response:", responseText);
+        throw new Error("AI returned an invalid format for the enhanced story idea. Please try again.");
       }
-      // The backend returns this structured object to the client.
-      return {
-        ...parsedData,
-        id: `${Date.now()}-enhanced`, 
-        characterIdeas: parsedData.characterIdeas || [],
-        sceneIdeas: parsedData.sceneIdeas || [],
-        isFallbackResult: false
-      };
-    } catch (e) {
-      console.error("Failed to parse JSON response for Spark Enhancement:", e, "\nRaw response:", responseText);
-      throw new Error("AI returned an invalid format for the enhanced story idea. Please try again.");
-    }
-
-  } catch (error) {
-    console.error('Gemini API error for spark enhancement:', error);
-    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
-    }
-    throw new Error('Failed to enhance creative spark from AI. Primary API (Gemini) failed and fallback is not configured or also failed.');
-  }
+    },
+    logTokenUsage
+  );
 };
 
 
@@ -753,7 +705,6 @@ export const analyzeIdeaMagicQuotient = async (
   idea: ScriptIdeaInput,
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<MagicQuotientAnalysis & { isFallbackResult?: boolean }> => {
-  // In a backend model, this function receives params from your API endpoint.
   const prompt = `
     You are an experienced film development executive and script doctor. Analyze the following movie/series idea.
     Idea Title: "${idea.title || 'Untitled Project'}"
@@ -774,56 +725,43 @@ export const analyzeIdeaMagicQuotient = async (
       },
       "generatedDisclaimer": "This analysis is AI-generated, subjective, and not a guarantee of success or failure. Real-world outcomes depend on many factors beyond the initial concept. Use as a creative brainstorming tool."
     }
-    Focus on providing insightful, constructive feedback. Ensure all scores are integers between 1 and 10. The entire output must be a single, valid JSON object.
+    Focus on providing insightful, constructive feedback. Ensure all scores are integers between 1 and 10.
+    The entire output must be a single, valid JSON object.
+    CRITICAL: All double quotes within the JSON values must be escaped as \\\" (e.g., "he said \"hello\"").
   `;
 
-  try {
-    // This ai.models.generateContent call happens on your backend.
-    const model = getGeminiAI().getGenerativeModel({ model: getSelectedGeminiModel() });
-    const response: GenerateContentResult = await model.generateContent(prompt);
+  return runGeminiWithFallback(
+    'Magic Quotient Analysis',
+    prompt,
+    { temperature: 0.7 },
+    (responseText) => {
+      try {
+        const jsonStr = extractJsonPayloadFromModelText(responseText);
+        const parsedData = JSON.parse(jsonStr) as MagicQuotientAnalysis;
+        if (!parsedData.overallAssessment || !Array.isArray(parsedData.strengths) || !parsedData.subjectiveScores) {
+          throw new Error("Generated JSON for magic quotient is missing required fields.");
+        }
+        const scores = parsedData.subjectiveScores;
+        scores.originality = Number(scores.originality) || 0;
+        scores.audienceAppeal = Number(scores.audienceAppeal) || 0;
+        scores.criticalReception = Number(scores.criticalReception) || 0;
 
-    const responseText = response.response.text().trim();
-    logTokenUsage?.('Magic Quotient Analysis (Gemini)', prompt.length, responseText.length);
-
-    let jsonStr = responseText;
-    const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-    const match = jsonStr.match(fenceRegex);
-    if (match && match[2]) {
-      jsonStr = match[2].trim();
-    }
-
-    try {
-      const parsedData = JSON.parse(jsonStr) as MagicQuotientAnalysis;
-      if (!parsedData.overallAssessment || !Array.isArray(parsedData.strengths) || !parsedData.subjectiveScores) {
-        throw new Error("Generated JSON for magic quotient is missing required fields.");
+        return {
+          ...parsedData,
+          subjectiveScores: scores,
+          strengths: Array.isArray(parsedData.strengths) ? parsedData.strengths : [],
+          areasForDevelopment: Array.isArray(parsedData.areasForDevelopment) ? parsedData.areasForDevelopment : [],
+          actionableSuggestions: Array.isArray(parsedData.actionableSuggestions) ? parsedData.actionableSuggestions : [],
+          generatedDisclaimer: parsedData.generatedDisclaimer || MAGIC_QUOTIENT_DISCLAIMER,
+          isFallbackResult: false,
+        };
+      } catch (e) {
+        console.error("Failed to parse JSON response for Magic Quotient:", e, "\nRaw response:", responseText);
+        throw new Error("AI returned an invalid format for the magic quotient analysis. Please try again.");
       }
-      const scores = parsedData.subjectiveScores;
-      scores.originality = Number(scores.originality) || 0;
-      scores.audienceAppeal = Number(scores.audienceAppeal) || 0;
-      scores.criticalReception = Number(scores.criticalReception) || 0;
-
-      // The backend returns this structured object to the client.
-      return {
-        ...parsedData,
-        subjectiveScores: scores,
-        strengths: Array.isArray(parsedData.strengths) ? parsedData.strengths : [],
-        areasForDevelopment: Array.isArray(parsedData.areasForDevelopment) ? parsedData.areasForDevelopment : [],
-        actionableSuggestions: Array.isArray(parsedData.actionableSuggestions) ? parsedData.actionableSuggestions : [],
-        generatedDisclaimer: parsedData.generatedDisclaimer || MAGIC_QUOTIENT_DISCLAIMER,
-        isFallbackResult: false,
-      };
-    } catch (e) {
-      console.error("Failed to parse JSON response for Magic Quotient:", e, "\nRaw response:", responseText);
-      throw new Error("AI returned an invalid format for the magic quotient analysis. Please try again.");
-    }
-
-  } catch (error) {
-    console.error('Gemini API error for magic quotient analysis:', error);
-    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
-    }
-    throw new Error('Failed to get magic quotient analysis from AI. Primary API (Gemini) failed and fallback is not configured or also failed.');
-  }
+    },
+    logTokenUsage
+  );
 };
 
 // Duplicate analyzeMovieMorphokinetics function removed - using the one at line 1445
@@ -855,7 +793,6 @@ export const getMovieTitleSuggestions = async (
     const model = getGeminiAI().getGenerativeModel({ 
       model: getSelectedGeminiModel(),
       generationConfig: {
-        responseMimeType: "application/json",
         temperature: 0.3,
         topK: 20,
       }
@@ -864,14 +801,8 @@ export const getMovieTitleSuggestions = async (
     const responseText = response.response.text().trim();
     logTokenUsage?.(`Movie Title Suggestions (Gemini): ${currentTitle}`, prompt.length, responseText.length);
 
-    let jsonStr = responseText;
-    const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-    const match = jsonStr.match(fenceRegex);
-    if (match && match[2]) {
-      jsonStr = match[2].trim();
-    }
-
     try {
+      const jsonStr = extractJsonPayloadFromModelText(responseText);
       const parsedData = JSON.parse(jsonStr) as string[];
       if (!Array.isArray(parsedData)) {
         console.warn("Parsed movie title suggestions is not an array:", parsedData, "\nRaw response:", responseText);
@@ -907,41 +838,32 @@ export const fetchMovieFinancialsWithGemini = async (
     If a budget range is found (e.g., "$10-15 million"), use the average or represent the range in the currency field (e.g. "10-15 million USD").
     If no specific numerical budget is found, set budget to null. Prioritize USD if multiple currencies are mentioned or if a common currency for international films is expected.
   `;
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.2
+
+  return runGeminiWithFallback(
+    `Fetch Movie Financials: ${movieTitle}`,
+    prompt,
+    { temperature: 0.2 },
+    (responseText, response) => {
+      try {
+        const jsonStr = extractJsonPayloadFromModelText(responseText);
+        const parsed = JSON.parse(jsonStr);
+        const budgetValue = parsed.budget ? Number(parsed.budget) : undefined;
+
+        return {
+          budget: budgetValue !== undefined && !isNaN(budgetValue) ? budgetValue : undefined,
+          currency: parsed.currency || (budgetValue ? "USD" : undefined),
+          duration: parsed.duration,
+          sources: extractGroundingSources(response) || parsed.sources || [],
+          isFallbackResult: false,
+        };
+      } catch (e) {
+        console.error("Failed to parse JSON response for Financials:", e, "\nRaw response:", responseText);
+        throw new Error("AI returned an invalid format for financial data. Please try again.");
       }
-    });
-    const response = await model.generateContent(prompt);
-    const responseText = response.response.text().trim();
-    logTokenUsage?.(`Fetch Movie Financials (Gemini): ${movieTitle}`, prompt.length, responseText.length);
-
-    let jsonStr = responseText;
-    const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-    const match = jsonStr.match(fenceRegex);
-    if (match && match[2]) {
-      jsonStr = match[2].trim();
-    }
-    
-    const parsed = JSON.parse(jsonStr);
-    const budgetValue = parsed.budget ? Number(parsed.budget) : undefined;
-
-    return {
-      budget: budgetValue !== undefined && !isNaN(budgetValue) ? budgetValue : undefined,
-      currency: parsed.currency || (budgetValue ? "USD" : undefined), // Default to USD if budget found but no currency
-      duration: parsed.duration,
-      sources: extractGroundingSources(response) || parsed.sources || [],
-      isFallbackResult: false,
-    };
-  } catch (error) {
-    console.error(`Gemini API error fetching financials for ${movieTitle}:`, error);
-    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
-    }
-    throw new Error(`Failed to fetch financial data for ${movieTitle}.`);
-  }
+    },
+    logTokenUsage,
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] // Enable Google Search for financials
+  );
 };
 
 export const generateQualitativeROIAnalysisWithGemini = async (
@@ -986,24 +908,15 @@ export const generateQualitativeROIAnalysisWithGemini = async (
     Conclude with a general statement about the speculative nature of pre-release ROI thoughts based purely on creative factors and estimated/provided budgets.
     The entire response should be plain text.
   `;
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.6
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const analysisText = response.response.text().trim();
-    logTokenUsage?.(`Qualitative ROI Analysis (Gemini): ${movieTitle}`, prompt.length, analysisText.length);
-    return { analysisText, isFallbackResult: false };
-  } catch (error) {
-    console.error(`Gemini API error generating ROI analysis for ${movieTitle}:`, error);
-    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
-    }
-    throw new Error(`Failed to generate qualitative ROI analysis for ${movieTitle}.`);
-  }
+  return runGeminiWithFallback(
+    `Qualitative ROI Analysis: ${movieTitle}`,
+    prompt,
+    { temperature: 0.6 },
+    (responseText) => {
+      return { analysisText: responseText.trim(), isFallbackResult: false };
+    },
+    logTokenUsage
+  );
 };
 
 export const generateGreybrainerInsightWithGemini = async (
@@ -1061,27 +974,18 @@ Start with: [STORY LAYER], [ORCHESTRATION], [PERFORMANCE], or [MORPHOKINETICS]
 Generate insight:
   `.trim();
   
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      tools: [{ googleSearch: {} }],
-      generationConfig: {
-        temperature: 0.75,
-        topP: 0.9,
-        topK: 50,
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const insightText = response.response.text().trim();
-    logTokenUsage?.('Greybrainer Insight Generation (Gemini)', prompt.length, insightText.length);
-    return insightText;
-  } catch (error) {
-    console.error('Gemini API error generating Greybrainer insight:', error);
-    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
-    }
-    throw new Error('Failed to generate Greybrainer insight from AI.');
-  }
+  return runGeminiWithFallback(
+    'Greybrainer Insight Generation',
+    prompt,
+    {
+      temperature: 0.75,
+      topP: 0.9,
+      topK: 50,
+    },
+    (responseText) => responseText.trim(),
+    logTokenUsage,
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[] // Using as any[] to bypass Tool type definition limitations
+  );
 };
 
 // NEW: Expanded Publication-Ready Insight (Medium Post / Opinion Piece)
@@ -1195,28 +1099,19 @@ SEO/VIRAL ELEMENTS:
 Generate the full publication-ready article now:
   `.trim();
   
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      tools: [{ googleSearch: {} }],
-      generationConfig: {
-        temperature: 0.8,
-        topP: 0.95,
-        topK: 60,
-        maxOutputTokens: 4096,
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const expandedInsight = response.response.text().trim();
-    logTokenUsage?.('Expanded Publication Insight (Gemini)', prompt.length, expandedInsight.length);
-    return expandedInsight;
-  } catch (error) {
-    console.error('Gemini API error generating expanded insight:', error);
-    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
-    }
-    throw new Error('Failed to generate expanded publication insight from AI.');
-  }
+  return runGeminiWithFallback(
+    'Expanded Publication Insight',
+    prompt,
+    {
+      temperature: 0.8,
+      topP: 0.95,
+      topK: 60,
+      maxOutputTokens: 4096,
+    },
+    (responseText) => responseText.trim(),
+    logTokenUsage,
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[] // Using as any[] to bypass Tool type definition limitations
+  );
 };
 
 // NEW: Movie-Anchored Insight Generation
@@ -1278,27 +1173,18 @@ Example structure:
 Generate insight:
   `.trim();
 
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      tools: [{ googleSearch: {} }],
-      generationConfig: {
-        temperature: 0.75,
-        topP: 0.9,
-        topK: 50,
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const insightText = response.response.text().trim();
-    logTokenUsage?.('Movie-Anchored Insight Generation (Gemini)', prompt.length, insightText.length);
-    return insightText;
-  } catch (error) {
-    console.error('Gemini API error generating movie-anchored insight:', error);
-    if (error instanceof Error && (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID'))) {
-         throw new Error('Invalid Gemini API Key. Please check your API_KEY environment variable.');
-    }
-    throw new Error('Failed to generate movie-anchored insight from AI.');
-  }
+  return runGeminiWithFallback(
+    'Movie-Anchored Insight Generation',
+    prompt,
+    {
+      temperature: 0.75,
+      topP: 0.9,
+      topK: 50,
+    },
+    (responseText) => responseText.trim(),
+    logTokenUsage,
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[] // Using as any[] to bypass Tool type definition limitations
+  );
 };
 
 // Layer Analysis Function
@@ -1314,61 +1200,53 @@ export const analyzeLayerWithGemini = async (
 ): Promise<ParsedLayerAnalysis> => {
   const prompt = generateAnalysisPrompt(movieTitle, reviewStage, layer, layerTitle, layerDescription, year, director);
   
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      tools: [{ googleSearch: {} }],
-      generationConfig: {
-        temperature: 0.7
+  return runGeminiWithFallback(
+    `Layer Analysis: ${layerTitle}`,
+    prompt,
+    { temperature: 0.7 },
+    (responseText, fullResponse) => {
+      const rawAnalysisText = responseText.trim();
+      
+      // Parse the response
+      let directorName = parseDirector(rawAnalysisText);
+      let mainCast = parseMainCast(rawAnalysisText);
+      let aiSuggestedScore = parseAISuggestedScore(rawAnalysisText);
+      let improvementSuggestions = parseImprovementSuggestions(rawAnalysisText);
+      let vonnegutShape: VonnegutShapeData | undefined;
+
+      if (layer === ReviewLayer.STORY) {
+        vonnegutShape = parseVonnegutShapeData(rawAnalysisText);
       }
-    });
-    const response = await model.generateContent(prompt);
-    const rawAnalysisText = response.response.text().trim();
-    logTokenUsage?.(`Layer Analysis (Gemini): ${layerTitle}`, prompt.length, rawAnalysisText.length);
-    
-    // Parse the response
-    let director = parseDirector(rawAnalysisText);
-    let mainCast = parseMainCast(rawAnalysisText);
-    let aiSuggestedScore = parseAISuggestedScore(rawAnalysisText);
-    let improvementSuggestions = parseImprovementSuggestions(rawAnalysisText);
-    let vonnegutShape: VonnegutShapeData | undefined;
+      
+      // Clean the analysis text by removing parsed sections
+      let cleanedAnalysisText = rawAnalysisText;
+      const vonnegutBlockRegex = /---VONNEGUT STORY SHAPE START---[\s\S]*?---VONNEGUT STORY SHAPE END---/i;
+      cleanedAnalysisText = cleanedAnalysisText.replace(vonnegutBlockRegex, '').trim();
 
-    if (layer === ReviewLayer.STORY) {
-      vonnegutShape = parseVonnegutShapeData(rawAnalysisText);
-    }
-    
-    // Clean the analysis text by removing parsed sections
-    let cleanedAnalysisText = rawAnalysisText;
-    const vonnegutBlockRegex = /---VONNEGUT STORY SHAPE START---[\s\S]*?---VONNEGUT STORY SHAPE END---/i;
-    cleanedAnalysisText = cleanedAnalysisText.replace(vonnegutBlockRegex, '').trim();
+      if (directorName) cleanedAnalysisText = cleanedAnalysisText.replace(/Director:\s*(.*)/i, '').trim();
+      if (mainCast && mainCast.length > 0) cleanedAnalysisText = cleanedAnalysisText.replace(/Main Cast:\s*([\w\s,]+)/i, '').trim();
+      
+      const scoreRegex = new RegExp(`Suggested Score:\\s*\\d*\\.?\\d+\\s*/\\s*${MAX_SCORE}`, "i");
+      cleanedAnalysisText = cleanedAnalysisText.replace(scoreRegex, '').trim();
+      
+      // More precise removal of Potential Enhancements section
+      cleanedAnalysisText = cleanedAnalysisText.replace(/Potential Enhancements:[\s\S]*?(?=\n\n|\n---|\n\*\*|$)/i, '').trim();
+      cleanedAnalysisText = cleanedAnalysisText.replace(/\n\s*\n/g, '\n').trim();
 
-    if (director) cleanedAnalysisText = cleanedAnalysisText.replace(/Director:\s*(.*)/i, '').trim();
-    if (mainCast && mainCast.length > 0) cleanedAnalysisText = cleanedAnalysisText.replace(/Main Cast:\s*([\w\s,]+)/i, '').trim();
-    
-    const scoreRegex = new RegExp(`Suggested Score:\\s*\\d*\\.?\\d+\\s*/\\s*${MAX_SCORE}`, "i");
-    cleanedAnalysisText = cleanedAnalysisText.replace(scoreRegex, '').trim();
-    
-    // More precise removal of Potential Enhancements section
-    cleanedAnalysisText = cleanedAnalysisText.replace(/Potential Enhancements:[\s\S]*?(?=\n\n|\n---|\n\*\*|$)/i, '').trim();
-    cleanedAnalysisText = cleanedAnalysisText.replace(/\n\s*\n/g, '\n').trim();
-
-    return {
-      analysisText: cleanedAnalysisText,
-      director,
-      mainCast,
-      groundingSources: extractGroundingSources(response) || [],
-      aiSuggestedScore,
-      improvementSuggestions,
-      vonnegutShape,
-      isFallbackResult: false,
-    };
-
-  } catch (error) {
-    console.error(`Gemini API error for layer ${layer}:`, error);
-    handleGeminiError(error as Error, `Layer Analysis: ${layerTitle}`);
-    // This line should never be reached as handleGeminiError always throws
-    throw new Error('Unexpected error in layer analysis');
-  }
+      return {
+        analysisText: cleanedAnalysisText,
+        director: directorName,
+        mainCast,
+        groundingSources: extractGroundingSources(fullResponse) || [],
+        aiSuggestedScore,
+        improvementSuggestions,
+        vonnegutShape,
+        isFallbackResult: false,
+      };
+    },
+    logTokenUsage,
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] // Enable Google Search for layer analysis
+  );
 };
 
 // Final Report Generation
@@ -1496,24 +1374,14 @@ export const generateFinalReportWithGemini = async (
     ---LINKEDIN POST END---
   `.trim();
 
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      tools: [{ googleSearch: {} }],
-      generationConfig: {
-        temperature: 0.7
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const fullResponse = response.response.text().trim();
-    logTokenUsage?.('Final Report Generation (Gemini)', prompt.length, fullResponse.length);
-    
-    return parseFinalReportAndMore(fullResponse, financialData);
-  } catch (error) {
-    console.error('Gemini API error generating final report:', error);
-    handleGeminiError(error as Error, 'Final Report Generation');
-    throw new Error('Unexpected error in final report generation');
-  }
+  return runGeminiWithFallback(
+    'Final Report Generation',
+    prompt,
+    { temperature: 0.7 },
+    (responseText) => parseFinalReportAndMore(responseText.trim(), financialData),
+    logTokenUsage,
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[]
+  );
 };
 
 export const generateDirectorModeBlogPost = async (
@@ -1587,22 +1455,13 @@ Big benefit.
 Polarizing or contrarian angle.​​
   `.trim();
 
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.8
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const blogPost = response.response.text().trim();
-    logTokenUsage?.('Director Mode Blog Generation (Gemini)', prompt.length, blogPost.length);
-    return blogPost;
-  } catch (error) {
-    console.error('Gemini API error generating director mode blog post:', error);
-    handleGeminiError(error as Error, 'Director Mode Blog Generation');
-    throw new Error('Unexpected error in director mode blog generation');
-  }
+  return runGeminiWithFallback(
+    'Director Mode Blog Generation',
+    prompt,
+    { temperature: 0.8 },
+    (responseText) => responseText.trim(),
+    logTokenUsage
+  );
 };
 
 /**
@@ -1719,34 +1578,16 @@ When publishing this post to Medium (@GreyBrainer), please:
 
 **Generate the Grey Editor essay now, following the template exactly.**`;
 
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.9,
-        maxOutputTokens: 2048
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const greyBlogPost = response.response.text().trim();
-    
-    if (logTokenUsage) {
-      const usageMetadata = response.response.usageMetadata;
-      if (usageMetadata) {
-        logTokenUsage(
-          'Grey Editor Blog Generation',
-          usageMetadata.promptTokenCount || 0,
-          usageMetadata.candidatesTokenCount || 0
-        );
-      }
-    }
-    
-    return greyBlogPost;
-  } catch (error) {
-    console.error('Gemini API error generating Grey Editor blog post:', error);
-    handleGeminiError(error as Error, 'Grey Editor Blog Generation');
-    throw new Error('Failed to generate Grey Editor blog post');
-  }
+  return runGeminiWithFallback(
+    'Grey Editor Blog Generation',
+    prompt,
+    {
+      temperature: 0.9,
+      maxOutputTokens: 2048
+    },
+    (responseText) => responseText.trim(),
+    logTokenUsage
+  );
 };
 
 /**
@@ -1811,7 +1652,7 @@ Use these past posts to create narrative continuity. Show evolution, not repetit
 
 # 🎬 The Greybrainer Pulse: ${today}
 
-*[Write a 2-sentence hook that positions this report as the latest chapter in your ongoing cinema narrative. Example: "For your second week of January 2026, the Indian audience is torn between divine action spectacles and polarizing big-budget misfires. Here's how this week's trends reveal deeper shifts in what we're willing to forgive—and what we're ready to abandon."]*
+*[Write a 2-sentence hook that positions this report as the latest chapter in your ongoing cinema narrative. Example: "For your second week of March 2026, the Indian audience is torn between divine action spectacles and polarizing big-budget misfires. Here's how this week's trends reveal deeper shifts in what we're willing to forgive—and what we're ready to abandon."]*
 
 ---
 
@@ -1821,7 +1662,7 @@ Use these past posts to create narrative continuity. Show evolution, not repetit
 * **The Hook:** [Why is everyone watching this? Star power? Genre novelty? Cultural moment?]
 * **The Numbers:** [Box office figures, trending position, social media buzz]
 * **Grey Analysis:** [What does this success reveal about audience needs? What narrative itch is it scratching?]
-* **🔗 Narrative Bridge:** [Connect to @GreyBrainer's past analysis. Example: "This builds on the 'Divine Action' genre we analyzed in [Past Post Title]. Notice how the mythology is now global, not just regional."]
+* **🔗 Narrative Bridge:** [Connect to past analysis from the provided Ecosystem context. Example: "This builds on the 'Divine Action' genre we analyzed in [Past Post Title]. Notice how the mythology is now global, not just regional."]
 
 *[Repeat for 2-3 Popular items]*
 
@@ -1845,7 +1686,7 @@ Use these past posts to create narrative continuity. Show evolution, not repetit
 * **The Trigger:** [What sparked the debate? Historical accuracy? Representation? #MeToo angle?]
 * **The Stakes:** [Why does this matter beyond the film? What does it reveal about Indian society in 2026?]
 * **The Grey Stance:** [Take a clear position. Your audience expects vulnerability, not fence-sitting.]
-* **🔗 Thematic Thread:** [Connect to @GreyBrainer's broader social cinema analysis. Example: "This refugee crisis debate echoes our Freedom at Midnight essay, where we explored how historical trauma shapes current politics."]
+* **🔗 Thematic Thread:** [Connect to broader social cinema analysis from the provided Ecosystem context. Example: "This refugee crisis debate echoes our Freedom at Midnight essay, where we explored how historical trauma shapes current politics."]
 
 *[Repeat for 2-3 Social items]*
 
@@ -1898,34 +1739,16 @@ Use these past posts to create narrative continuity. Show evolution, not repetit
 
 **Generate the Research Summation report now, following the format exactly.**`;
 
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.85,
-        maxOutputTokens: 3072
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const researchReport = response.response.text().trim();
-    
-    if (logTokenUsage) {
-      const usageMetadata = response.response.usageMetadata;
-      if (usageMetadata) {
-        logTokenUsage(
-          'Greybrainer Research Engine',
-          usageMetadata.promptTokenCount || 0,
-          usageMetadata.candidatesTokenCount || 0
-        );
-      }
-    }
-    
-    return researchReport;
-  } catch (error) {
-    console.error('Gemini API error generating Greybrainer Research:', error);
-    handleGeminiError(error as Error, 'Greybrainer Research Generation');
-    throw new Error('Failed to generate Greybrainer Research report');
-  }
+  return runGeminiWithFallback(
+    'Greybrainer Research Engine',
+    prompt,
+    {
+      temperature: 0.85,
+      maxOutputTokens: 3072
+    },
+    (responseText) => responseText.trim(),
+    logTokenUsage
+  );
 };
 
 /**
@@ -2064,21 +1887,21 @@ Approach:
 ### 3. Thematic Bridges (GreyBrainer Ecosystem)
 
 ${pastEcosystemContext ? 
-`*[Using the provided newsletter/past content, create at least 2 explicit connections. If this is a newsletter with trending topics and suggestions, extract those clues and incorporate them naturally:]*
+`*[Using the provided context, create at least 2 explicit connections. Do not use generic Medium/@GreyBrainer references if context is provided:]*
 
 **Contrast Bridge:** "Unlike the [Approach] we saw in **[Past Analysis]**, ${movieDisplay} choose${movieCount === 1 ? 's' : ''} [Different Approach]. This shift signals..."
 
 **Parallel Bridge:** "This echoes the [Theme] we first identified in **[Past Film/Article Title]**, where [Similar Pattern]..."
 
-**Newsletter Integration:** [If trending topics or suggestions were provided in the context, acknowledge them: "As noted in our recent newsletter about [Topic], ${movieDisplay} exemplif${movieCount === 1 ? 'ies' : 'y'} this exact pattern..."]` 
+**Ecosystem Integration:** [If trending topics or suggestions were provided in the context, acknowledge them: "As noted in our recent database analysis about [Topic], ${movieDisplay} exemplif${movieCount === 1 ? 'ies' : 'y'} this exact pattern..."]` 
 : 
-`*[Create thematic bridges to hypothetical past analyses that feel authentic, or reference the Medium blog https://medium.com/@GreyBrainer:]*
+`*[Create thematic bridges to hypothetical past analyses that feel authentic, focusing on the Greybrainer Insights database:]*
 
-**Example Contrast:** "Unlike the loud spectacles we've analyzed before on Medium/@GreyBrainer, ${movieDisplay} choose${movieCount === 1 ? 's' : ''} restraint - a bold bet in today's market."
+**Example Contrast:** "Unlike the loud spectacles we've analyzed recently in the Greybrainer database, ${movieDisplay} choose${movieCount === 1 ? 's' : ''} restraint - a bold bet in today's market."
 
 **Example Parallel:** "This continues the pattern we identified in regional cinema's rise - authenticity over scale."`}
 
-**The Pattern:** [Summarize the THROUGHLINE connecting ${movieDisplay} to past GreyBrainer analyses (from Medium/@GreyBrainer or provided context) and the broader trend]
+**The Pattern:** [Summarize the THROUGHLINE connecting ${movieDisplay} to past GreyBrainer analyses and the broader trend]
 
 ---
 
@@ -2128,34 +1951,16 @@ ${pastEcosystemContext ?
 
 **Generate the Grey Verdict Editorial now, following the template exactly.**`;
 
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.88,
-        maxOutputTokens: 3072
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const editorial = response.response.text().trim();
-    
-    if (logTokenUsage) {
-      const usageMetadata = response.response.usageMetadata;
-      if (usageMetadata) {
-        logTokenUsage(
-          'Grey Verdict Editorial',
-          usageMetadata.promptTokenCount || 0,
-          usageMetadata.candidatesTokenCount || 0
-        );
-      }
-    }
-    
-    return editorial;
-  } catch (error) {
-    console.error('Gemini API error generating Grey Verdict Editorial:', error);
-    handleGeminiError(error as Error, 'Grey Verdict Editorial Generation');
-    throw new Error('Failed to generate Grey Verdict Editorial');
-  }
+  return runGeminiWithFallback(
+    'Grey Verdict Editorial',
+    prompt,
+    {
+      temperature: 0.88,
+      maxOutputTokens: 3072
+    },
+    (responseText) => responseText.trim(),
+    logTokenUsage
+  );
 };
 
 // Personnel Analysis
@@ -2179,26 +1984,20 @@ Focus on what makes ${name} distinctive and valuable in the film industry.
 Begin your analysis:
   `.trim();
 
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.7
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const analysisText = response.response.text().trim();
-    logTokenUsage?.(`Personnel Analysis (Gemini): ${name}`, prompt.length, analysisText.length);
-    return {
-      analysisText,
-      groundingSources: extractGroundingSources(response) || [],
-      isFallbackResult: false
-    };
-  } catch (error) {
-    console.error(`Gemini API error analyzing ${type} ${name}:`, error);
-    handleGeminiError(error as Error, `Personnel Analysis: ${name}`);
-    throw new Error('Unexpected error in personnel analysis');
-  }
+  return runGeminiWithFallback(
+    `Personnel Analysis: ${name}`,
+    prompt,
+    { temperature: 0.7 },
+    (responseText, response) => {
+      return {
+        analysisText: responseText.trim(),
+        groundingSources: extractGroundingSources(response) || [],
+        isFallbackResult: false
+      };
+    },
+    logTokenUsage,
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] // Enable Google Search for personnel analysis
+  );
 };
 
 // Creative Spark Generation
@@ -2383,56 +2182,47 @@ Format your response as:
 Begin your analysis:
   `.trim();
 
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.7
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const responseText = response.response.text().trim();
-    logTokenUsage?.('Morphokinetics Analysis (Gemini)', prompt.length, responseText.length);
-    
-    // Parse the response
-    const summaryMatch = responseText.match(/\*\*OVERALL SUMMARY:\*\*\s*([\s\S]*?)(?=\*\*TIMELINE STRUCTURE:\*\*|$)/i);
-    const timelineMatch = responseText.match(/\*\*TIMELINE STRUCTURE:\*\*\s*([\s\S]*?)(?=\*\*KEY MOMENTS:\*\*|$)/i);
-    const momentsMatch = responseText.match(/\*\*KEY MOMENTS:\*\*\s*([\s\S]*?)$/i);
-    
-    const keyMoments: any[] = [];
-    
-    if (momentsMatch) {
-      const momentLines = momentsMatch[1].split('\n').filter(line => line.trim().match(/^\d+\./));
+  return runGeminiWithFallback(
+    'Morphokinetics Analysis',
+    prompt,
+    { temperature: 0.7 },
+    (responseText) => {
+      // Parse the response
+      const summaryMatch = responseText.match(/\*\*OVERALL SUMMARY:\*\*\s*([\s\S]*?)(?=\*\*TIMELINE STRUCTURE:\*\*|$)/i);
+      const timelineMatch = responseText.match(/\*\*TIMELINE STRUCTURE:\*\*\s*([\s\S]*?)(?=\*\*KEY MOMENTS:\*\*|$)/i);
+      const momentsMatch = responseText.match(/\*\*KEY MOMENTS:\*\*\s*([\s\S]*?)$/i);
       
-      momentLines.forEach(line => {
-        const match = line.match(/Time:\s*([\d.]+)\s*\|\s*Intensity:\s*(\d+)\s*\|\s*Valence:\s*([-\d.]+)\s*\|\s*Emotion:\s*([^|]+)\s*\|\s*Twist:\s*([^|]+)\s*\|\s*Pacing:\s*([^|]+)\s*\|\s*Description:\s*(.+)/i);
+      const keyMoments: any[] = [];
+      
+      if (momentsMatch) {
+        const momentLines = momentsMatch[1].split('\n').filter(line => line.trim().match(/^\d+\./));
         
-        if (match) {
-                   keyMoments.push({
-            time: parseFloat(match[1]),
-            intensityScore: parseInt(match[2]),
-            emotionalValence: parseFloat(match[3]),
-            dominantEmotion: match[4].trim(),
-            isTwist: match[5].trim().toLowerCase() === 'yes',
-            isPacingShift: match[6].trim().toLowerCase() === 'yes',
-            eventDescription: match[7].trim()
-          });
-        }
-      });
-    }
-    
-    return {
-      overallSummary: summaryMatch ? summaryMatch[1].trim() : 'Analysis could not be parsed properly.',
-      timelineStructureNotes: timelineMatch ? timelineMatch[1].trim() : 'Timeline analysis not available.',
-      keyMoments,
-      isFallbackResult: false
-    };
-    
-  } catch (error) {
-    console.error('Gemini API error analyzing morphokinetics:', error);
-    handleGeminiError(error as Error, 'Morphokinetics Analysis');
-    throw new Error('Unexpected error in morphokinetics analysis');
-  }
+        momentLines.forEach(line => {
+          const match = line.match(/Time:\s*([\d.]+)\s*\|\s*Intensity:\s*(\d+)\s*\|\s*Valence:\s*([-\d.]+)\s*\|\s*Emotion:\s*([^|]+)\s*\|\s*Twist:\s*([^|]+)\s*\|\s*Pacing:\s*([^|]+)\s*\|\s*Description:\s*(.+)/i);
+          
+          if (match) {
+            keyMoments.push({
+              time: parseFloat(match[1]),
+              intensityScore: parseInt(match[2]),
+              emotionalValence: parseFloat(match[3]),
+              dominantEmotion: match[4].trim(),
+              isTwist: match[5].trim().toLowerCase() === 'yes',
+              isPacingShift: match[6].trim().toLowerCase() === 'yes',
+              eventDescription: match[7].trim()
+            });
+          }
+        });
+      }
+      
+      return {
+        overallSummary: summaryMatch ? summaryMatch[1].trim() : 'Analysis could not be parsed properly.',
+        timelineStructureNotes: timelineMatch ? timelineMatch[1].trim() : 'Timeline analysis not available.',
+        keyMoments,
+        isFallbackResult: false
+      };
+    },
+    logTokenUsage
+  );
 };
 
 // Movie Matching Functions
@@ -2493,38 +2283,30 @@ Focus on real, existing movies and series. **Strongly prioritize ${previousYear}
 Begin matching:
   `.trim();
 
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.3
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const responseText = response.response.text().trim();
-    logTokenUsage?.('Movie Name Matching (Gemini)', prompt.length, responseText.length);
-    
-    // Parse the numbered list with improved regex
-    const matches: string[] = [];
-    const lines = responseText.split('\n').filter(line => line.trim());
-    
-    lines.forEach(line => {
-      // More flexible parsing to handle various numbering formats
-      const match = line.match(/^\s*\d+[.)\s]+(.+)$/) || line.match(/^\s*[-*•]\s*(.+)$/);
-      if (match && match[1]) {
-        const title = match[1].trim().replace(/["']/g, ''); // Remove quotes
-        if (title.length > 0 && title.length < 100) { // Reasonable title length
-          matches.push(title);
+  return runGeminiWithFallback(
+    'Movie Name Matching',
+    prompt,
+    { temperature: 0.3 },
+    (responseText) => {
+      // Parse the numbered list with improved regex
+      const matches: string[] = [];
+      const lines = responseText.split('\n').filter(line => line.trim());
+      
+      lines.forEach(line => {
+        // More flexible parsing to handle various numbering formats
+        const match = line.match(/^\s*\d+[.)\s]+(.+)$/) || line.match(/^\s*[-*•]\s*(.+)$/);
+        if (match && match[1]) {
+          const title = match[1].trim().replace(/["']/g, ''); // Remove quotes
+          if (title.length > 0 && title.length < 100) { // Reasonable title length
+            matches.push(title);
+          }
         }
-      }
-    });
-    
-    return matches.length > 0 ? matches.slice(0, 12) : [userInput]; // Return original if no matches
-  } catch (error) {
-    console.error('Gemini API error finding movie matches:', error);
-    handleGeminiError(error as Error, 'finding movie matches');
-    return [userInput]; // Return original input as fallback
-  }
+      });
+      
+      return matches.length > 0 ? matches.slice(0, 12) : [userInput];
+    },
+    logTokenUsage
+  );
 };
 
 
@@ -2588,24 +2370,17 @@ export const generateGreybrainerComparisonWithGemini = async (
     Use your search capabilities to gather accurate information about both items. Maintain an analytical, balanced tone while highlighting what makes each unique and valuable.
   `;
 
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.7,
-        topP: 0.85,
-        topK: 60,
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const comparisonText = response.response.text().trim();
-    logTokenUsage?.(`Greybrainer Comparison (Gemini): ${item1.title} vs ${item2.title}`, prompt.length, comparisonText.length);
-    return comparisonText;
-  } catch (error) {
-    console.error('Gemini API error generating comparison:', error);
-    handleGeminiError(error as Error, 'Comparison Analysis');
-    throw new Error('Unexpected error in comparison generation');
-  }
+  return runGeminiWithFallback(
+    'Greybrainer Comparison Analysis',
+    prompt,
+    {
+      temperature: 0.7,
+      topP: 0.85,
+      topK: 60,
+    },
+    (responseText) => responseText.trim(),
+    logTokenUsage
+  );
 };
 
 export const generateDetailedReportFromInsightWithGemini = async (
@@ -2633,24 +2408,17 @@ export const generateDetailedReportFromInsightWithGemini = async (
     Maintain a professional, analytical, and objective tone. While data can be illustrative, prioritize credible information.
     The output should be the full text of the report. Format with clear paragraph breaks. You can use simple headings for sections if it improves readability (e.g., "## Introduction"), but avoid complex markdown.
   `;
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.7,
-        topP: 0.85,
-        topK: 60,
-      }
-    });
-    const response = await model.generateContent(prompt);
-    const reportText = response.response.text().trim();
-    logTokenUsage?.('Detailed Insight Report Generation (Gemini)', prompt.length, reportText.length);
-    return reportText;
-  } catch (error) {
-    console.error('Gemini API error generating detailed insight report:', error);
-    handleGeminiError(error as Error, 'Detailed Report Generation');
-    throw new Error('Unexpected error in detailed report generation');
-  }
+  return runGeminiWithFallback(
+    'Detailed Insight Report Generation',
+    prompt,
+    {
+      temperature: 0.7,
+      topP: 0.85,
+      topK: 60,
+    },
+    (responseText) => responseText.trim(),
+    logTokenUsage
+  );
 };
 
 // Simple movie title suggestions using Gemini API
@@ -2690,52 +2458,533 @@ Example JSON format:
 Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
   `.trim();
 
-  try {
-    // Note: As of Dec 2024, gemini-2.5-flash no longer supports JSON mode with Tools
-    // Removing responseMimeType and parsing JSON manually from response
-    const model = getGeminiAI().getGenerativeModel({
-      model: getSelectedGeminiModel(),
-      tools: [{ googleSearch: {} }] as any,
-      generationConfig: {
-        temperature: 0.3
-        // responseMimeType removed - causes 400 error with tools
+  return runGeminiWithFallback(
+    'Movie Search',
+    prompt,
+    { temperature: 0.3 },
+    (responseText) => {
+      try {
+        const cleanJson = extractJsonPayloadFromModelText(responseText);
+        const suggestions: MovieSuggestion[] = JSON.parse(cleanJson);
+        return suggestions;
+      } catch (e) {
+        console.error('Failed to parse search JSON:', e);
+        throw e; // Let runGeminiWithFallback handle retry/fallback
       }
-    });
-    
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); 
-    
-    const response = await model.generateContent(prompt);
-    clearTimeout(timeoutId);
-    
-    const responseText = response.response.text().trim();
-    logTokenUsage?.('Movie Search (Gemini)', prompt.length, responseText.length);
-    
-    // Extract JSON from response - model may wrap in markdown or return plain JSON
-    let cleanJson = responseText;
-    
-    // Try to extract JSON from markdown code blocks
-    const jsonBlockMatch = responseText.match(/```(?:json)?\s*(\[[\s\S]*?\])\s*```/);
-    if (jsonBlockMatch) {
-      cleanJson = jsonBlockMatch[1];
-    } else {
-      // Try to find raw JSON array
-      const jsonArrayMatch = responseText.match(/\[[\s\S]*\]/);
-      if (jsonArrayMatch) {
-        cleanJson = jsonArrayMatch[0];
-      }
-    }
-    
-    const suggestions: MovieSuggestion[] = JSON.parse(cleanJson.trim());
-    return suggestions;
-  } catch (error) {
-    console.error('Gemini API error searching movies:', error);
-    // Fallback to simple suggestions if JSON parsing fails or other error
+    },
+    logTokenUsage,
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[]
+  ).catch(async () => {
+    // Custom catch for searchMovies to provide its own fallback to suggestMovieTitles
     try {
-       const simpleSuggestions = await suggestMovieTitles(query, logTokenUsage);
-       return simpleSuggestions.map(s => ({ title: s }));
+      const simpleSuggestions = await suggestMovieTitles(query, logTokenUsage);
+      return simpleSuggestions.map(s => ({ title: s }));
     } catch (e) {
-       return [];
+      return [];
+    }
+  });
+};
+
+export const extractJsonPayloadFromModelText = (responseText: string): string => {
+  if (!responseText) return '';
+  let cleaned = responseText.trim();
+  
+  // 1. Remove ANY markdown code blocks (not just at start/end)
+  // This handles cases where the model puts text before/after, or multiple blocks
+  const blockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/ig;
+  let match;
+  let foundBlock = false;
+  
+  // If there's a complete markdown block, use its content
+  if ((match = blockRegex.exec(cleaned)) !== null) {
+    cleaned = match[1];
+    foundBlock = true;
+  }
+  
+  // If we didn't find a complete block, try stripping start/end backticks just in case it's truncated
+  if (!foundBlock) {
+    cleaned = cleaned.replace(/^```(?:json)?\s*/i, '');
+    cleaned = cleaned.replace(/\s*```$/i, '');
+  }
+
+  // 2. Find the JSON object or array boundaries
+  const firstBrace = cleaned.indexOf('{');
+  const firstBracket = cleaned.indexOf('[');
+  let first = -1;
+  if (firstBrace !== -1 && firstBracket !== -1) {
+    first = Math.min(firstBrace, firstBracket);
+  } else {
+    first = Math.max(firstBrace, firstBracket);
+  }
+
+  const lastBrace = cleaned.lastIndexOf('}');
+  const lastBracket = cleaned.lastIndexOf(']');
+  let last = -1;
+  if (lastBrace !== -1 && lastBracket !== -1) {
+    last = Math.max(lastBrace, lastBracket);
+  } else {
+    last = Math.max(lastBrace, lastBracket);
+  }
+  
+  // 3. Extract the JSON portion
+  if (first !== -1) {
+    if (last !== -1 && last >= first) {
+      cleaned = cleaned.substring(first, last + 1);
+    } else {
+      // Truncated JSON - no matching closing brace/bracket
+      cleaned = cleaned.substring(first);
     }
   }
+
+  // 4. Repair common JSON errors from LLMs
+  // A. Attempt to fix unescaped double quotes inside string values
+  // This looks for "key": " ... " ... " patterns and escapes the internal quotes
+  cleaned = cleaned.replace(/(": "\s*)([\s\S]*?)("\s*[,}\]])/g, (match, p1, p2, p3) => {
+    // Escape any unescaped quotes in the content portion (p2)
+    // We look for " that is not preceded by \
+    const fixedContent = p2.replace(/(?<!\\)"/g, '\\"');
+    return p1 + fixedContent + p3;
+  });
+
+  // B. Escape literal newlines inside strings
+  cleaned = cleaned.replace(/"([^"\\]*(?:\\.[^"\\]*)*)"/g, (m) => {
+    return m.replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+  });
+
+  // C. Remove trailing commas in objects or arrays before closing braces
+  cleaned = cleaned.replace(/,\s*}/g, '}').replace(/,\s*\]/g, ']');
+
+  return cleaned;
+};
+
+/**
+ * Generate an SEO Optimized Daily Newsletter with Narrative Continuity
+ * Uses Google Search Grounding for live trends and RAG context for memory.
+ */
+export const generateDailyNewsletter = async (
+  pastContentContext: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<{ title: string, themes: string, content: string, suggestedReviews: MovieSuggestion[], suggestedResearchTopics: string[] }> => {
+  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  
+  const prompt = `**ROLE**
+You are the Editor-in-Chief for the @GreyBrainer Daily Newsletter. Your readers are cinephiles and industry professionals who value "Morphokinetic" analysis, vulnerability, and deep cultural insights into Indian and global cinema.
+
+**OBJECTIVE**
+Write today's edition of the daily newsletter (${today}). It must be SEO-optimized, highly engaging, and form a continuous narrative with our past dispatches. 
+
+**LIVE GOOGLE SEARCH REQUIREMENT**
+Search Google right now to find:
+1. What are the top 3 trending stories in the Indian cinema ecosystem today?
+2. What notable movies or web series are releasing this week or later this month?
+
+**RAG CONTEXT (WHAT WE WROTE RECENTLY)**
+Here is the context of what we've written over the past 7 days:
+${pastContentContext}
+*(Note: If the past context mentions a movie or trend, DO NOT repeat the same analysis. Instead, build upon it extending the narrative.)*
+
+**OUTPUT STRUCTURE**
+Your output MUST be a valid JSON object with this exact structure:
+{
+  "title": "[Catchy, SEO-Friendly Newsletter Title]",
+  "themes": "[Comma-separated SEO keywords/themes covered in this issue]",
+  "content": "[The full newsletter content in clean Markdown string. CRITICAL: Use \\n for newlines and escape all double quotes with \\\" within this string.]",
+  "suggestedReviews": [
+    {
+      "title": "Movie or Series Title",
+      "year": "YYYY (optional)",
+      "type": "Movie|Series (optional)",
+      "description": "1 sentence: why this is worth a deeper Greybrainer review this week"
+    }
+  ],
+  "suggestedResearchTopics": [
+    "Short research angle/topic phrased as a headline"
+  ]
+}
+
+**IMPORTANT JSON RULES:**
+1. The entire response must be a single, valid JSON object.
+2. The "content" field is a single string containing Markdown. 
+   CRITICAL: You MUST escape all internal double quotes within the markdown string as \\\" (e.g., "he said \"hello\"") and all newlines as \\n.
+3. Do not include any text before or after the JSON object.
+4. If you fail to escape internal double quotes, the JSON will be invalid and the system will fail.
+
+**THE NEWSLETTER CONTENT FORMAT (Markdown)**
+# [The H1 Title Again]
+*(Start with a vulnerable, personal, or punchy 2-sentence hook that acknowledges what day/week it is and sets the thematic tone)*
+
+## 📰 The Ecosystem Pulse
+*(Synthesize the top news you found via Google Search. Group it into a single cohesive narrative rather than just listing news. Explain the "Grey Area" or why this news matters to the industry's evolution.)*
+
+## 🔗 The Narrative Thread
+*(This is where you MUST interlink with our past content. Create a thematic bridge between today's news and what we wrote in the RAG Context.)*
+
+## 🍿 On The Horizon
+*(Highlight one upcoming release found via your search. Provide a brief "Grey Anticipation" - not just what it is, but what it represents for the genre or the lead actor's career trajectory.)*
+
+## 🔮 The Grey Verdict & Question
+*(End with a bold take on today's landscape and pose a thought-provoking question to the readers to drive engagement/comments.)*
+
+**CRITICAL CONSTRAINTS:**
+- **FACTUAL ACCURACY:** Do not hallucinate. Only report news, trends, and release dates that you have explicitly verified using the Google Search tool. If the search results are ambiguous, be honest about the uncertainty.
+- **Zero Repetition:** Do not re-explain concepts we covered in the Past Context. 
+- **SEO Optimization:** Naturally weave the keywords into the H2 headers and body text.
+- **Skimmability:** Use bullet points, bold text for emphasis.
+- **Strict JSON:** You must output ONLY valid JSON, parseable by JSON.parse(). Ensure all double quotes in "content" are escaped.`;
+
+  return runGeminiWithFallback(
+    'Daily Newsletter Engine',
+    prompt,
+    {
+      temperature: 0.7,
+      maxOutputTokens: 4000,
+      responseMimeType: 'application/json'
+    },
+    (responseText) => {
+      try {
+        const jsonStr = extractJsonPayloadFromModelText(responseText);
+        const parsed = JSON.parse(jsonStr) as {
+          title?: unknown;
+          themes?: unknown;
+          content?: unknown;
+          suggestedReviews?: unknown;
+          suggestedResearchTopics?: unknown;
+        };
+        if (typeof parsed?.title !== 'string' || typeof parsed?.themes !== 'string' || typeof parsed?.content !== 'string') {
+          throw new Error('Newsletter JSON missing required string fields');
+        }
+        const suggestedReviews: MovieSuggestion[] = Array.isArray(parsed?.suggestedReviews)
+          ? (parsed.suggestedReviews as any[])
+              .filter((m) => m && typeof m === 'object')
+              .map((m) => ({
+                title: typeof (m as any).title === 'string' ? (m as any).title.trim() : '',
+                year: typeof (m as any).year === 'string' ? (m as any).year.trim() : undefined,
+                director: typeof (m as any).director === 'string' ? (m as any).director.trim() : undefined,
+                type: (m as any).type === 'Movie' || (m as any).type === 'Series' ? (m as any).type : undefined,
+                description: typeof (m as any).description === 'string' ? (m as any).description.trim() : undefined,
+              }))
+              .filter((m) => typeof m.title === 'string' && m.title.length > 0)
+          : [];
+
+        const suggestedResearchTopics: string[] = Array.isArray(parsed?.suggestedResearchTopics)
+          ? (parsed.suggestedResearchTopics as any[])
+              .filter((t) => typeof t === 'string' && t.trim().length > 0)
+              .map((t) => (t as string).trim())
+          : [];
+
+        return {
+          title: parsed.title,
+          themes: parsed.themes,
+          content: parsed.content,
+          suggestedReviews,
+          suggestedResearchTopics,
+        };
+      } catch (e) {
+        console.error('Failed to parse Daily Newsletter JSON', e, responseText);
+        throw new Error('Failed to generate proper newsletter format. Please try again.');
+      }
+    },
+    logTokenUsage,
+    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[]
+  );
+};
+
+export const extractNewsletterSuggestionsFromContent = async (
+  newsletter: { title?: string; themes?: string; content: string },
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<{ suggestedReviews: MovieSuggestion[]; suggestedResearchTopics: string[] }> => {
+  const prompt = `You are an editorial assistant for @GreyBrainer.
+
+Given the newsletter content below, extract:
+1) Suggested movies/series to review next (title + optional year/type + 1 sentence why).
+2) Suggested research topics (headline-style).
+
+OUTPUT MUST be valid JSON only (no markdown fences) with exactly:
+{
+  "suggestedReviews": [
+    { "title": "string", "year": "YYYY (optional)", "type": "Movie|Series (optional)", "description": "string (optional)" }
+  ],
+  "suggestedResearchTopics": ["string"]
+}
+
+NEWSLETTER TITLE: ${newsletter.title || ''}
+THEMES/SEO: ${newsletter.themes || ''}
+CONTENT (markdown):
+${newsletter.content.substring(0, 12000)}
+`;
+
+  return runGeminiWithFallback(
+    'Newsletter Suggestions Extraction',
+    prompt,
+    { 
+      temperature: 0.2, 
+      maxOutputTokens: 2048,
+      responseMimeType: 'application/json'
+    },
+    (responseText) => {
+      const jsonStr = extractJsonPayloadFromModelText(responseText);
+      const parsed = JSON.parse(jsonStr) as {
+        suggestedReviews?: unknown;
+        suggestedResearchTopics?: unknown;
+      };
+
+      const suggestedReviews: MovieSuggestion[] = Array.isArray(parsed?.suggestedReviews)
+        ? (parsed.suggestedReviews as any[])
+            .filter((m) => m && typeof m === 'object')
+            .map((m) => ({
+              title: typeof (m as any).title === 'string' ? (m as any).title.trim() : '',
+              year: typeof (m as any).year === 'string' ? (m as any).year.trim() : undefined,
+              director: typeof (m as any).director === 'string' ? (m as any).director.trim() : undefined,
+              type: (m as any).type === 'Movie' || (m as any).type === 'Series' ? (m as any).type : undefined,
+              description: typeof (m as any).description === 'string' ? (m as any).description.trim() : undefined,
+            }))
+            .filter((m) => typeof m.title === 'string' && m.title.length > 0)
+        : [];
+
+      const suggestedResearchTopics: string[] = Array.isArray(parsed?.suggestedResearchTopics)
+        ? (parsed.suggestedResearchTopics as any[])
+            .filter((t) => typeof t === 'string' && t.trim().length > 0)
+            .map((t) => (t as string).trim())
+        : [];
+
+      return { suggestedReviews, suggestedResearchTopics };
+    },
+    logTokenUsage
+  );
+};
+
+export const generateDistributionPackForNewsletter = async (
+  newsletter: { title: string; themes: string; content: string; suggestedReviews?: MovieSuggestion[]; suggestedResearchTopics?: string[] },
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<DistributionPack> => {
+  const prompt = `**ROLE**
+You are the Head of Growth & Social Strategy for @GreyBrainer. Your brand voice is "Cinematic Academic" — high-brow, data-driven, yet punchy and provocative.
+
+**OBJECTIVE**
+Convert the newsletter content into a high-performance Distribution Pack for our social ecosystem:
+- X (Twitter): @GreyBrainer
+- LinkedIn: GreyBrainer AI
+- Instagram: @greybrainer.ai
+- YouTube: GreyBrainer AI (Community)
+
+**VOICE DNA (INJECT THIS)**
+- Sentences: Mix of short, punchy hooks and deep, insightful follow-ups.
+- Tone: "The Post-Weekend Pulse" style — analytical, objective, but with a "Social Spark."
+- Vocabulary: Use terms like "Morphokinetic," "Legacy Closure," "Franchise Bloat," and "Digital Fences."
+
+**INPUT:**
+- Title: ${newsletter.title}
+- Themes/SEO keywords: ${newsletter.themes}
+- Suggested Reviews: ${(newsletter.suggestedReviews || []).map(m => (m.year ? `${m.title} (${m.year})` : m.title)).join(', ')}
+- Suggested Research Topics: ${(newsletter.suggestedResearchTopics || []).join(' | ')}
+- Content (markdown excerpt): ${newsletter.content.substring(0, 4500)}
+
+**OUTPUT REQUIREMENTS:**
+1. **Carousel Plan (Instagram/LinkedIn)**: 7-10 slides. Each slide needs a headline, body text, and a specific Visual Prompt for an AI image generator (e.g., Midjourney/DALL-E) to ensure visual continuity.
+2. **Platform-Native Copy**:
+   - **X (Thread)**: 5-7 tweets. Strong hook on Tweet 1.
+   - **LinkedIn**: Thought-leadership style, focusing on the "Critical View" and "Industry Impact."
+   - **Instagram**: Hook-first caption, emoji-rich but professional.
+3. **IST Windows**: All times in IST.
+4. **CRITICAL**: You MUST escape all internal double quotes within the JSON values as \\\" (e.g., "he said \"hello\"").
+
+**OUTPUT JSON SHAPE (Strict valid JSON only - DO NOT use markdown code blocks or backticks):**
+{
+  "primaryKeyword": "string",
+  "secondaryKeywords": ["string"],
+  "longTailQueries": ["string"],
+  "slug": "string",
+  "metaTitle": "string",
+  "metaDescription": "string",
+  "headlines": ["string"],
+  "twitterThread": ["string"],
+  "linkedinPost": "string",
+  "instagramCaption": "string",
+  "hashtags": ["#tag"],
+  "quoteCards": ["string"],
+  "internalLinksPlan": ["string"],
+  "voiceDNA": "Cinematic Academic with focus on [today's primary theme]",
+  "carouselPlan": [
+    { "slideNumber": 1, "headline": "string", "bodyText": "string", "visualPrompt": "string", "overlayStyle": "string" }
+  ],
+  "abTesting": {
+    "versionA": { "strategy": "Educational", "copy": "string", "hook": "string" },
+    "versionB": { "strategy": "Contrarian/Provocative", "copy": "string", "hook": "string" }
+  },
+  "postingPlan": [
+    { "platform": "Medium|LinkedIn|X|Instagram|YouTube|Newsletter|Other", "handle": "@GreyBrainer|GreyBrainer AI|@greybrainer.ai", "postType": "string", "copy": "string", "bestTimeLocal": "string (IST)", "goal": "string" }
+  ]
+}`;
+
+  return runGeminiWithFallback(
+    `Distribution Pack (Newsletter): ${newsletter.title}`,
+    prompt,
+    { 
+      temperature: 0.4, 
+      maxOutputTokens: 3500,
+      responseMimeType: 'application/json'
+    },
+    (responseText) => {
+      const jsonStr = extractJsonPayloadFromModelText(responseText);
+      const parsed = JSON.parse(jsonStr) as Partial<DistributionPack>;
+
+      const toStringArray = (v: unknown): string[] =>
+        Array.isArray(v) ? v.filter((x) => typeof x === 'string').map((x) => (x as string).trim()).filter(Boolean) : [];
+
+      const carouselPlan = Array.isArray(parsed.carouselPlan) ? parsed.carouselPlan : [];
+      const normalizedCarouselPlan = carouselPlan
+        .filter((s: any) => s && typeof s === 'object')
+        .map((s: any) => ({
+          slideNumber: Number(s.slideNumber) || 0,
+          headline: typeof s.headline === 'string' ? s.headline.trim() : '',
+          bodyText: typeof s.bodyText === 'string' ? s.bodyText.trim() : '',
+          visualPrompt: typeof s.visualPrompt === 'string' ? s.visualPrompt.trim() : '',
+          overlayStyle: typeof s.overlayStyle === 'string' ? s.overlayStyle.trim() : 'center-bold',
+        }));
+
+      const postingPlan = Array.isArray((parsed as any).postingPlan) ? (parsed as any).postingPlan : [];
+      const normalizedPostingPlan = postingPlan
+        .filter((p: any) => p && typeof p === 'object')
+        .map((p: any) => ({
+          platform: p.platform,
+          handle: typeof p.handle === 'string' ? p.handle.trim() : '',
+          postType: typeof p.postType === 'string' ? p.postType.trim() : '',
+          copy: typeof p.copy === 'string' ? p.copy.trim() : '',
+          bestTimeLocal: typeof p.bestTimeLocal === 'string' ? p.bestTimeLocal.trim() : '',
+          goal: typeof p.goal === 'string' ? p.goal.trim() : '',
+        }))
+        .filter((p: any) => typeof p.platform === 'string' && p.platform && p.postType && p.copy);
+
+      const pack: DistributionPack = {
+        primaryKeyword: typeof parsed.primaryKeyword === 'string' ? parsed.primaryKeyword.trim() : '',
+        secondaryKeywords: toStringArray(parsed.secondaryKeywords),
+        longTailQueries: toStringArray(parsed.longTailQueries),
+        slug: typeof parsed.slug === 'string' ? parsed.slug.trim() : '',
+        metaTitle: typeof parsed.metaTitle === 'string' ? parsed.metaTitle.trim() : '',
+        metaDescription: typeof parsed.metaDescription === 'string' ? parsed.metaDescription.trim() : '',
+        headlines: toStringArray(parsed.headlines),
+        twitterThread: toStringArray(parsed.twitterThread),
+        linkedinPost: typeof parsed.linkedinPost === 'string' ? parsed.linkedinPost.trim() : '',
+        instagramCaption: typeof parsed.instagramCaption === 'string' ? parsed.instagramCaption.trim() : '',
+        hashtags: toStringArray(parsed.hashtags),
+        quoteCards: toStringArray(parsed.quoteCards),
+        internalLinksPlan: toStringArray(parsed.internalLinksPlan),
+        carouselPlan: normalizedCarouselPlan,
+        voiceDNA: typeof parsed.voiceDNA === 'string' ? parsed.voiceDNA.trim() : '',
+        abTesting: parsed.abTesting,
+        postingPlan: normalizedPostingPlan as any,
+      };
+
+      if (!pack.primaryKeyword || !pack.slug || !pack.metaTitle || !pack.metaDescription) {
+        console.warn('Distribution pack missing fields, falling back to defaults:', pack);
+        pack.primaryKeyword = pack.primaryKeyword || 'Greybrainer Analysis';
+        pack.slug = pack.slug || 'greybrainer-analysis-' + Date.now();
+        pack.metaTitle = pack.metaTitle || 'Greybrainer Strategic Insight';
+        pack.metaDescription = pack.metaDescription || 'Strategic insights and analysis from Greybrainer AI.';
+      }
+      return pack;
+    },
+    logTokenUsage
+  );
+};
+
+export const generateDistributionPackForResearch = async (
+  trendInput: { trendingTopics: string; researchReport: string },
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<DistributionPack> => {
+  const prompt = `You are a distribution specialist for @GreyBrainer.
+
+Turn the research report into an SEO + social distribution pack. The aim is momentum: one core post, then follow-ups and repurposed social content.
+
+INPUT:
+- Trending Topics: ${trendInput.trendingTopics.substring(0, 1800)}
+- Research Report excerpt: ${trendInput.researchReport.substring(0, 4000)}
+
+OUTPUT REQUIREMENTS:
+- Output MUST be valid JSON only. 
+- DO NOT use markdown code blocks, backticks, or any text before/after the JSON.
+- CRITICAL: All double quotes within the JSON values must be escaped as \\\" (e.g., "he said \"hello\"").
+- Use IST time windows in bestTimeLocal (e.g. "09:00-11:00 IST").
+
+OUTPUT JSON SHAPE:
+{
+  "primaryKeyword": "string",
+  "secondaryKeywords": ["string"],
+  "longTailQueries": ["string"],
+  "slug": "string",
+  "metaTitle": "string",
+  "metaDescription": "string",
+  "headlines": ["string"],
+  "twitterThread": ["string"],
+  "linkedinPost": "string",
+  "instagramCaption": "string",
+  "hashtags": ["#tag"],
+  "quoteCards": ["string"],
+  "internalLinksPlan": ["string"],
+  "abTesting": {
+    "versionA": { "strategy": "Educational", "copy": "string", "hook": "string" },
+    "versionB": { "strategy": "Contrarian/Provocative", "copy": "string", "hook": "string" }
+  },
+  "postingPlan": [
+    { "platform": "Medium|LinkedIn|X|Instagram|YouTube|Newsletter|Other", "postType": "string", "copy": "string", "bestTimeLocal": "string", "goal": "string" }
+  ]
+}`;
+
+  return runGeminiWithFallback(
+    `Distribution Pack (Research)`,
+    prompt,
+    { 
+      temperature: 0.4, 
+      maxOutputTokens: 2048,
+      responseMimeType: 'application/json'
+    },
+    (responseText) => {
+      const jsonStr = extractJsonPayloadFromModelText(responseText);
+      const parsed = JSON.parse(jsonStr) as Partial<DistributionPack>;
+
+      const toStringArray = (v: unknown): string[] =>
+        Array.isArray(v) ? v.filter((x) => typeof x === 'string').map((x) => (x as string).trim()).filter(Boolean) : [];
+
+      const postingPlan = Array.isArray((parsed as any).postingPlan) ? (parsed as any).postingPlan : [];
+      const normalizedPostingPlan = postingPlan
+        .filter((p: any) => p && typeof p === 'object')
+        .map((p: any) => ({
+          platform: p.platform,
+          postType: typeof p.postType === 'string' ? p.postType.trim() : '',
+          copy: typeof p.copy === 'string' ? p.copy.trim() : '',
+          bestTimeLocal: typeof p.bestTimeLocal === 'string' ? p.bestTimeLocal.trim() : '',
+          goal: typeof p.goal === 'string' ? p.goal.trim() : '',
+        }))
+        .filter((p: any) => typeof p.platform === 'string' && p.platform && p.postType && p.copy);
+
+      const pack: DistributionPack = {
+        primaryKeyword: typeof parsed.primaryKeyword === 'string' ? parsed.primaryKeyword.trim() : '',
+        secondaryKeywords: toStringArray(parsed.secondaryKeywords),
+        longTailQueries: toStringArray(parsed.longTailQueries),
+        slug: typeof parsed.slug === 'string' ? parsed.slug.trim() : '',
+        metaTitle: typeof parsed.metaTitle === 'string' ? parsed.metaTitle.trim() : '',
+        metaDescription: typeof parsed.metaDescription === 'string' ? parsed.metaDescription.trim() : '',
+        headlines: toStringArray(parsed.headlines),
+        twitterThread: toStringArray(parsed.twitterThread),
+        linkedinPost: typeof parsed.linkedinPost === 'string' ? parsed.linkedinPost.trim() : '',
+        instagramCaption: typeof parsed.instagramCaption === 'string' ? parsed.instagramCaption.trim() : '',
+        hashtags: toStringArray(parsed.hashtags),
+        quoteCards: toStringArray(parsed.quoteCards),
+        internalLinksPlan: toStringArray(parsed.internalLinksPlan),
+        abTesting: parsed.abTesting,
+        postingPlan: normalizedPostingPlan as any,
+      };
+
+      if (!pack.primaryKeyword || !pack.slug || !pack.metaTitle || !pack.metaDescription) {
+        console.warn('Distribution pack missing fields, falling back to defaults:', pack);
+        // Fallback defaults so it doesn't crash the UI
+        pack.primaryKeyword = pack.primaryKeyword || 'Greybrainer Analysis';
+        pack.slug = pack.slug || 'greybrainer-analysis-' + Date.now();
+        pack.metaTitle = pack.metaTitle || 'Greybrainer Strategic Insight';
+        pack.metaDescription = pack.metaDescription || 'Strategic insights and analysis from Greybrainer AI.';
+      }
+      return pack;
+    },
+    logTokenUsage
+  );
 };

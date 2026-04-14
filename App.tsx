@@ -1,7 +1,7 @@
 
 
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { EnhancedMovieInputForm } from './components/EnhancedMovieInputForm';
@@ -23,13 +23,68 @@ import { MorphokineticsDisplay } from './components/MorphokineticsDisplay';
 import { LightBulbIcon } from './components/icons/LightBulbIcon';
 import { GreybrainerInsights } from './components/GreybrainerInsights';
 import { GreybrainerComparison } from './components/GreybrainerComparison';
+import { DailyNewsletter } from './components/DailyNewsletter';
 // Admin components moved to AdminSettings modal
 
 import { GoogleSearchKeyManager } from './components/GoogleSearchKeyManager';
 import { AdminSettings } from './components/AdminSettings';
 
 import { AuthWrapper } from './components/AuthWrapper';
+import { fetchRecentNewsletterSuggestions, NewsletterPipelineAudit, runNewsletterPipelineAudit } from './services/newsletterService';
+import { GreybrainerUser } from './services/firebaseConfig';
 
+
+const NewsletterSuggestionsLoader: React.FC<{
+  authUser: GreybrainerUser | null;
+  onLoaded: (data: { movies: MovieSuggestion[]; topics: string[] }) => void;
+  onAuditLoaded: (audit: NewsletterPipelineAudit | null) => void;
+}> = ({ authUser, onLoaded, onAuditLoaded }) => {
+  const lastUidRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    const uid = authUser?.uid || null;
+    if (!uid) return;
+
+    const run = async () => {
+      try {
+        const s = await fetchRecentNewsletterSuggestions(14);
+        onLoaded(s);
+        if ((s.movies?.length || 0) === 0 && (s.topics?.length || 0) === 0) {
+          try {
+            const audit = await runNewsletterPipelineAudit(30);
+            onAuditLoaded(audit);
+          } catch {
+            onAuditLoaded(null);
+          }
+        } else {
+          onAuditLoaded(null);
+        }
+      } catch (e) {
+        console.error('Failed to load newsletter suggestions:', e);
+        onLoaded({ movies: [], topics: [] });
+        try {
+          const audit = await runNewsletterPipelineAudit(30);
+          onAuditLoaded(audit);
+        } catch {
+          onAuditLoaded(null);
+        }
+      }
+    };
+
+    if (lastUidRef.current !== uid) {
+      lastUidRef.current = uid;
+      run();
+    }
+
+    const handler = () => run();
+    window.addEventListener('newsletterSuggestions:refresh', handler as EventListener);
+    return () => {
+      window.removeEventListener('newsletterSuggestions:refresh', handler as EventListener);
+    };
+  }, [authUser?.uid, onLoaded, onAuditLoaded]);
+
+  return null;
+};
 
 const App: React.FC = () => {
   const [movieInput, setMovieInput] = useState<MovieAnalysisInput>({
@@ -68,7 +123,12 @@ const App: React.FC = () => {
   const [tokenBudgetConfig, setTokenBudgetConfig] = useState<TokenBudgetConfig>(INITIAL_TOKEN_BUDGET_CONFIG);
   const [showTokenDashboard, setShowTokenDashboard] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [settingsInitialTab, setSettingsInitialTab] = useState<'keys' | 'admin' | 'omnichannel' | 'debug' | 'health' | 'scoreboard'>('keys');
+  const [settingsInitialTab] = useState<'newsletter' | 'keys' | 'help' | 'admin' | 'omnichannel' | 'health' | 'diagnostics' | 'scoreboard'>('keys');
+  const [newsletterSuggestions, setNewsletterSuggestions] = useState<{ movies: MovieSuggestion[]; topics: string[] }>({ movies: [], topics: [] });
+  const [newsletterAudit, setNewsletterAudit] = useState<NewsletterPipelineAudit | null>(null);
+
+  const lastBudgetFetchTitleRef = useRef<string>('');
+  const budgetFetchDebounceRef = useRef<number | null>(null);
 
   const [morphokineticsAnalysis, setMorphokineticsAnalysis] = useState<MorphokineticsAnalysis | null>(null);
   const [isAnalyzingMorphokinetics, setIsAnalyzingMorphokinetics] = useState<boolean>(false);
@@ -98,11 +158,6 @@ const App: React.FC = () => {
     // User data now comes from AuthWrapper
   }, []);
 
-  const saveTokenBudgetConfig = useCallback((config: TokenBudgetConfig) => {
-    setTokenBudgetConfig(config);
-    localStorage.setItem('tokenBudgetConfig', JSON.stringify(config));
-  }, []);
-
   const logTokenUsage: LogTokenUsageFn = useCallback((operation, inputChars, outputChars) => {
     if (!tokenBudgetConfig.isEnabled) return;
     const newEntry: TokenUsageEntry = {
@@ -116,6 +171,76 @@ const App: React.FC = () => {
       return updatedLog;
     });
   }, [tokenBudgetConfig.isEnabled]);
+
+  const fetchBudgetEstimate = useCallback(async (titleOverride?: string) => {
+    if (!movieInput.enableROIAnalysis) return;
+    if (movieInput.productionBudget !== undefined) return;
+
+    const titleToFetch = (titleOverride ?? movieInput.movieTitle).trim();
+    if (!titleToFetch) return;
+
+    if (lastBudgetFetchTitleRef.current === titleToFetch && (financialAnalysisData?.fetchedBudget || financialAnalysisData?.isLoadingBudget)) {
+      return;
+    }
+
+    lastBudgetFetchTitleRef.current = titleToFetch;
+    setFinancialAnalysisData(prev => ({ ...(prev || {}), isLoadingBudget: true, errorBudget: null }));
+    try {
+      const financials = await fetchMovieFinancialsWithGemini(titleToFetch, logTokenUsage);
+      setFinancialAnalysisData(prev => ({
+        ...(prev || {}),
+        fetchedBudget: financials.budget,
+        fetchedBudgetCurrency: financials.currency,
+        fetchedBudgetSources: financials.sources,
+        fetchedDuration: financials.duration,
+        isLoadingBudget: false,
+        isFallbackBudgetResult: financials.isFallbackResult,
+        errorBudget: null,
+      }));
+    } catch (error) {
+      setFinancialAnalysisData(prev => ({
+        ...(prev || {}),
+        isLoadingBudget: false,
+        errorBudget: error instanceof Error ? error.message : 'Failed to fetch budget info.',
+      }));
+    }
+  }, [movieInput.enableROIAnalysis, movieInput.productionBudget, movieInput.movieTitle, financialAnalysisData?.fetchedBudget, financialAnalysisData?.isLoadingBudget, logTokenUsage]);
+
+  const applyBudgetEstimate = useCallback((budgetUsd: number) => {
+    const rounded = Math.round(budgetUsd);
+    setMovieInput(prev => ({ ...prev, productionBudget: rounded, enableROIAnalysis: true }));
+    setFinancialAnalysisData(prev => ({ ...(prev || {}), userProvidedBudget: rounded }));
+  }, []);
+
+  useEffect(() => {
+    if (!movieInput.enableROIAnalysis) return;
+    if (movieInput.productionBudget !== undefined) return;
+
+    const title = movieInput.movieTitle.trim();
+    if (!title) return;
+
+    const stableIdentifier = !!movieInput.year || /\(\d{4}\)/.test(title);
+    if (!stableIdentifier) return;
+
+    if (budgetFetchDebounceRef.current) {
+      window.clearTimeout(budgetFetchDebounceRef.current);
+    }
+    budgetFetchDebounceRef.current = window.setTimeout(() => {
+      fetchBudgetEstimate(title);
+    }, 900);
+
+    return () => {
+      if (budgetFetchDebounceRef.current) {
+        window.clearTimeout(budgetFetchDebounceRef.current);
+        budgetFetchDebounceRef.current = null;
+      }
+    };
+  }, [movieInput.enableROIAnalysis, movieInput.productionBudget, movieInput.movieTitle, movieInput.year, fetchBudgetEstimate]);
+
+  const saveTokenBudgetConfig = useCallback((config: TokenBudgetConfig) => {
+    setTokenBudgetConfig(config);
+    localStorage.setItem('tokenBudgetConfig', JSON.stringify(config));
+  }, []);
 
   const resetAllAnalysesState = () => {
     setOverallError(null); setLayerAnalyses(initialLayerAnalyses()); setSummaryReport(null);
@@ -190,15 +315,56 @@ const App: React.FC = () => {
   }, [movieInput.movieTitle, analyzeMovieFlowInternal]);
 
   const handleGetSuggestions = useCallback(async (title: string): Promise<MovieSuggestion[]> => {
+    const query = title.trim().toLowerCase();
+    const normalizeKey = (t: string) => t.toLowerCase().replace(/\s*\(\d{4}\)\s*$/, '').trim();
+
+    const newsletterMatches = query.length
+      ? newsletterSuggestions.movies
+          .filter((m) => normalizeKey(m.title).includes(query) || m.title.toLowerCase().includes(query))
+          .slice(0, 6)
+      : [];
+
     try {
-      // Use Gemini API for movie suggestions instead of Google Search
-      const suggestions = await searchMovies(title, logTokenUsage);
-      return suggestions;
+      const aiSuggestions = await searchMovies(title, logTokenUsage);
+      const merged: MovieSuggestion[] = [];
+      const seen = new Set<string>();
+
+      [...newsletterMatches, ...aiSuggestions].forEach((m) => {
+        if (!m || typeof m.title !== 'string') return;
+        const key = normalizeKey(m.title);
+        if (!key || seen.has(key)) return;
+        seen.add(key);
+        merged.push(m);
+      });
+
+      return merged.slice(0, 10);
     } catch (error) {
       console.error('Error getting movie title suggestions:', error);
-      return [];
+      return newsletterMatches;
     }
-  }, [logTokenUsage]);
+  }, [logTokenUsage, newsletterSuggestions.movies]);
+
+  const handleNewsletterSuggestionsUpdated = useCallback((data: { movies: MovieSuggestion[]; topics: string[] }) => {
+    setNewsletterSuggestions((prev) => {
+      const movieMap = new Map<string, MovieSuggestion>();
+      prev.movies.forEach((m) => {
+        if (!m?.title) return;
+        movieMap.set(m.title.trim().toLowerCase(), { ...m, title: m.title.trim() });
+      });
+      data.movies.forEach((m) => {
+        if (!m?.title) return;
+        movieMap.set(m.title.trim().toLowerCase(), { ...m, title: m.title.trim() });
+      });
+
+      const topicSet = new Set<string>(prev.topics.map((t) => t.trim()).filter(Boolean));
+      data.topics.forEach((t) => {
+        const cleaned = t.trim();
+        if (cleaned) topicSet.add(cleaned);
+      });
+
+      return { movies: Array.from(movieMap.values()), topics: Array.from(topicSet.values()) };
+    });
+  }, []);
 
 
 
@@ -356,6 +522,7 @@ const App: React.FC = () => {
     <AuthWrapper>
       {(authUser) => (
         <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-slate-100">
+          <NewsletterSuggestionsLoader authUser={authUser} onLoaded={setNewsletterSuggestions} onAuditLoaded={setNewsletterAudit} />
           <Header
             onToggleTokenDashboard={() => setShowTokenDashboard(prev => !prev)}
           />
@@ -369,12 +536,15 @@ const App: React.FC = () => {
               <div className="flex justify-end mb-6">
                 <button
                   onClick={() => setShowSettings(true)}
+                  type="button"
                   className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2"
                   title="Settings & Configuration"
                 >
                   ⚙️ Settings
                 </button>
               </div>
+
+              <DailyNewsletter logTokenUsage={logTokenUsage} onNewsletterSuggestionsUpdated={handleNewsletterSuggestionsUpdated} />
 
               <EnhancedMovieInputForm
                 movieInput={movieInput}
@@ -383,6 +553,13 @@ const App: React.FC = () => {
                 onAnalyze={handleAnalyzeMovie}
                 isAnalyzing={isAnalyzingLayers}
                 onGetSuggestions={handleGetSuggestions}
+                financialAnalysisData={financialAnalysisData}
+                onFetchBudgetEstimate={() => fetchBudgetEstimate()}
+                onApplyBudgetEstimate={applyBudgetEstimate}
+                newsletterSuggestedMovies={newsletterSuggestions.movies}
+                newsletterSuggestedTopics={newsletterSuggestions.topics}
+                newsletterAudit={newsletterAudit}
+                onOpenSettings={() => setShowSettings(true)}
               />
 
               {overallError && (<div className={`my-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}>{overallError}</div>)}
@@ -434,6 +611,7 @@ const App: React.FC = () => {
               <GreybrainerInsights
                 currentUserEmail={authUser?.email}
                 logTokenUsage={logTokenUsage}
+                newsletterSuggestions={newsletterSuggestions}
               />
               <GreybrainerComparison logTokenUsage={logTokenUsage} />
               {/* Monthly Scoreboard temporarily disabled due to network issues */}
@@ -450,7 +628,6 @@ const App: React.FC = () => {
           /> */}
 
               {/* Admin Dashboard moved to Settings modal */}
-
               <CreativeSparkGenerator genres={COMMON_GENRES} onGenerate={handleGenerateCreativeSpark} isLoading={isGeneratingCreativeSpark || isCurrentlyProcessing} error={creativeSparkError} results={creativeSparkResults} selectedIdea={selectedSparkForUI} onSelectIdea={handleSelectSparkIdea} onEnhanceIdea={handleEnhanceSparkIdea} isEnhancing={isEnhancingSpark || isCurrentlyProcessing} />
 
               <ScriptMagicQuotientAnalyzer genres={COMMON_GENRES} onAnalyze={handleAnalyzeScriptMagicQuotient} isLoading={isAnalyzingMagicQuotient || isCurrentlyProcessing} error={magicQuotientError} analysisResult={magicQuotientResult} />

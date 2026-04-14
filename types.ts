@@ -3,6 +3,52 @@ export interface SocialSnippets {
   linkedin?: string;
 }
 
+export interface CarouselSlide {
+  slideNumber: number;
+  headline: string;
+  bodyText: string;
+  visualPrompt: string; // Instructions for AI image generation
+  overlayStyle?: string; // e.g. "top-right", "center-bold"
+}
+
+export interface DistributionPack {
+  primaryKeyword: string;
+  secondaryKeywords: string[];
+  longTailQueries: string[];
+  slug: string;
+  metaTitle: string;
+  metaDescription: string;
+  headlines: string[];
+  twitterThread: string[];
+  linkedinPost: string;
+  instagramCaption: string;
+  hashtags: string[];
+  quoteCards: string[];
+  internalLinksPlan: string[];
+  carouselPlan?: CarouselSlide[]; // Added for Instagram/LinkedIn carousels
+  voiceDNA?: string; // Summary of brand voice used for this pack
+  abTesting?: {
+    versionA: {
+      strategy: string; // e.g. "Educational"
+      copy: string;
+      hook: string;
+    };
+    versionB: {
+      strategy: string; // e.g. "Contrarian"
+      copy: string;
+      hook: string;
+    };
+  };
+  postingPlan: Array<{
+    platform: 'Medium' | 'LinkedIn' | 'X' | 'Instagram' | 'YouTube' | 'Newsletter' | 'Other';
+    postType: string;
+    copy: string;
+    bestTimeLocal: string;
+    goal: string;
+    handle?: string; // Target handle for the platform
+  }>;
+}
+
 export interface MovieSuggestion {
   title: string;
   year?: string;

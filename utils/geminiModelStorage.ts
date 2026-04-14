@@ -11,8 +11,7 @@ import {
   setSelectedGeminiModel as setSelectedModel,
   getModelInfo as getModelInformation,
   autoSetupGreybrainerModel as autoSetupModel,
-  AVAILABLE_GEMINI_MODELS as AVAILABLE_MODELS,
-  type GeminiModelConfig
+  AVAILABLE_GEMINI_MODELS as AVAILABLE_MODELS
 } from '../services/modelConfigService';
 
 // Legacy interface for backward compatibility
@@ -107,6 +106,9 @@ export const getModelUpdateRecommendations = async (apiKey: string): Promise<str
     const modelLower = model.toLowerCase();
     return (
       modelLower.includes('latest') ||
+      modelLower.includes('3.1') ||
+      modelLower.includes('3.0') ||
+      modelLower.includes('2.5') ||
       modelLower.includes('2.0') ||
       modelLower.includes('1.6') ||
       (modelLower.includes('pro') && modelLower.includes('1.5'))

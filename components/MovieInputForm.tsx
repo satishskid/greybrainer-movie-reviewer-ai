@@ -295,8 +295,9 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
         </div>
         <div className="md:col-span-2 lg:col-span-1"> {/* Ensure this takes full width on medium, one third on large */}
           <div className="flex items-center justify-between mb-1">
-            <label htmlFor="productionBudget" className="text-sm font-medium text-indigo-300">
-              Est. Production Budget (USD)
+            <label htmlFor="productionBudget" className="text-sm font-medium text-indigo-300 flex items-center gap-2">
+              Est. Production Budget (INR)
+              <span className="text-xs text-emerald-400 font-normal italic">auto-fetched from research</span>
             </label>
             <div className="flex items-center space-x-2">
               {/* Green budget estimates icon */}
@@ -318,7 +319,7 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
               {/* ROI toggle button */}
               <button
                 type="button"
-                onClick={handleROIToggle}
+                onClick={() => setMovieInput({ ...movieInput, enableROIAnalysis: !movieInput.enableROIAnalysis })}
                 className={`flex items-center space-x-1 px-2 py-1 rounded text-xs transition-colors ${
                   movieInput.enableROIAnalysis
                     ? 'bg-indigo-600 text-white'
@@ -336,7 +337,7 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
             name="productionBudget"
             value={movieInput.productionBudget === undefined ? '' : movieInput.productionBudget}
             onChange={handleInputChange}
-            placeholder="e.g., 100000000"
+            placeholder="e.g., 85,00,00,000"
             min="0"
             className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-slate-100 placeholder-slate-400 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none" // Hide number spinners
             aria-label="Estimated Production Budget Input"
@@ -348,19 +349,23 @@ export const MovieInputForm: React.FC<MovieInputFormProps> = ({
             <div className="mt-2 p-3 bg-green-900/20 border border-green-700/30 rounded-lg">
               <div className="space-y-2 text-xs text-green-300">
                 <div className="flex justify-between">
-                  <span>Independent Film:</span>
-                  <span className="font-mono">$100K - $2M</span>
+                  <span>Low Budget:</span>
+                  <span className="font-mono">₹1Cr – ₹10Cr</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Studio Film:</span>
-                  <span className="font-mono">$20M - $200M</span>
+                  <span>Mid Budget:</span>
+                  <span className="font-mono">₹10Cr – ₹100Cr</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Blockbuster:</span>
-                  <span className="font-mono">$100M - $400M+</span>
+                  <span>Big Budget:</span>
+                  <span className="font-mono">₹100Cr – ₹500Cr</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Pan-India / Blockbuster:</span>
+                  <span className="font-mono">₹500Cr+</span>
                 </div>
                 <div className="pt-2 border-t border-green-700/30 text-green-400">
-                  <p>💡 These ranges help calibrate ROI analysis accuracy</p>
+                  <p>💡 Budget is auto-fetched via Gemini search grounding where available</p>
                 </div>
               </div>
             </div>

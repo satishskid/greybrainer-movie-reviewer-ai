@@ -783,7 +783,7 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
           summaryReport={summaryReportData}
           morphokineticsAnalysis={morphokineticsAnalysis || undefined}
           personnelData={personnelData}
-          financialAnalysisData={financialAnalysisData || undefined}
+          financialData={financialAnalysisData || undefined}
           onClose={() => setShowPublishableReport(false)}
         />
       )}

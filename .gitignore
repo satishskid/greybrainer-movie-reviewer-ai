@@ -34,6 +34,7 @@ dist-ssr
 # Local Netlify folder
 .netlify
 .wrangler
+.firebase
 .clinerules/byterover-rules.md
 .kilocode/rules/byterover-rules.md
 .roo/rules/byterover-rules.md

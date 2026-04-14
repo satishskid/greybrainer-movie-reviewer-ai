@@ -70,11 +70,16 @@ class ModelConfigurationService {
     const envFallback = import.meta.env.VITE_GEMINI_FALLBACK_MODEL;
     const envLegacy = import.meta.env.VITE_GEMINI_LEGACY_MODEL;
 
+    const availableModels = modelConfig.availableModels as GeminiModelConfig[];
+    
+    // Validate that environment variables point to existing models
+    const isValidModel = (id: string) => availableModels.some(m => m.id === id);
+
     return {
-      preferredModel: envPreferred || modelConfig.defaultModels.preferred,
-      fallbackModel: envFallback || modelConfig.defaultModels.fallback,
-      legacyModel: envLegacy || modelConfig.defaultModels.legacy,
-      availableModels: modelConfig.availableModels as GeminiModelConfig[],
+      preferredModel: (envPreferred && isValidModel(envPreferred)) ? envPreferred : modelConfig.defaultModels.preferred,
+      fallbackModel: (envFallback && isValidModel(envFallback)) ? envFallback : modelConfig.defaultModels.fallback,
+      legacyModel: (envLegacy && isValidModel(envLegacy)) ? envLegacy : modelConfig.defaultModels.legacy,
+      availableModels,
       discoveredModels: [],
       validationResults: {},
       lastDiscovery: null,
@@ -86,20 +91,34 @@ class ModelConfigurationService {
    * Get the currently selected model with environment variable override
    */
   getSelectedModel(): string {
-    const stored = localStorage.getItem('greybrainer_gemini_model');
+    let stored = localStorage.getItem('greybrainer_gemini_model');
+    let source = 'localStorage';
+    
+    // PROACTIVE FIX: Clear the specifically known incorrect model IDs that were previously used
+    const invalidModels = ['gemini-3.1-flash', 'gemini-3-flash', 'gemini-3.1-pro'];
+    if (stored && invalidModels.includes(stored)) {
+      console.warn(`⚠️ ModelConfigService: Detected invalid model ${stored} in localStorage. Clearing it.`);
+      localStorage.removeItem('greybrainer_gemini_model');
+      stored = null;
+    }
+    
+    let modelId: string;
     
     // Check if stored model is still available in current configuration
     if (stored && this.isModelAvailable(stored)) {
-      return stored;
+      modelId = stored;
+    } else {
+      // If stored model is invalid or not in current list, clear it and use preferred model
+      if (stored) {
+        localStorage.removeItem('greybrainer_gemini_model');
+        console.warn(`⚠️ ModelConfigService: Cleared invalid/unavailable stored model: ${stored}`);
+      }
+      modelId = this.config.preferredModel;
+      source = 'configuration/env';
     }
     
-    // If stored model is invalid, clear it and use preferred model
-    if (stored && !this.isModelAvailable(stored)) {
-      localStorage.removeItem('greybrainer_gemini_model');
-      this.logInfo(`Cleared invalid stored model: ${stored}`);
-    }
-    
-    return this.config.preferredModel;
+    console.log(`🤖 ModelConfigService: Selected model "${modelId}" from ${source}`);
+    return modelId;
   }
 
   /**

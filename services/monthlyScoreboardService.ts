@@ -1,7 +1,7 @@
 import { collection, doc, setDoc, getDocs, query, where, orderBy, limit } from 'firebase/firestore';
 import { db } from './firebaseConfig';
 import { MonthlyScoreboardItem } from '../types';
-import { analyzeLayerWithGemini, LogTokenUsageFn } from './geminiService';
+import { analyzeLayerWithGemini, LogTokenUsageFn, extractJsonPayloadFromModelText } from './geminiService';
 import { ReviewStage, ReviewLayer } from '../types';
 import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
@@ -220,13 +220,7 @@ export class MonthlyScoreboardService {
       logTokenUsage?.(`Monthly Releases Search (${month} ${year})`, prompt.length, responseText.length);
       
       // Parse JSON response
-      let jsonStr = responseText;
-      const fenceRegex = /^```(\w*)?\s*\n?(.*?)\n?\s*```$/s;
-      const match = jsonStr.match(fenceRegex);
-      if (match && match[2]) {
-        jsonStr = match[2].trim();
-      }
-      
+      const jsonStr = extractJsonPayloadFromModelText(responseText);
       const parsedReleases = JSON.parse(jsonStr);
       
       // Validate that it's an array
