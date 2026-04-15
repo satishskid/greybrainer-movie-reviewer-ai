@@ -29,7 +29,7 @@ interface DailyBriefOptions {
 }
 
 const DEFAULT_TIMEZONE = "Asia/Kolkata";
-const DEFAULT_MODEL = "gemini-pro-latest";
+const DEFAULT_MODEL = "gemini-2.5-pro";
 const DEFAULT_WORKERS_AI_MODEL = "@cf/meta/llama-3.1-8b-instruct";
 
 function nowIso() {
@@ -150,10 +150,10 @@ function buildPrompt(input: {
     .join("\n");
 
   return `
-You are the Greybrainer daily editor. Produce ONE daily brief draft for ${input.dateLabel}.
+You are the Greybrainer briefing editor. Produce ONE intelligence brief draft for ${input.dateLabel}.
 
 Goal:
-- Create a Lens daily intelligence brief for Indian movie/OTT audiences.
+- Create a Lens intelligence brief for Indian movie/OTT audiences.
 - Include the required tag block exactly as shown.
 - Provide 3 sections: Trending Now, Critical View, Social Spark.
 - End with a short optimization note about how this brief should connect to existing GreyBrainer Medium posts.
@@ -222,13 +222,13 @@ async function callGemini(client: Client, env: Env, prompt: string) {
     apiKey = env.GEMINI_API_KEY ?? null;
   }
   if (!apiKey) {
-    throw new Error("Gemini API key is not configured. Store GEMINI_API_KEY or save a BYOK key in the daily brief vault.");
+    throw new Error("Gemini API key is not configured. Store GEMINI_API_KEY or save a BYOK key in the worker key vault.");
   }
 
   const requestConfig = getGeminiRequestConfig(env, selectedModel, apiKey);
   const usedAt = nowIso();
 
-  const greybrain_system_prompt = `Act as the Lead Editor for "Greybrain Lens," an elite daily newsletter that fuses biological cinematic intuition with AI-driven analysis. 
+  const greybrain_system_prompt = `Act as the Lead Editor for "Greybrain Lens," an elite editor-led intelligence brief that fuses biological cinematic intuition with AI-driven analysis. 
 
 Strict Constraints (Zero Hallucination Policy):
 1. Do NOT invent movies, cast members, release dates, box office numbers, or OTT platforms. 
@@ -240,7 +240,7 @@ Structure:
 2. [THE SPOTLIGHT] 2 major mainstream movies/series.
 3. [THE SIGNAL] 2 Hidden Gems (indie/regional/docs).
 4. [THE ALGORITHM] (Current Trends) 2 viral trends & the "Morphokinetic Shift" behind them. (Place trends down here so they do not crowd the top).
-5. [GREYBRAINER ENGINE FUEL] (Movie/Topic Chips) 3 highly specific research prompts or movie tags. NOTE: Always put these chips/topics at the very end of the newsletter.`;
+5. [GREYBRAINER ENGINE FUEL] (Movie/Topic Chips) 3 highly specific research prompts or movie tags. NOTE: Always put these chips/topics at the very end of the brief.`;
 
   const response = await fetch(requestConfig.url, {
     method: "POST",
@@ -289,7 +289,7 @@ Structure:
       };
     }
 
-    throw new Error(`Gemini daily brief failed via ${requestConfig.via}: ${response.status} ${errorText}`);
+    throw new Error(`Gemini worker brief failed via ${requestConfig.via}: ${response.status} ${errorText}`);
   }
 
   const payload = (await response.json()) as {
@@ -297,7 +297,7 @@ Structure:
   };
   const text = payload.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
   if (!text) {
-    throw new Error("Gemini returned an empty daily brief response.");
+    throw new Error("Gemini returned an empty worker brief response.");
   }
 
   let parsed: {
@@ -351,7 +351,7 @@ export async function generateDailyBrief(
       dateKey,
       dateLabel,
       draftId: existing.id,
-      message: "Daily brief already exists for today.",
+      message: "Worker brief already exists for today.",
     };
   }
 
@@ -491,7 +491,7 @@ export async function generateDailyBrief(
       status: "failed",
       dateKey,
       dateLabel,
-      message: "Failed to persist daily brief draft.",
+      message: "Failed to persist worker brief draft.",
     };
   }
 

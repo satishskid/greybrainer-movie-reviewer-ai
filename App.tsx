@@ -1,7 +1,7 @@
 
 
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { EnhancedMovieInputForm } from './components/EnhancedMovieInputForm';
@@ -23,68 +23,12 @@ import { MorphokineticsDisplay } from './components/MorphokineticsDisplay';
 import { LightBulbIcon } from './components/icons/LightBulbIcon';
 import { GreybrainerInsights } from './components/GreybrainerInsights';
 import { GreybrainerComparison } from './components/GreybrainerComparison';
-import { DailyNewsletter } from './components/DailyNewsletter';
 // Admin components moved to AdminSettings modal
 
 import { GoogleSearchKeyManager } from './components/GoogleSearchKeyManager';
 import { AdminSettings } from './components/AdminSettings';
 
 import { AuthWrapper } from './components/AuthWrapper';
-import { fetchRecentNewsletterSuggestions, NewsletterPipelineAudit, runNewsletterPipelineAudit } from './services/newsletterService';
-import { GreybrainerUser } from './services/firebaseConfig';
-
-
-const NewsletterSuggestionsLoader: React.FC<{
-  authUser: GreybrainerUser | null;
-  onLoaded: (data: { movies: MovieSuggestion[]; topics: string[] }) => void;
-  onAuditLoaded: (audit: NewsletterPipelineAudit | null) => void;
-}> = ({ authUser, onLoaded, onAuditLoaded }) => {
-  const lastUidRef = useRef<string | null>(null);
-
-  useEffect(() => {
-    const uid = authUser?.uid || null;
-    if (!uid) return;
-
-    const run = async () => {
-      try {
-        const s = await fetchRecentNewsletterSuggestions(14);
-        onLoaded(s);
-        if ((s.movies?.length || 0) === 0 && (s.topics?.length || 0) === 0) {
-          try {
-            const audit = await runNewsletterPipelineAudit(30);
-            onAuditLoaded(audit);
-          } catch {
-            onAuditLoaded(null);
-          }
-        } else {
-          onAuditLoaded(null);
-        }
-      } catch (e) {
-        console.error('Failed to load newsletter suggestions:', e);
-        onLoaded({ movies: [], topics: [] });
-        try {
-          const audit = await runNewsletterPipelineAudit(30);
-          onAuditLoaded(audit);
-        } catch {
-          onAuditLoaded(null);
-        }
-      }
-    };
-
-    if (lastUidRef.current !== uid) {
-      lastUidRef.current = uid;
-      run();
-    }
-
-    const handler = () => run();
-    window.addEventListener('newsletterSuggestions:refresh', handler as EventListener);
-    return () => {
-      window.removeEventListener('newsletterSuggestions:refresh', handler as EventListener);
-    };
-  }, [authUser?.uid, onLoaded, onAuditLoaded]);
-
-  return null;
-};
 
 const App: React.FC = () => {
   const [movieInput, setMovieInput] = useState<MovieAnalysisInput>({
@@ -123,9 +67,7 @@ const App: React.FC = () => {
   const [tokenBudgetConfig, setTokenBudgetConfig] = useState<TokenBudgetConfig>(INITIAL_TOKEN_BUDGET_CONFIG);
   const [showTokenDashboard, setShowTokenDashboard] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [settingsInitialTab] = useState<'newsletter' | 'keys' | 'help' | 'admin' | 'omnichannel' | 'health' | 'diagnostics' | 'scoreboard'>('keys');
-  const [newsletterSuggestions, setNewsletterSuggestions] = useState<{ movies: MovieSuggestion[]; topics: string[] }>({ movies: [], topics: [] });
-  const [newsletterAudit, setNewsletterAudit] = useState<NewsletterPipelineAudit | null>(null);
+  const [settingsInitialTab] = useState<'keys' | 'help' | 'admin' | 'omnichannel' | 'health' | 'diagnostics' | 'scoreboard'>('keys');
 
   const lastBudgetFetchTitleRef = useRef<string>('');
   const budgetFetchDebounceRef = useRef<number | null>(null);
@@ -315,56 +257,13 @@ const App: React.FC = () => {
   }, [movieInput.movieTitle, analyzeMovieFlowInternal]);
 
   const handleGetSuggestions = useCallback(async (title: string): Promise<MovieSuggestion[]> => {
-    const query = title.trim().toLowerCase();
-    const normalizeKey = (t: string) => t.toLowerCase().replace(/\s*\(\d{4}\)\s*$/, '').trim();
-
-    const newsletterMatches = query.length
-      ? newsletterSuggestions.movies
-          .filter((m) => normalizeKey(m.title).includes(query) || m.title.toLowerCase().includes(query))
-          .slice(0, 6)
-      : [];
-
     try {
-      const aiSuggestions = await searchMovies(title, logTokenUsage);
-      const merged: MovieSuggestion[] = [];
-      const seen = new Set<string>();
-
-      [...newsletterMatches, ...aiSuggestions].forEach((m) => {
-        if (!m || typeof m.title !== 'string') return;
-        const key = normalizeKey(m.title);
-        if (!key || seen.has(key)) return;
-        seen.add(key);
-        merged.push(m);
-      });
-
-      return merged.slice(0, 10);
+      return await searchMovies(title, logTokenUsage);
     } catch (error) {
       console.error('Error getting movie title suggestions:', error);
-      return newsletterMatches;
+      return [];
     }
-  }, [logTokenUsage, newsletterSuggestions.movies]);
-
-  const handleNewsletterSuggestionsUpdated = useCallback((data: { movies: MovieSuggestion[]; topics: string[] }) => {
-    setNewsletterSuggestions((prev) => {
-      const movieMap = new Map<string, MovieSuggestion>();
-      prev.movies.forEach((m) => {
-        if (!m?.title) return;
-        movieMap.set(m.title.trim().toLowerCase(), { ...m, title: m.title.trim() });
-      });
-      data.movies.forEach((m) => {
-        if (!m?.title) return;
-        movieMap.set(m.title.trim().toLowerCase(), { ...m, title: m.title.trim() });
-      });
-
-      const topicSet = new Set<string>(prev.topics.map((t) => t.trim()).filter(Boolean));
-      data.topics.forEach((t) => {
-        const cleaned = t.trim();
-        if (cleaned) topicSet.add(cleaned);
-      });
-
-      return { movies: Array.from(movieMap.values()), topics: Array.from(topicSet.values()) };
-    });
-  }, []);
+  }, [logTokenUsage]);
 
 
 
@@ -522,7 +421,6 @@ const App: React.FC = () => {
     <AuthWrapper>
       {(authUser) => (
         <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-slate-100">
-          <NewsletterSuggestionsLoader authUser={authUser} onLoaded={setNewsletterSuggestions} onAuditLoaded={setNewsletterAudit} />
           <Header
             onToggleTokenDashboard={() => setShowTokenDashboard(prev => !prev)}
           />
@@ -544,8 +442,6 @@ const App: React.FC = () => {
                 </button>
               </div>
 
-              <DailyNewsletter logTokenUsage={logTokenUsage} onNewsletterSuggestionsUpdated={handleNewsletterSuggestionsUpdated} />
-
               <EnhancedMovieInputForm
                 movieInput={movieInput}
                 setMovieInput={setMovieInput}
@@ -556,10 +452,6 @@ const App: React.FC = () => {
                 financialAnalysisData={financialAnalysisData}
                 onFetchBudgetEstimate={() => fetchBudgetEstimate()}
                 onApplyBudgetEstimate={applyBudgetEstimate}
-                newsletterSuggestedMovies={newsletterSuggestions.movies}
-                newsletterSuggestedTopics={newsletterSuggestions.topics}
-                newsletterAudit={newsletterAudit}
-                onOpenSettings={() => setShowSettings(true)}
               />
 
               {overallError && (<div className={`my-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}>{overallError}</div>)}
@@ -609,9 +501,7 @@ const App: React.FC = () => {
               {morphokineticsAnalysis && !isAnalyzingMorphokinetics && (<MorphokineticsDisplay analysis={morphokineticsAnalysis} />)}
 
               <GreybrainerInsights
-                currentUserEmail={authUser?.email}
                 logTokenUsage={logTokenUsage}
-                newsletterSuggestions={newsletterSuggestions}
               />
               <GreybrainerComparison logTokenUsage={logTokenUsage} />
               {/* Monthly Scoreboard temporarily disabled due to network issues */}

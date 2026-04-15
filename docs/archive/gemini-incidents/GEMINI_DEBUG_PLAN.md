@@ -1,5 +1,8 @@
 # 🔍 GEMINI API DEBUG PLAN
 
+> Historical note: this debug plan reflects an older stage of the Gemini rollout.
+> The active app no longer uses these 1.5/pro alias recommendations or the legacy SDK in runtime code.
+
 ## 🚨 CURRENT ISSUE
 Both `gemini-1.5-flash` and `gemini-pro` return 404 errors:
 - "models/[model-name] is not found for API version v1beta"
@@ -19,17 +22,19 @@ Both `gemini-1.5-flash` and `gemini-pro` return 404 errors:
 #### **Step 1: Test with Minimal Example**
 Create simple test to isolate the issue:
 ```javascript
-const genAI = new GoogleGenerativeAI(apiKey);
-const model = genAI.getGenerativeModel({ model: 'gemini-1.5-flash-latest' });
-const result = await model.generateContent('Hello');
+const client = new GoogleGenAI({ apiKey });
+const result = await client.models.generateContent({
+	model: 'gemini-2.5-flash',
+	contents: 'Hello'
+});
 ```
 
 #### **Step 2: Try Different Model Names**
 Test these model names in order:
-1. `gemini-1.5-flash-latest` ✅ (trying now)
-2. `gemini-1.5-pro-latest`
-3. `gemini-1.0-pro`
-4. `text-bison-001`
+1. `gemini-2.5-flash`
+2. `gemini-2.5-pro`
+3. `gemini-3-flash-preview`
+4. `gemini-3.1-pro-preview`
 
 #### **Step 3: Check API Key Permissions**
 - Verify API key has Generative AI API enabled
@@ -37,14 +42,14 @@ Test these model names in order:
 - Test with a fresh API key if needed
 
 #### **Step 4: Library Update**
-- Update to latest @google/generative-ai version
+- Use the current Google Gen AI SDK (`@google/genai`)
 - Check for breaking changes in recent versions
 
-## 🎯 CURRENT TEST: gemini-1.5-flash-latest
+## 🎯 CURRENT TEST: gemini-2.5-flash
 
-**Rationale**: This is the most commonly working model name in recent documentation.
+**Rationale**: This is the current stable price-performance baseline for production testing.
 
-**If this fails**: Will try `gemini-1.5-pro-latest` next.
+**If this fails**: Will try `gemini-2.5-pro` next.
 
 ## 📊 EXPECTED OUTCOMES
 
@@ -62,13 +67,13 @@ Test these model names in order:
 
 ## 🔧 NEXT STEPS BASED ON RESULTS
 
-1. **If gemini-1.5-flash-latest works**: ✅ Problem solved
-2. **If still 404**: Try gemini-1.5-pro-latest
+1. **If gemini-2.5-flash works**: ✅ Problem solved
+2. **If still failing**: Try gemini-2.5-pro
 3. **If all models fail**: Check API key configuration
 4. **If intermittent**: Regional or quota issue
 
 ---
 
-**Current Status**: Testing `gemini-1.5-flash-latest`
+**Current Status**: Historical debug plan only
 **Deploy Time**: ~2 minutes
 **Test URL**: https://greybrainer.netlify.app

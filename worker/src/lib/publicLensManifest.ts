@@ -268,7 +268,7 @@ function normalizeContentType(subjectType: string, reviewStage: string | null, t
 
 function categoryForContentType(contentType: LensContentType, reviewStage: string | null) {
   if (contentType === "brief") {
-    return "Daily Brief";
+    return "Intelligence Brief";
   }
 
   if (contentType === "study") {
@@ -292,7 +292,7 @@ function eyebrowForContentType(contentType: LensContentType, reviewStage: string
 
 function labelForContentType(contentType: LensContentType, title: string) {
   if (contentType === "brief") {
-    return "Daily Brief";
+    return "Intelligence Brief";
   }
 
   if (contentType === "study") {

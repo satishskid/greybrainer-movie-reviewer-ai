@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { getGeminiApiKeyString, hasGeminiApiKey, isGeminiKeyValidated } from '../utils/geminiKeyStorage';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '../utils/googleGenAICompat';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
 
 const GeminiDebugTest: React.FC = () => {

@@ -79,7 +79,7 @@ export const CloudflareByokManager: React.FC<CloudflareByokManagerProps> = ({ ow
       });
       setKeys((current) => [record, ...current]);
       setApiKeyInput('');
-      setSuccess('Stored the default Gemini key for daily briefs.');
+      setSuccess('Stored the default Gemini key for the Cloudflare worker flow.');
       await loadSystemStatus();
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Failed to store BYOK key.');
@@ -99,7 +99,7 @@ export const CloudflareByokManager: React.FC<CloudflareByokManagerProps> = ({ ow
           <div className="mt-2 text-sm font-medium text-slate-100">{systemStatus?.ok ? 'Connected' : 'Unavailable'}</div>
         </div>
         <div className="rounded-lg border border-slate-700 bg-slate-900/40 p-4">
-          <div className="text-[11px] uppercase tracking-wide text-slate-500">Daily Schedule</div>
+          <div className="text-[11px] uppercase tracking-wide text-slate-500">Worker Schedule</div>
           <div className="mt-2 text-sm font-medium text-slate-100">
             {systemStatus?.dailyBrief.scheduleEnabled ? `Enabled • ${systemStatus.dailyBrief.timezone}` : 'Disabled'}
           </div>
@@ -166,11 +166,11 @@ export const CloudflareByokManager: React.FC<CloudflareByokManagerProps> = ({ ow
           </div>
         </label>
         <label className="text-sm text-slate-300">
-          <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">Daily Brief Gemini BYOK</div>
+          <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">Cloudflare Worker Gemini BYOK</div>
           <input
             value={apiKeyInput}
             onChange={(event) => setApiKeyInput(event.target.value)}
-            placeholder="Paste Gemini API key for Cloudflare daily briefs"
+            placeholder="Paste Gemini API key for the Cloudflare worker flow"
             className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-sm text-slate-100"
           />
         </label>
@@ -226,7 +226,7 @@ export const CloudflareByokManager: React.FC<CloudflareByokManagerProps> = ({ ow
         <div className="font-semibold uppercase tracking-wide text-sky-300">How this works now</div>
         <div className="mt-2 space-y-1 text-sky-100/90">
           <div>Deep Research uses the browser-side Gemini key.</div>
-          <div>Daily Brief uses the Cloudflare Worker key vault.</div>
+          <div>The Cloudflare worker flow uses the worker key vault.</div>
           <div>If AI Gateway is configured, the Worker routes Gemini through Cloudflare while still honoring editor BYOK.</div>
           <div>If Gemini quota is exhausted, the Worker can fall back to Workers AI to scaffold a usable editor draft.</div>
         </div>

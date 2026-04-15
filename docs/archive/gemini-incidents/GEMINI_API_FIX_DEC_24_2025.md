@@ -1,5 +1,8 @@
 # Gemini API Issues Fix - December 24, 2025
 
+> Historical incident note: this document captures a point-in-time compatibility issue.
+> The live app has since moved to explicit stable 2.5 defaults plus the newer Google Gen AI SDK compatibility layer.
+
 ## 🔍 Issues Identified
 
 ### Issue 1: Model Incompatibility (400 Error) ✅ FIXED
@@ -14,7 +17,7 @@
 - This is a known limitation of Gemini 2.5 models
 
 **Solution Applied:**
-Changed `searchMovies()` function in `services/geminiService.ts` to explicitly use `gemini-1.5-flash`:
+At that time, the workaround was to move the affected call away from the failing 2.5 configuration:
 
 ```typescript
 // Before (line ~2141)
@@ -27,15 +30,9 @@ const model = getGeminiAI().getGenerativeModel({
   }
 });
 
-// After
-const model = getGeminiAI().getGenerativeModel({ 
-  model: 'gemini-1.5-flash',  // ✅ Explicitly use 1.5 for JSON + tools
-  tools: [{ googleSearch: {} }],
-  generationConfig: {
-    temperature: 0.3,
-    responseMimeType: "application/json"  // ✅ Works in 1.5
-  }
-});
+// Historical workaround only - not current guidance
+// Current app behavior uses explicit stable 2.5 defaults, manual parsing,
+// and the newer Google Gen AI SDK compatibility layer instead of recommending 1.5 models.
 ```
 
 **Status:** ✅ **FIXED & DEPLOYED**

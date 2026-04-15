@@ -1,14 +1,14 @@
 {
   "modelConfiguration": {
-    "version": "7.0.0",
-    "lastUpdated": "2026-03-20",
-    "description": "Updated Gemini model configuration for March 2026 - Migrated to Gemini 3.x"
+    "version": "7.1.0",
+    "lastUpdated": "2026-04-15",
+    "description": "Gemini model configuration audited against April 2026 Google release guidance with stable production defaults"
   },
   "defaultModels": {
     "preferred": "gemini-2.5-flash",
     "fallback": "gemini-2.5-flash-lite",
     "experimental": "gemini-3.1-flash-lite-preview",
-    "legacy": "gemini-2.0-flash-lite"
+    "legacy": "gemini-2.5-pro"
   },
   "availableModels": [
     {
@@ -118,14 +118,16 @@
     {
       "id": "gemini-2.0-flash-lite",
       "name": "Greybrainer Legacy (2.0 Flash Lite)",
-      "description": "Legacy Gemini 2.0 Flash Lite for high efficiency",
+      "description": "Deprecated Gemini 2.0 Flash Lite retained only for historical compatibility",
       "category": "basic",
       "isRecommended": false,
       "isStable": true,
+      "isDeprecated": true,
+      "deprecationWarning": "Gemini 2.0 Flash Lite is scheduled for shutdown on June 1, 2026. Prefer Gemini 2.5 Flash or 2.5 Flash Lite.",
       "maxTokens": 524288,
       "costTier": "economy",
-      "lastVerified": "2026-03-29",
-      "useCase": "Legacy production model for basic tasks",
+      "lastVerified": "2026-04-15",
+      "useCase": "Historical compatibility only; avoid selecting for production",
       "apiVersion": "v1",
       "supportedMethods": [
         "generateContent",
@@ -136,9 +138,11 @@
   "modelPriority": [
     "gemini-2.5-flash",
     "gemini-2.5-pro",
+    "gemini-2.5-flash-lite",
     "gemini-3-flash-preview",
     "gemini-3.1-pro-preview",
-    "gemini-3.1-flash-lite-preview"
+    "gemini-3.1-flash-lite-preview",
+    "gemini-2.0-flash-lite"
   ],
   "discoveryPatterns": [
     {

@@ -16,25 +16,6 @@ interface EnhancedMovieInputFormProps {
   financialAnalysisData?: FinancialAnalysisData | null;
   onFetchBudgetEstimate?: () => void;
   onApplyBudgetEstimate?: (budgetUsd: number) => void;
-  newsletterSuggestedMovies?: MovieSuggestion[];
-  newsletterSuggestedTopics?: string[];
-  newsletterAudit?: {
-    firestore: {
-      ok: boolean;
-      fetched: number;
-      latestId: string | null;
-      withContent: number;
-      withSuggestedReviews: number;
-      withSuggestedTopics: number;
-    };
-    baas: {
-      ok: boolean;
-      latestDate: string | null;
-      latestTitle: string | null;
-      recentFetched: number | null;
-    };
-  } | null;
-  onOpenSettings?: () => void;
 }
 
 export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
@@ -47,10 +28,6 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
   financialAnalysisData,
   onFetchBudgetEstimate,
   onApplyBudgetEstimate,
-  newsletterSuggestedMovies,
-  newsletterSuggestedTopics,
-  newsletterAudit,
-  onOpenSettings,
 }) => {
   const [inputMode, setInputMode] = useState<'search' | 'id'>('search');
   const [idInput, setIdInput] = useState('');
@@ -58,7 +35,6 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
   const [foundTitle, setFoundTitle] = useState<string>('');
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [idError, setIdError] = useState('');
-  const [copiedTopic, setCopiedTopic] = useState<string | null>(null);
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
   
   // Original search states
@@ -244,15 +220,6 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
     setShowSuggestions(false);
   };
 
-  const handleTopicPick = (topic: string) => {
-    const cleaned = topic.trim();
-    if (!cleaned) return;
-    navigator.clipboard.writeText(cleaned).then(() => {
-      setCopiedTopic(cleaned);
-      window.setTimeout(() => setCopiedTopic(null), 2000);
-    }).catch(() => {});
-  };
-
   useEffect(() => {
     if (!showAdvancedOptions && inputMode === 'id') {
       setInputMode('search');
@@ -290,62 +257,6 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
         setSelectedSuggestionIndex(-1);
         break;
     }
-  };
-
-  const renderNewsletterEmptyState = () => {
-    const fs = newsletterAudit?.firestore;
-    const baas = newsletterAudit?.baas;
-    if (!fs || !fs.ok) {
-      return (
-        <div className="text-xs text-slate-300">
-          No picks yet. Click Refresh to fetch. If still empty, open Settings and run Enrich Chips.
-        </div>
-      );
-    }
-
-    if (fs.fetched === 0) {
-      return (
-        <div className="text-xs text-slate-300">
-          No newsletters found in Firestore. Import from BaaS, or generate today’s Daily Editorial.
-          {baas?.ok && (baas.latestDate || baas.latestTitle) && (
-            <div className="mt-1 text-[11px] text-slate-400">
-              BaaS latest: {baas.latestDate || '—'} {baas.latestTitle ? `• ${baas.latestTitle}` : ''}
-            </div>
-          )}
-        </div>
-      );
-    }
-
-    if (fs.withSuggestedReviews === 0 && fs.withContent > 0) {
-      return (
-        <div className="text-xs text-slate-300">
-          Newsletters found ({fs.fetched}) but no movie picks yet. Open Settings and run Enrich Chips, then Refresh.
-        </div>
-      );
-    }
-
-    return (
-      <div className="text-xs text-slate-300">
-        No picks yet. Click Refresh to fetch. If still empty, open Settings and run Enrich Chips.
-      </div>
-    );
-  };
-
-  const renderResearchEmptyState = () => {
-    const fs = newsletterAudit?.firestore;
-    if (fs?.ok && fs.fetched > 0 && fs.withSuggestedTopics === 0 && fs.withContent > 0) {
-      return (
-        <div className="text-xs text-slate-300">
-          Newsletters found ({fs.fetched}) but no research picks yet. Open Settings and run Enrich Chips, then Refresh.
-        </div>
-      );
-    }
-
-    return (
-      <div className="text-xs text-slate-300">
-        No research picks yet. Click Refresh to fetch. If still empty, open Settings and run Enrich Chips.
-      </div>
-    );
   };
 
   return (
@@ -393,108 +304,14 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
           </div>
         </div>
 
-        <div className="md:col-span-2 lg:col-span-3">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            <div className="p-3 rounded-lg border border-emerald-500/30 bg-emerald-900/10">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-semibold text-emerald-200 uppercase tracking-wider">
-                  Newsletter Picks
-                  <span className="ml-2 text-[11px] text-slate-300 normal-case tracking-normal">
-                    ({newsletterSuggestedMovies?.length || 0})
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {(newsletterSuggestedMovies && newsletterSuggestedMovies.length > 0) ? (
-                    <div className="text-[11px] text-slate-300">Click to fill title</div>
-                  ) : (
-                    <div className="text-[11px] text-slate-300">—</div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => window.dispatchEvent(new Event('newsletterSuggestions:refresh'))}
-                    className="px-2 py-1 text-[11px] rounded bg-slate-700/60 hover:bg-slate-700 text-slate-200 border border-slate-500/30 transition-colors"
-                  >
-                    Refresh
-                  </button>
-                  {onOpenSettings && (
-                    <button
-                      type="button"
-                      onClick={onOpenSettings}
-                      className="px-2 py-1 text-[11px] rounded bg-emerald-700/30 hover:bg-emerald-700/45 text-emerald-100 border border-emerald-500/30 transition-colors"
-                    >
-                      Setup
-                    </button>
-                  )}
-                </div>
+        <div className="md:col-span-2 lg:col-span-3 rounded-lg border border-indigo-500/20 bg-indigo-500/5 px-4 py-3">
+          <div className="flex items-start gap-3">
+            <SparklesIcon className="w-5 h-5 text-indigo-300 mt-0.5" />
+            <div>
+              <div className="text-sm font-medium text-indigo-200">Manual report engine</div>
+              <div className="text-xs text-slate-300 mt-1">
+                Search for a title directly here or paste one manually. The report workflow stays manual and stable.
               </div>
-              {(newsletterSuggestedMovies && newsletterSuggestedMovies.length > 0) ? (
-                <div className="flex flex-wrap gap-2">
-                  {newsletterSuggestedMovies.slice(0, 12).map((m, idx) => (
-                    <button
-                      key={`nl-pick-${idx}-${m.title}`}
-                      type="button"
-                      onClick={() => handleSuggestionSelect(m)}
-                      className="px-2.5 py-1.5 text-xs rounded-md bg-emerald-600/20 hover:bg-emerald-600/35 text-emerald-100 border border-emerald-500/30 transition-colors"
-                      title={m.description || m.title}
-                    >
-                      {m.year ? `${m.title} (${m.year})` : m.title}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                renderNewsletterEmptyState()
-              )}
-            </div>
-
-            <div className="p-3 rounded-lg border border-amber-500/30 bg-amber-900/10">
-              <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-semibold text-amber-200 uppercase tracking-wider">
-                  Research Chips
-                  <span className="ml-2 text-[11px] text-slate-300 normal-case tracking-normal">
-                    ({newsletterSuggestedTopics?.length || 0})
-                  </span>
-                </div>
-                <div className="flex items-center gap-2">
-                  {(newsletterSuggestedTopics && newsletterSuggestedTopics.length > 0) ? (
-                    <div className="text-[11px] text-slate-300">{copiedTopic ? 'Copied!' : 'Click to copy'}</div>
-                  ) : (
-                    <div className="text-[11px] text-slate-300">—</div>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => window.dispatchEvent(new Event('newsletterSuggestions:refresh'))}
-                    className="px-2 py-1 text-[11px] rounded bg-slate-700/60 hover:bg-slate-700 text-slate-200 border border-slate-500/30 transition-colors"
-                  >
-                    Refresh
-                  </button>
-                  {onOpenSettings && (
-                    <button
-                      type="button"
-                      onClick={onOpenSettings}
-                      className="px-2 py-1 text-[11px] rounded bg-amber-700/30 hover:bg-amber-700/45 text-amber-100 border border-amber-500/30 transition-colors"
-                    >
-                      Setup
-                    </button>
-                  )}
-                </div>
-              </div>
-              {(newsletterSuggestedTopics && newsletterSuggestedTopics.length > 0) ? (
-                <div className="flex flex-wrap gap-2">
-                  {newsletterSuggestedTopics.slice(0, 12).map((t, idx) => (
-                    <button
-                      key={`nl-topic-pick-${idx}`}
-                      type="button"
-                      onClick={() => handleTopicPick(t)}
-                      className="px-2.5 py-1.5 text-xs rounded-md bg-amber-600/20 hover:bg-amber-600/35 text-amber-100 border border-amber-500/30 transition-colors"
-                      title={t}
-                    >
-                      {t}
-                    </button>
-                  ))}
-                </div>
-              ) : (
-                renderResearchEmptyState()
-              )}
             </div>
           </div>
         </div>

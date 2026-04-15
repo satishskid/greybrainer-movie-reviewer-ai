@@ -2,6 +2,7 @@
 
 const GEMINI_API_KEY_STORAGE_KEY = 'greybrainer_gemini_api_key';
 const GEMINI_KEY_VALIDATION_STORAGE_KEY = 'greybrainer_gemini_key_validated';
+const GEMINI_API_KEY_ENV_FALLBACK = import.meta.env.VITE_GEMINI_API_KEY?.trim() || null;
 
 // Removed quota reset functionality as quota monitoring has been simplified
 
@@ -16,8 +17,9 @@ export interface GeminiKeyInfo {
  */
 export const storeGeminiApiKey = async (apiKey: string, isValidated: boolean = false): Promise<void> => {
   try {
+    const normalizedKey = apiKey.trim();
     const keyInfo: GeminiKeyInfo = {
-      apiKey,
+      apiKey: normalizedKey,
       isValidated,
       lastValidated: isValidated ? Date.now() : undefined,
     };
@@ -35,13 +37,37 @@ export const storeGeminiApiKey = async (apiKey: string, isValidated: boolean = f
 export const getGeminiApiKey = (): GeminiKeyInfo | null => {
   try {
     const stored = localStorage.getItem(GEMINI_API_KEY_STORAGE_KEY);
-    if (!stored) return null;
+    if (!stored) {
+      return GEMINI_API_KEY_ENV_FALLBACK
+        ? {
+            apiKey: GEMINI_API_KEY_ENV_FALLBACK,
+            isValidated: true,
+          }
+        : null;
+    }
     
     const keyInfo: GeminiKeyInfo = JSON.parse(stored);
-    return keyInfo;
+    if (!keyInfo?.apiKey?.trim()) {
+      return GEMINI_API_KEY_ENV_FALLBACK
+        ? {
+            apiKey: GEMINI_API_KEY_ENV_FALLBACK,
+            isValidated: true,
+          }
+        : null;
+    }
+
+    return {
+      ...keyInfo,
+      apiKey: keyInfo.apiKey.trim(),
+    };
   } catch (error) {
     console.error('Failed to retrieve Gemini API key:', error);
-    return null;
+    return GEMINI_API_KEY_ENV_FALLBACK
+      ? {
+          apiKey: GEMINI_API_KEY_ENV_FALLBACK,
+          isValidated: true,
+        }
+      : null;
   }
 };
 
@@ -50,7 +76,7 @@ export const getGeminiApiKey = (): GeminiKeyInfo | null => {
  */
 export const getGeminiApiKeyString = (): string | null => {
   const keyInfo = getGeminiApiKey();
-  return keyInfo ? keyInfo.apiKey : null;
+  return keyInfo ? keyInfo.apiKey.trim() : null;
 };
 
 /**
@@ -58,7 +84,7 @@ export const getGeminiApiKeyString = (): string | null => {
  */
 export const hasGeminiApiKey = (): boolean => {
   const keyInfo = getGeminiApiKey();
-  return keyInfo !== null && keyInfo.apiKey.length > 0;
+  return keyInfo !== null && keyInfo.apiKey.trim().length > 0;
 };
 
 /**

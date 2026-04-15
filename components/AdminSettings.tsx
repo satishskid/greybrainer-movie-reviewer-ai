@@ -12,9 +12,8 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { MonthlyScoreboardAdmin } from './MonthlyScoreboardAdmin';
 import { OmnichannelDraftsPanel } from './OmnichannelDraftsPanel';
 import { AdminService } from '../services/adminService';
-import { enrichRecentFirestoreNewslettersWithSuggestions, importBaasNewslettersToFirestore, runNewsletterPipelineAudit, NewsletterPipelineAudit } from '../services/newsletterService';
 
-type AdminSettingsTab = 'newsletter' | 'keys' | 'help' | 'admin' | 'omnichannel' | 'health' | 'diagnostics' | 'scoreboard';
+type AdminSettingsTab = 'keys' | 'help' | 'admin' | 'omnichannel' | 'health' | 'diagnostics' | 'scoreboard';
 
 interface AdminSettingsProps {
   isOpen: boolean;
@@ -23,13 +22,10 @@ interface AdminSettingsProps {
   currentUser?: any;
 }
 
-export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab = 'newsletter', onClose, currentUser }) => {
+export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab = 'keys', onClose, currentUser }) => {
   const [activeTab, setActiveTab] = useState<AdminSettingsTab>(initialTab);
   const [systemHealth, setSystemHealth] = useState<any>(null);
   const [isCheckingHealth, setIsCheckingHealth] = useState(false);
-  const [newsletterAudit, setNewsletterAudit] = useState<NewsletterPipelineAudit | null>(null);
-  const [isRunningNewsletterAudit, setIsRunningNewsletterAudit] = useState(false);
-  const [newsletterAction, setNewsletterAction] = useState<{ type: string; message: string } | null>(null);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const isAdmin = AdminService.isAdminSync(currentUser);
@@ -70,60 +66,11 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
     if (!isOpen) return;
     if (showAdvanced) return;
     if (activeTab === 'admin' || activeTab === 'omnichannel' || activeTab === 'health' || activeTab === 'diagnostics' || activeTab === 'scoreboard') {
-      setActiveTab('newsletter');
+      setActiveTab('keys');
     }
   }, [activeTab, isOpen, showAdvanced]);
 
   if (!isOpen) return null;
-
-  const handleRunNewsletterAudit = async () => {
-    setIsRunningNewsletterAudit(true);
-    setNewsletterAction(null);
-    try {
-      const audit = await runNewsletterPipelineAudit(30);
-      setNewsletterAudit(audit);
-    } catch (e) {
-      setNewsletterAction({ type: 'error', message: e instanceof Error ? e.message : 'Failed to run audit' });
-    } finally {
-      setIsRunningNewsletterAudit(false);
-    }
-  };
-
-  const handleRefreshHomepageChips = () => {
-    window.dispatchEvent(new Event('newsletterSuggestions:refresh'));
-  };
-
-  const handleImportFromBaas = async () => {
-    setIsRunningNewsletterAudit(true);
-    setNewsletterAction(null);
-    try {
-      const result = await importBaasNewslettersToFirestore(60);
-      setNewsletterAction({ type: 'success', message: `Imported ${result.imported}, skipped ${result.skippedExisting}, failed ${result.failed}` });
-      const audit = await runNewsletterPipelineAudit(30);
-      setNewsletterAudit(audit);
-      window.dispatchEvent(new Event('newsletterSuggestions:refresh'));
-    } catch (e) {
-      setNewsletterAction({ type: 'error', message: e instanceof Error ? e.message : 'Import failed' });
-    } finally {
-      setIsRunningNewsletterAudit(false);
-    }
-  };
-
-  const handleEnrichSuggestions = async () => {
-    setIsRunningNewsletterAudit(true);
-    setNewsletterAction(null);
-    try {
-      const result = await enrichRecentFirestoreNewslettersWithSuggestions(14);
-      setNewsletterAction({ type: 'success', message: `Enriched ${result.enriched}, skipped ${result.skipped}, failed ${result.failed}` });
-      const audit = await runNewsletterPipelineAudit(30);
-      setNewsletterAudit(audit);
-      window.dispatchEvent(new Event('newsletterSuggestions:refresh'));
-    } catch (e) {
-      setNewsletterAction({ type: 'error', message: e instanceof Error ? e.message : 'Enrichment failed' });
-    } finally {
-      setIsRunningNewsletterAudit(false);
-    }
-  };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -132,7 +79,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
         <div className="flex items-center justify-between p-6 border-b border-slate-700">
           <div>
             <h2 className="text-xl font-semibold text-slate-100">Settings</h2>
-            <p className="text-sm text-slate-400">Newsletter workflow and required keys</p>
+            <p className="text-sm text-slate-400">Core engine configuration and required keys</p>
           </div>
           <div className="flex items-center gap-3">
             {isAdmin && (
@@ -157,16 +104,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
 
         {/* Tabs */}
         <div className="flex border-b border-slate-700">
-          <button
-            onClick={() => setActiveTab('newsletter')}
-            className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'newsletter'
-                ? 'text-indigo-400 border-b-2 border-indigo-400'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            📰 Newsletter
-          </button>
           <button
             onClick={() => setActiveTab('keys')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
@@ -245,118 +182,6 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
 
         {/* Content */}
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
-          {activeTab === 'newsletter' && (
-            <div>
-              <h3 className="text-lg font-medium text-slate-100 mb-4">Newsletter Pipeline</h3>
-
-              <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 mb-4">
-                <div className="text-sm text-slate-300">
-                  This is the back-office for the chips shown on the main screen (Newsletter Picks / Research Chips).
-                </div>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={handleRefreshHomepageChips}
-                    className="px-3 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded transition-colors"
-                  >
-                    Refresh chips on homepage
-                  </button>
-                  <button
-                    type="button"
-                    onClick={onClose}
-                    className="px-3 py-2 bg-slate-700/60 hover:bg-slate-700 text-slate-200 text-sm rounded transition-colors"
-                  >
-                    Back to writing
-                  </button>
-                </div>
-              </div>
-
-              <div className="bg-slate-800 rounded-lg p-4 border border-slate-700 mb-4">
-                <div className="flex items-center justify-between gap-3 mb-3">
-                  <div>
-                    <h4 className="text-md font-medium text-slate-200">Status & Actions</h4>
-                    <p className="text-xs text-slate-400">Ingest → Store → Fetch → Chips</p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleRunNewsletterAudit}
-                      disabled={isRunningNewsletterAudit}
-                      className="px-3 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-slate-700 text-white text-sm rounded transition-colors flex items-center gap-2"
-                    >
-                      {isRunningNewsletterAudit ? <LoadingSpinner size="sm" /> : '🔎'}
-                      Refresh
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleImportFromBaas}
-                      disabled={isRunningNewsletterAudit || !isAdmin}
-                      className="px-3 py-2 bg-slate-700 hover:bg-slate-600 disabled:bg-slate-800 disabled:text-slate-500 text-slate-200 text-sm rounded transition-colors"
-                    >
-                      Import
-                    </button>
-                    <button
-                      type="button"
-                      onClick={handleEnrichSuggestions}
-                      disabled={isRunningNewsletterAudit || !isAdmin}
-                      className="px-3 py-2 bg-emerald-700/70 hover:bg-emerald-700 disabled:bg-slate-800 disabled:text-slate-500 text-emerald-100 text-sm rounded transition-colors"
-                    >
-                      Enrich Chips
-                    </button>
-                  </div>
-                </div>
-
-                {newsletterAction && (
-                  <div className={`mb-3 px-3 py-2 rounded border text-sm ${
-                    newsletterAction.type === 'success'
-                      ? 'bg-emerald-900/20 border-emerald-700/50 text-emerald-200'
-                      : 'bg-red-900/20 border-red-700/50 text-red-200'
-                  }`}>
-                    {newsletterAction.message}
-                  </div>
-                )}
-
-                {newsletterAudit ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div className="bg-slate-900/40 rounded-lg border border-slate-700 p-3">
-                      <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">Firestore</div>
-                      <div className="space-y-1 text-slate-200">
-                        <div><span className="text-slate-400">Fetched:</span> {newsletterAudit.firestore.fetched}</div>
-                        <div><span className="text-slate-400">Latest:</span> {newsletterAudit.firestore.latestId || '—'}</div>
-                        <div><span className="text-slate-400">With Content:</span> {newsletterAudit.firestore.withContent}</div>
-                        <div><span className="text-slate-400">With Movie Chips:</span> {newsletterAudit.firestore.withSuggestedReviews}</div>
-                        <div><span className="text-slate-400">With Research Chips:</span> {newsletterAudit.firestore.withSuggestedTopics}</div>
-                        {!newsletterAudit.firestore.ok && (
-                          <div className="text-red-300">{newsletterAudit.firestore.error}</div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="bg-slate-900/40 rounded-lg border border-slate-700 p-3">
-                      <div className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">BaaS (D1)</div>
-                      <div className="space-y-1 text-slate-200">
-                        <div><span className="text-slate-400">Latest Date:</span> {newsletterAudit.baas.latestDate || '—'}</div>
-                        <div><span className="text-slate-400">Latest Title:</span> {newsletterAudit.baas.latestTitle || '—'}</div>
-                        <div><span className="text-slate-400">Recent Fetched:</span> {newsletterAudit.baas.recentFetched ?? '—'}</div>
-                        {!newsletterAudit.baas.ok && (
-                          <div className="text-red-300">{newsletterAudit.baas.error}</div>
-                        )}
-                      </div>
-                    </div>
-                    {!isAdmin && (
-                      <div className="md:col-span-2 text-xs text-slate-400">
-                        Import/Enrich actions require an admin account.
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-sm text-slate-400">
-                    Click Refresh to check what’s in Firestore and whether chips are present.
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
           {activeTab === 'keys' && (
             <div>
               <h3 className="text-lg font-medium text-slate-100 mb-6">API Key Configuration</h3>
@@ -370,8 +195,8 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
                 </div>
 
                 <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
-                  <h4 className="text-md font-medium text-slate-200 mb-3">☁️ Cloudflare Daily Brief & AI Gateway</h4>
-                  <p className="text-sm text-slate-400 mb-4">Worker-side key vault, daily brief generation, and Cloudflare AI Gateway routing status.</p>
+                  <h4 className="text-md font-medium text-slate-200 mb-3">☁️ Cloudflare Worker Flow & AI Gateway</h4>
+                  <p className="text-sm text-slate-400 mb-4">Worker-side key vault, scheduled worker generation, and Cloudflare AI Gateway routing status.</p>
                   <CloudflareByokManager ownerEmail={currentUser?.email ?? null} />
                 </div>
 
@@ -400,20 +225,19 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
                 <div className="text-sm text-slate-300 leading-6 space-y-4">
                   <div>
                     <div className="text-slate-100 font-medium mb-1">For content writers</div>
-                    <div>1) Pick a movie from Newsletter Picks (chips) or type a title.</div>
+                    <div>1) Type a movie title or search for one directly in the main input.</div>
                     <div>2) Click Analyze Movie Magic.</div>
                     <div>3) Use the output (layer analysis + final report).</div>
                   </div>
 
                   <div>
-                    <div className="text-slate-100 font-medium mb-1">If Newsletter Picks show 0</div>
-                    <div>1) Click Refresh on the main screen (next to Newsletter Picks).</div>
-                    <div>2) If still 0, open Settings → Newsletter and run Enrich Chips (admin), then Refresh on homepage.</div>
+                    <div className="text-slate-100 font-medium mb-1">How to keep the workflow simple</div>
+                    <div>1) Start from a title, not from scheduled signals or worker-fed prompts.</div>
+                    <div>2) Keep keys limited to the analysis features you actively use.</div>
                   </div>
 
                   <div>
                     <div className="text-slate-100 font-medium mb-1">What Settings does</div>
-                    <div><span className="text-slate-200">Newsletter:</span> fixes chips by importing/enriching newsletters.</div>
                     <div><span className="text-slate-200">Keys:</span> stores your personal Gemini/Google Search keys in this browser.</div>
                     <div><span className="text-slate-200">Admin/Health/Diagnostics:</span> troubleshooting (admins only).</div>
                   </div>

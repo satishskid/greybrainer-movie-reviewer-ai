@@ -79,7 +79,7 @@ generationConfig: {
 3. **Model names changed:**
    - ❌ `gemini-1.5-flash` - Does NOT exist in v1beta
    - ✅ `gemini-2.5-flash` - Current stable (June 2025 release)
-   - ✅ `gemini-flash-latest` - Auto-updating alias
+    - ⚠️ `gemini-flash-latest` - Historical auto-updating alias, no longer recommended for production docs/config
 
 ### Documentation Lag
 - Google's docs (updated Dec 18, 2025) still reference 1.5 as stable
@@ -98,6 +98,12 @@ generationConfig: {
 - `test-comparison.html` - Compares old vs new approach
 - `list-real-models.html` - Queries Google API for available models
 - `test-gemini-2.5-flash.html` - Tests specific model compatibility
+
+## 2026 Note
+
+- This document is retained for incident history.
+- Current runtime no longer uses alias-based defaults like `gemini-flash-latest`.
+- Active code now routes Gemini calls through the newer Google Gen AI SDK compatibility layer and prefers explicit stable model IDs.
 - `verify-final-fix.html` - Comprehensive verification suite
 
 ---

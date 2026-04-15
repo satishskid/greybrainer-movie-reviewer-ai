@@ -65,13 +65,15 @@
 #### 2.1 Dynamic Insight Generation
 - **Status**: ✅ PASS (Previously FAIL - Now Fixed)
 - **Function**: generateGreybrainerInsightWithGemini()
-- **Fix Applied**: Added missing `tools: [{ googleSearchRetrieval: {} }]` parameter
+- **Fix Applied**: Added missing search grounding so the call matches the rest of the Gemini workflow
 - **Features**:
   - Generates 40-70 word industry insights
   - Professional, data-informed tone
   - Current trend analysis
   - Refresh functionality
 - **API Consistency**: ✅ Now matches other working functions
+
+**2026 Note:** Current runtime uses the modern `googleSearch` tool shape rather than the old `googleSearchRetrieval` naming.
 
 #### 2.2 Detailed Report Generation
 - **Status**: ✅ PASS (Recently Restored)

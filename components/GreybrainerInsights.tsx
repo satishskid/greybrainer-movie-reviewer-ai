@@ -10,28 +10,21 @@ import { DownloadIcon } from './icons/DownloadIcon';
 import { ReadMoreLess } from './ReadMoreLess'; // For potentially long detailed reports
 import GeminiCanvasExport from './GeminiCanvasExport';
 import { FileText, Newspaper, Share2, Sparkles, FileCode, Target, Globe, BarChart2, Shield } from 'lucide-react';
-import { DailyBriefStudio } from './DailyBriefStudio';
 import { DistributionPack, MovieSuggestion } from '../types';
 import { SocialDistributionDashboard } from './SocialDistributionDashboard';
 import { trendIntelligenceService } from '../services/trendIntelligenceService';
 import { hasFirecrawlApiKey } from '../utils/firecrawlKeyStorage';
 
 interface GreybrainerInsightsProps {
-  currentUserEmail?: string | null;
   logTokenUsage?: LogTokenUsageFn;
-  newsletterSuggestions?: { movies: MovieSuggestion[]; topics: string[] };
 }
 
-type WorkflowMode = 'daily-adaptive' | 'deep-research';
 type InsightMode = 'on-demand' | 'movie-anchored' | 'research-trending' | 'grey-verdict' | 'competitive-intelligence';
 type AnalysisLayer = 'story' | 'orchestration' | 'performance' | 'morphokinetics' | 'random';
 
 export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
-  currentUserEmail,
   logTokenUsage,
-  newsletterSuggestions,
 }) => {
-  const [workflowMode, setWorkflowMode] = useState<WorkflowMode>('daily-adaptive');
   // Deep research mode selection
   const [insightMode, setInsightMode] = useState<InsightMode>('research-trending');
   
@@ -430,202 +423,70 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
       
       <div className="text-slate-300 text-sm space-y-2 gb-content-area">
         <p>
-          Greybrainer now runs two clear workflows: one adaptive daily editorial draft that is generated automatically,
-          and one human-initiated deep research studio for movie-led analysis and publication development.
+          Greybrainer now runs a single editor-led workflow for movie analysis, topics, and publication prep.
         </p>
-        <div className="my-5 grid gap-3 md:grid-cols-2">
+        <div className="mb-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-100">
+          Everything below is manual and editor-started. Nothing here auto-runs in the background.
+        </div>
+
+        <div className="flex flex-wrap gap-2 my-4 border-b border-slate-700 pb-2">
           <button
-            onClick={() => setWorkflowMode('daily-adaptive')}
-            className={`rounded-2xl border px-5 py-4 text-left transition ${
-              workflowMode === 'daily-adaptive'
-                ? 'border-sky-400/60 bg-sky-500/10 shadow-lg shadow-sky-950/30'
-                : 'border-slate-700 bg-slate-900/60 hover:border-slate-500'
+            onClick={() => setInsightMode('research-trending')}
+            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+              insightMode === 'research-trending'
+                ? 'bg-amber-500 text-black'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
             }`}
           >
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-300">Flow 1</div>
-            <div className="mt-2 text-lg font-semibold text-slate-100">Daily Adaptive Brief</div>
-            <div className="mt-2 text-sm leading-6 text-slate-400">
-              One automated newsletter-style draft per day, reviewed by editor, then published to website and social.
-            </div>
+            📊 Topics & Research
           </button>
           <button
-            onClick={() => setWorkflowMode('deep-research')}
-            className={`rounded-2xl border px-5 py-4 text-left transition ${
-              workflowMode === 'deep-research'
-                ? 'border-amber-400/60 bg-amber-500/10 shadow-lg shadow-amber-950/30'
-                : 'border-slate-700 bg-slate-900/60 hover:border-slate-500'
+            onClick={() => setInsightMode('grey-verdict')}
+            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+              insightMode === 'grey-verdict'
+                ? 'bg-purple-500 text-white'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
             }`}
           >
-            <div className="text-xs font-semibold uppercase tracking-[0.24em] text-amber-300">Flow 2</div>
-            <div className="mt-2 text-lg font-semibold text-slate-100">Deep Research Studio</div>
-            <div className="mt-2 text-sm leading-6 text-slate-400">
-              Human-driven movie and culture analysis. The editor enters a title, angle, or prompt, generates output,
-              refines it, and then publishes.
-            </div>
+            ⚖️ Grey Verdict
+          </button>
+          <button
+            onClick={() => setInsightMode('competitive-intelligence')}
+            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+              insightMode === 'competitive-intelligence'
+                ? 'bg-indigo-600 text-white'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            🎯 Trend Intelligence
+          </button>
+          <button
+            onClick={() => setInsightMode('on-demand')}
+            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+              insightMode === 'on-demand'
+                ? 'bg-amber-500 text-black'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            Quick Insight
+          </button>
+          <button
+            onClick={() => setInsightMode('movie-anchored')}
+            className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
+              insightMode === 'movie-anchored'
+                ? 'bg-amber-500 text-black'
+                : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
+            }`}
+          >
+            🎬 Movie Analysis
           </button>
         </div>
 
-        {workflowMode === 'daily-adaptive' && (
-          <DailyBriefStudio
-            currentUserEmail={currentUserEmail}
-          />
-        )}
-
-        {workflowMode === 'deep-research' && (
-          <>
-            <div className="mb-3 rounded-2xl border border-amber-500/20 bg-amber-500/5 px-4 py-3 text-sm text-amber-100">
-              Everything below is editor-initiated. Nothing here runs on an automatic schedule.
-            </div>
-
-            {(newsletterSuggestions?.movies?.length || newsletterSuggestions?.topics?.length) ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 my-4">
-                <div className="p-3 bg-slate-800/80 rounded-lg border border-teal-500/30">
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="text-xs font-semibold text-teal-300 uppercase tracking-wider">
-                      Newsletter Picks ({newsletterSuggestions?.movies?.length || 0})
-                    </div>
-                    <div className="text-[10px] text-slate-400">Click to use in active tab</div>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {newsletterSuggestions?.movies?.map((movie, index) => {
-                      const label = movie.year ? `${movie.title} (${movie.year})` : movie.title;
-                      return (
-                        <button
-                          key={`global-movie-${index}`}
-                          type="button"
-                          onClick={() => {
-                            if (insightMode === 'movie-anchored') {
-                              setSelectedMovie(label);
-                            } else if (insightMode === 'grey-verdict') {
-                              setGreyVerdictMovieTitle(prev => prev ? `${prev}, ${label}` : label);
-                            } else if (insightMode === 'research-trending') {
-                              setTrendingTopics(prev => prev.trim() ? `${prev.trim()}\n• ${label}` : `• ${label}`);
-                            } else {
-                              setInsightMode('movie-anchored');
-                              setSelectedMovie(label);
-                            }
-                          }}
-                          className="px-2 py-1.5 text-xs font-medium rounded-md bg-teal-900/40 hover:bg-teal-700 text-teal-100 border border-teal-700/50 transition-colors text-left"
-                          title={movie.description || `Use ${label}`}
-                        >
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-
-                <div className="p-3 bg-slate-800/80 rounded-lg border border-amber-500/30">
-                  <div className="flex justify-between items-center mb-2">
-                    <div className="text-xs font-semibold text-amber-300 uppercase tracking-wider">
-                      Research Chips ({newsletterSuggestions?.topics?.length || 0})
-                    </div>
-                    <div className="text-[10px] text-slate-400">Click to use in active tab</div>
-                  </div>
-                  <div className="flex flex-col gap-2">
-                    {newsletterSuggestions?.topics?.map((topic, index) => (
-                      <button
-                        key={`global-topic-${index}`}
-                        type="button"
-                        onClick={() => {
-                          if (insightMode === 'grey-verdict') {
-                            setGreyVerdictTrendAngle(topic);
-                          } else {
-                            if (insightMode !== 'research-trending') {
-                              setInsightMode('research-trending');
-                            }
-                            setTrendingTopics(prev => prev.trim() ? `${prev.trim()}\n• ${topic}` : `• ${topic}`);
-                          }
-                        }}
-                        className="px-2 py-1.5 text-xs font-medium rounded-md bg-amber-900/30 hover:bg-amber-800/60 text-amber-100 border border-amber-700/50 transition-colors text-left line-clamp-2"
-                        title={topic}
-                      >
-                        {topic}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ) : null}
-
-            <div className="flex flex-wrap gap-2 my-4 border-b border-slate-700 pb-2">
-              <button
-                onClick={() => setInsightMode('research-trending')}
-                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
-                  insightMode === 'research-trending'
-                    ? 'bg-amber-500 text-black'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                }`}
-              >
-                📊 Research & Trending
-              </button>
-              <button
-                onClick={() => setInsightMode('grey-verdict')}
-                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
-                  insightMode === 'grey-verdict'
-                    ? 'bg-purple-500 text-white'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                }`}
-              >
-                ⚖️ Grey Verdict
-              </button>
-              <button
-                onClick={() => setInsightMode('competitive-intelligence')}
-                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
-                  insightMode === 'competitive-intelligence'
-                    ? 'bg-indigo-600 text-white'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                }`}
-              >
-                🎯 Trend Intelligence
-              </button>
-              <button
-                onClick={() => setInsightMode('on-demand')}
-                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
-                  insightMode === 'on-demand'
-                    ? 'bg-amber-500 text-black'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                }`}
-              >
-                Rapid Insight
-              </button>
-              <button
-                onClick={() => setInsightMode('movie-anchored')}
-                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
-                  insightMode === 'movie-anchored'
-                    ? 'bg-amber-500 text-black'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                }`}
-              >
-                🎬 Movie-Anchored Insight
-              </button>
-              <button
-                onClick={() => setInsightMode('research-trending')}
-                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
-                  insightMode === 'research-trending'
-                    ? 'bg-amber-500 text-black'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                }`}
-              >
-                📊 Research & Trending
-              </button>
-              <button
-                onClick={() => setInsightMode('grey-verdict')}
-                className={`px-4 py-2 rounded-t-lg font-medium text-sm transition ${
-                  insightMode === 'grey-verdict'
-                    ? 'bg-purple-500 text-white'
-                    : 'bg-slate-700 text-slate-300 hover:bg-slate-600'
-                }`}
-              >
-                ⚖️ Grey Verdict
-              </button>
-            </div>
-
-            {insightMode === 'on-demand' && (
+        {insightMode === 'on-demand' && (
           <>
             <div className="mt-3 mb-3">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-1">
-                <p className="font-semibold text-yellow-300 mb-1 sm:mb-0">Dynamic AI Insight:</p>
+                <p className="font-semibold text-yellow-300 mb-1 sm:mb-0">Quick AI Insight:</p>
                 <div className="flex flex-wrap gap-2">
                   <button
                     onClick={fetchDynamicInsight}
@@ -640,7 +501,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                     onClick={handleGenerateDetailedReport}
                     disabled={!dynamicInsightText || isGeneratingDetailedReport || isFetchingDynamicInsight}
                     className="flex items-center px-2.5 py-1 text-xs font-medium text-slate-300 hover:text-yellow-300 bg-teal-700 hover:bg-teal-600 rounded-md transition-colors disabled:opacity-50"
-                    title="Generate Detailed Report from this Insight"
+                    title="Expand this insight into a fuller report"
                   >
                     <DocumentTextIcon className="w-3 h-3 mr-1.5" />
                     Generate Detailed Report
@@ -649,7 +510,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                     onClick={handleGenerateExpandedArticle}
                     disabled={!dynamicInsightText || isGeneratingArticle || isFetchingDynamicInsight}
                     className="flex items-center px-2.5 py-1 text-xs font-medium text-white hover:text-amber-200 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 rounded-md transition-colors disabled:opacity-50 shadow-lg"
-                    title="Expand to Publication-Ready Article (800-1200 words)"
+                    title="Expand this insight into a publication-ready article"
                   >
                     <Newspaper className="w-3 h-3 mr-1.5" />
                     Expand to Publication
@@ -793,7 +654,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
             {/* Movie Input */}
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-2">
-                Select Recent Movie/Show (as hook):
+                Movie / Show for Analysis *
               </label>
               <input
                 type="text"
@@ -802,25 +663,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                 placeholder="e.g., Pushpa 2, Animal, Heeramandi, The Family Man..."
                 className="w-full px-4 py-2 bg-slate-700 text-white rounded-lg border border-slate-600 focus:border-amber-500 focus:outline-none"
               />
-              <p className="text-xs text-slate-400 mt-1">Enter a recent Indian film or OTT show that's fresh in audience's mind</p>
-              {newsletterSuggestions?.movies?.length ? (
-                <div className="mt-2">
-                  <div className="text-xs text-slate-400 mb-1">Suggested from Newsletter</div>
-                  <div className="flex flex-wrap gap-2">
-                    {newsletterSuggestions.movies.slice(0, 10).map((m, idx) => (
-                      <button
-                        key={`nl-movie-${idx}-${m.title}`}
-                        type="button"
-                        onClick={() => setSelectedMovie(m.year ? `${m.title} (${m.year})` : m.title)}
-                        className="px-2 py-1 text-xs rounded bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700"
-                        title={m.description || m.title}
-                      >
-                        {m.year ? `${m.title} (${m.year})` : m.title}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+              <p className="text-xs text-slate-400 mt-1">Enter a film or show you want the engine to use as the analysis anchor.</p>
             </div>
 
             {/* Layer Selection */}
@@ -866,7 +709,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                   <span className="ml-2">Generating Insight...</span>
                 </span>
               ) : (
-                '🎬 Generate Movie-Anchored Insight'
+                '🎬 Run Movie Analysis'
               )}
             </button>
 
@@ -969,22 +812,22 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
           <div className="mt-4 space-y-4">
             <div className="bg-slate-700/40 p-4 rounded-lg border border-amber-500/30">
               <h3 className="text-amber-300 font-semibold mb-3 flex items-center">
-                📊 Research & Trending Engine
+                📊 Topics & Research
               </h3>
               <p className="text-slate-300 text-sm mb-4">
-                <strong>Build your continuous narrative.</strong> Analyze trending topics and create strategic research that connects to your audience. Generate actionable insights that position each post as a chapter in an ongoing story.
+                <strong>Build your continuous narrative.</strong> Start from topics, headlines, or research prompts, then generate strategic insights and publication-ready research that connect to your audience.
               </p>
               
               <div className="space-y-3">
                 <div>
                   <label htmlFor="trending-topics" className="block text-sm font-medium text-slate-200 mb-1">
-                    Trending Topics / News Headlines *
+                    Topics / News Headlines *
                   </label>
                   <textarea
                     id="trending-topics"
                     value={trendingTopics}
                     onChange={(e) => setTrendingTopics(e.target.value)}
-                    placeholder="Click the chips above to auto-fill trending topics from your daily newsletter, or type your own here..."
+                    placeholder="Add trend headlines, release notes, or your own research prompts here..."
                     rows={6}
                     className="w-full px-3 py-2 bg-slate-800 border border-slate-600 rounded-md text-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent"
                   />
@@ -995,7 +838,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                   disabled={!trendingTopics.trim() || isGeneratingResearch}
                   className="w-full px-4 py-2 bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-medium rounded-md shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isGeneratingResearch ? '✨ Analyzing the Pulse of Indian Cinema...' : '🔮 Generate Strategic Research & Medium Action Plan'}
+                  {isGeneratingResearch ? '✨ Analyzing Topics...' : '🔮 Generate Research Plan'}
                 </button>
               </div>
             </div>
@@ -1010,7 +853,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
               <div className="bg-slate-800/60 p-4 rounded-lg border border-amber-500/40">
                 <div className="flex justify-between items-center mb-3">
                   <h3 className="text-amber-300 font-semibold flex items-center">
-                    📈 Research Summation Report
+                    📈 Research Report
                   </h3>
                   <div className="flex gap-2">
                     <button
@@ -1093,7 +936,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
           <div className="mt-4 space-y-4">
             <div className="bg-purple-900/30 p-4 rounded-lg border border-purple-500/30">
               <h3 className="text-purple-300 font-semibold mb-3 flex items-center">
-                ⚖️ Grey Verdict: Cultural Editorial Engine
+                ⚖️ Grey Verdict Editorial
               </h3>
               <p className="text-slate-300 text-sm mb-4">
                 <strong>Transform film analysis into cultural narratives.</strong> The Grey Verdict isn't a review - it's an editorial that uses specific films as proof of broader industry trends, societal shifts, or business insights.
@@ -1102,7 +945,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
               <div className="space-y-3">
                 <div>
                   <label htmlFor="verdict-movie" className="block text-sm font-medium text-slate-200 mb-1">
-                    Subject Film(s) / Series * <span className="text-purple-400 text-xs">(Click movie chips above to auto-fill)</span>
+                    Subject Film(s) / Series *
                   </label>
                   <input
                     id="verdict-movie"
@@ -1116,7 +959,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
 
                 <div>
                   <label htmlFor="verdict-trend" className="block text-sm font-medium text-slate-200 mb-1">
-                    Trend / Angle * <span className="text-purple-400 text-xs">(Click research chips above to auto-fill)</span>
+                    Trend / Angle *
                   </label>
                   <input
                     id="verdict-trend"
@@ -1133,7 +976,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                   disabled={!greyVerdictMovieTitle.trim() || !greyVerdictTrendAngle.trim() || isGeneratingVerdict}
                   className="w-full px-4 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 text-white font-medium rounded-md shadow transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  {isGeneratingVerdict ? '✨ Crafting Editorial Analysis...' : '⚖️ Generate Grey Verdict Editorial'}
+                  {isGeneratingVerdict ? '✨ Crafting Editorial...' : '⚖️ Generate Editorial'}
                 </button>
               </div>
             </div>
@@ -1328,8 +1171,6 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
           These research outputs can stay inside Greybrainer instead of being copied around manually. Drafts, versions,
           and publication state can move through the Cloudflare workflow after the editor is satisfied. Learn more about our <a href="mailto:consultancy@greybrainer.ai" className="text-indigo-400 hover:underline">consultancy services</a>.
         </p>
-          </>
-        )}
       </div>
     </div>
   );

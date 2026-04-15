@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI, GenerateContentResult } from "@google/generative-ai";
+import { GoogleGenerativeAI, GenerateContentResult } from "../utils/googleGenAICompat";
 import { ReviewLayer, ReviewStage, LayerAnalysisData, GroundingChunkWeb, GroundingMetadata, PersonnelData, SummaryReportData, CreativeSparkResult, VonnegutShapeData, PlotPoint, ScriptIdeaInput, MagicQuotientAnalysis, MorphokineticsAnalysis, FinancialAnalysisData, SocialSnippets, MovieSuggestion, DistributionPack } from '../types';
 import { MAX_SCORE, MAGIC_QUOTIENT_DISCLAIMER } from '../constants';
 import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
@@ -80,33 +80,32 @@ export async function runGeminiWithFallback<T>(
       }
     } catch (error: any) {
       const errorMsg = error.message?.toLowerCase() || '';
-      const isModelError = errorMsg.includes('404') || 
-                         error.status === 404 || 
+      const isModelError = errorMsg.includes('404') ||
+                         error.status === 404 ||
                          errorMsg.includes('not found') ||
                          errorMsg.includes('unsupported model');
-                         
+
       const isToolError = errorMsg.includes('tool') || errorMsg.includes('400') || errorMsg.includes('search');
       const isQuotaError = error.status === 429 || errorMsg.includes('429') || errorMsg.includes('quota');
-                   
+
       if (isModelError || isQuotaError || (isToolError && tools && tools.length > 0)) {
         console.warn(`⚠️ [${operationName}] Model ${modelName} error (${isToolError ? 'tool issue' : isQuotaError ? 'quota' : 'not found'}), trying next fallback...`);
         lastError = error;
         continue;
       }
-      
+
       console.error(`❌ [${operationName}] Permanent error with model ${modelName}:`, error);
       throw error;
     }
   }
 
-  // Second pass: If all failed and we had tools, retry WITHOUT tools as a last resort
   if (tools && tools.length > 0) {
     console.warn(`⚠️ [${operationName}] All tool-enabled models failed. Retrying WITHOUT tools.`);
     try {
       const genAI = getGeminiAI();
-      const model = genAI.getGenerativeModel({ 
-        model: modelsToTry[0], 
-        generationConfig 
+      const model = genAI.getGenerativeModel({
+        model: modelsToTry[0],
+        generationConfig
       });
       const response = await model.generateContent(prompt);
       const responseText = response.response.text();
@@ -120,160 +119,20 @@ export async function runGeminiWithFallback<T>(
   throw new Error(`[${operationName}] All Gemini attempts failed. Last error: ${lastError?.message || 'Unknown error'}`);
 }
 
-// Simple movie title suggestions using Gemini API
-export const suggestMovieTitles = async (
-  partialTitle: string,
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<string[]> => {
-  if (!partialTitle || partialTitle.trim().length < 2) {
-    return [];
-  }
-
-  const prompt = `
-You are a movie database assistant. The user is typing: "${partialTitle}"
-
-List 8 movie or TV series titles that match or contain this text. Include:
-- Exact matches first
-- Popular titles containing these letters
-- Recent releases when relevant
-- Both movies and series
-
-Format: Just the titles, one per line, no explanations.
-
-Examples:
-Input: "fam"
-Output:
-The Family Man
-The Family Man (Series)
-Famous
-Fame
-Family Plot
-
-Input: "stranger"
-Output:
-Stranger Things
-Stranger Than Fiction
-The Stranger
-
-Now suggest titles for: "${partialTitle}"
-  `.trim();
-
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 200
-      }
-    });
-    
-    // Add timeout for better reliability
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-    
-    const response = await model.generateContent(prompt);
-    clearTimeout(timeoutId);
-    
-    const responseText = response.response.text().trim();
-    logTokenUsage?.('Movie Title Suggestions (Gemini)', prompt.length, responseText.length);
-    
-    // Parse response - one title per line
-    const suggestions = responseText
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0 && line.length < 100)
-      .slice(0, 8); // Limit to 8 suggestions
-    
-    return suggestions;
-  } catch (error) {
-    console.error('Gemini API error getting movie suggestions:', error);
-    handleGeminiError(error as Error, 'Movie Title Suggestions');
-    return []; // Return empty array on error - user can type manually
-  }
-}; 
-
-// Lookup movie title by IMDb ID using Gemini API
-export const lookupMovieByImdbId = async (
-  imdbId: string,
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<string | null> => {
-  if (!imdbId || !imdbId.trim()) {
-    return null;
-  }
-
-  // Validate IMDb ID format (tt1234567 or tt12345678)
-  const imdbIdPattern = /^tt\d{7,8}$/;
-  if (!imdbIdPattern.test(imdbId.trim())) {
-    throw new Error('Invalid IMDb ID format. Must be "tt" followed by 7-8 digits (e.g., tt1234567)');
-  }
-
-  const prompt = `
-You are a movie database assistant. Look up the movie or TV series with IMDb ID: ${imdbId}
-
-Return only the exact title of the movie or series. If it's a series, include "(Series)" at the end.
-
-Examples:
-Input: tt1234567
-Output: The Family Man (Series)
-
-Input: tt7658407
-Output: The Family Man
-
-If the ID is not found or invalid, return "NOT_FOUND".
-
-Look up: ${imdbId}
-  `.trim();
-
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 100
-      }
-    });
-    
-    // Add timeout for better reliability
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-    
-    const response = await model.generateContent(prompt);
-    clearTimeout(timeoutId);
-    
-    const responseText = response.response.text().trim();
-    logTokenUsage?.('IMDb ID Lookup (Gemini)', prompt.length, responseText.length);
-    
-    if (responseText.toUpperCase().includes('NOT_FOUND')) {
-      return null;
-    }
-    
-    return responseText;
-  } catch (error) {
-    console.error('Gemini API error looking up IMDb ID:', error);
-    handleGeminiError(error as Error, 'IMDb ID Lookup');
-  }
-  
-  return null; // Fallback return
-};
-
-// Simple error handling without quota monitoring
 const handleGeminiError = (error: Error, operation: string): never => {
   const errorMessage = error.message.toLowerCase();
-  
-  // Handle quota/rate limit errors with simple informative message
+
   if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
     throw new Error('Gemini API has daily usage limits. Please try again later.');
   }
-  
-  // Handle other API errors
+
   if (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID')) {
     throw new Error('Invalid Gemini API Key. Please check your API key configuration.');
   }
-  
+
   throw new Error(`Gemini API error in ${operation}: ${error.message}`);
 };
 
-// Add missing type definitions
 interface CharacterIdea {
   name: string;
   description: string;
@@ -284,8 +143,15 @@ interface SceneIdea {
   description: string;
 }
 
-// Add missing generateAnalysisPrompt function
-const generateAnalysisPrompt = (movieTitle: string, reviewStage: ReviewStage, layer: ReviewLayer, layerTitle: string, layerDescription: string, year?: string, director?: string): string => {
+const generateAnalysisPrompt = (
+  movieTitle: string,
+  reviewStage: ReviewStage,
+  layer: ReviewLayer,
+  layerTitle: string,
+  layerDescription: string,
+  year?: string,
+  director?: string,
+): string => {
   const contextInfo = [
     year ? `Year: ${year}` : '',
     director ? `Director: ${director}` : ''
@@ -296,7 +162,7 @@ const generateAnalysisPrompt = (movieTitle: string, reviewStage: ReviewStage, la
   return `
     You are an expert film critic analyzing ${titleWithContext} (${reviewStage}).
     Focus on the ${layerTitle}: ${layerDescription}
-    
+
     IMPORTANT: Ensure you are analyzing the correct movie.
     ${year ? `Release Year: ${year}` : ''}
     ${director ? `Director: ${director}` : ''}
@@ -307,34 +173,34 @@ const generateAnalysisPrompt = (movieTitle: string, reviewStage: ReviewStage, la
     2. Strengths and weaknesses
     3. How it contributes to the overall film
     4. Suggested improvements
-    
+
     Include the following structured data:
     Director: [Director Name]
     Main Cast: [Cast Names]
     Suggested Score: [Score]/${MAX_SCORE}
     Potential Enhancements: [List of suggestions]
-    
+
     ${layer === ReviewLayer.STORY ? `
     Also include Vonnegut Story Shape analysis:
     ---VONNEGUT STORY SHAPE START---
     [Analysis of story shape and emotional arc]
     ---VONNEGUT STORY SHAPE END---
     ` : ''}
-    
+
     Provide your analysis:
   `;
 };
 
-
 export interface ParsedLayerAnalysis {
-  analysisText: string;
-  director?: string;
-  mainCast?: string[];
-  groundingSources?: GroundingChunkWeb[];
-  aiSuggestedScore?: number;
-  improvementSuggestions?: string | string[];
-  vonnegutShape?: VonnegutShapeData;
-  isFallbackResult?: boolean; 
+    analysisText: string;
+    aiSuggestedScore?: number;
+    director?: string;
+    mainCast?: string[];
+    groundingSources?: GroundingChunkWeb[];
+    improvementSuggestions?: string | string[];
+    vonnegutShape?: VonnegutShapeData;
+    isFallbackResult?: boolean;
+    error?: string;
 }
 
 export interface ParsedFinancials {
@@ -821,6 +687,8 @@ export const getMovieTitleSuggestions = async (
     return []; // Return empty array on error
   }
 };
+
+export const suggestMovieTitles = getMovieTitleSuggestions;
 
 export const fetchMovieFinancialsWithGemini = async (
   movieTitle: string,
@@ -1754,12 +1622,12 @@ Use these past posts to create narrative continuity. Show evolution, not repetit
 /**
  * Generate Grey Verdict Editorial - Cultural editorial that transforms film analysis into trend narratives
  * Based on the GreyBrainer Editorial Engine system
- * Supports multiple movies (comma-separated) and newsletter context parsing
+ * Supports multiple movies (comma-separated) and signal-board / ecosystem context parsing
  */
 export const generateGreyVerdictEditorial = async (
   movieTitles: string, // Now supports comma-separated list: "Angammal, The Raja Saab, Haq"
   trendAngle: string,
-  pastEcosystemContext?: string, // Can be newsletter with trending topics + suggestions
+  pastEcosystemContext?: string, // Can be signal-board context with trending topics + suggestions
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<string> => {
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -1775,7 +1643,7 @@ export const generateGreyVerdictEditorial = async (
 You are the **Editor-in-Chief of GreyBrainer**, the premier "Morphokinetic" film analysis platform. Your goal is to transcend simple movie reviews. You write **Cultural Editorials** that connect specific films to broader industry trends, societal shifts, and business insights.
 
 **YOUR MEDIUM BLOG REFERENCE**
-The GreyBrainer Medium blog (https://medium.com/@GreyBrainer) contains your past cultural analyses, trend narratives, and editorial insights. When the user provides newsletter context or past ecosystem data, look for:
+The GreyBrainer Medium blog (https://medium.com/@GreyBrainer) contains your past cultural analyses, trend narratives, and editorial insights. When the user provides signal-board context or past ecosystem data, look for:
 - Trending topics mentioned
 - Suggestions on how to approach the Grey Verdict
 - References to past films/analyses you should connect to
@@ -1784,11 +1652,11 @@ The GreyBrainer Medium blog (https://medium.com/@GreyBrainer) contains your past
 **INPUT DATA**
 * **Subject Film(s):** ${movieDisplay} ${movieCount > 1 ? `(${movieCount} films analyzed together)` : ''}
 * **The Trend/Angle:** ${trendAngle}
-${pastEcosystemContext ? `* **Newsletter Context / Past Ecosystem:**
+${pastEcosystemContext ? `* **Signal Board / Past Ecosystem Context:**
 ${pastEcosystemContext}
 
 **INSTRUCTION:** Parse the above context carefully. If it contains:
-- A newsletter with trending topics → Extract the key themes
+- A signal board or curated trend list → Extract the key themes
 - Suggestions on Grey Verdict approach → Follow those guidelines
 - References to past GreyBrainer analyses → Create explicit thematic bridges
 - Cultural patterns → Weave them into your trend analysis` : ''}
@@ -1946,7 +1814,7 @@ ${pastEcosystemContext ?
 * Use actual industry examples, box office data, OTT trends where possible
 * The "Grey" voice admits ambiguity - avoid absolute statements
 * End with forward-looking insights, not just analysis of what was
-* If newsletter context provided, extract trending topics and suggestions - use them as guidance
+* If signal-board or ecosystem context is provided, extract trending topics and suggestions - use them as guidance
 * Reference Medium blog https://medium.com/@GreyBrainer for ecosystem continuity
 
 **Generate the Grey Verdict Editorial now, following the template exactly.**`;
@@ -2485,6 +2353,40 @@ Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
   });
 };
 
+export const lookupMovieByImdbId = async (
+  imdbId: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string | null> => {
+  const cleanedId = imdbId.trim();
+  if (!cleanedId) {
+    return null;
+  }
+
+  const prompt = `You are a movie database assistant.
+
+Resolve this IMDb title id to the canonical movie or series title:
+${cleanedId}
+
+Rules:
+- Return only the title text.
+- No markdown, no quotes, no explanation.
+- If the id cannot be resolved confidently, return exactly: NOT_FOUND`;
+
+  return runGeminiWithFallback(
+    'IMDb ID Lookup',
+    prompt,
+    { temperature: 0.1, maxOutputTokens: 80 },
+    (responseText) => {
+      const result = responseText.trim().replace(/^"|"$/g, '');
+      if (!result || result === 'NOT_FOUND') {
+        return null;
+      }
+      return result;
+    },
+    logTokenUsage
+  ).catch(() => null);
+};
+
 export const extractJsonPayloadFromModelText = (responseText: string): string => {
   if (!responseText) return '';
   let cleaned = responseText.trim();
@@ -2555,337 +2457,6 @@ export const extractJsonPayloadFromModelText = (responseText: string): string =>
   cleaned = cleaned.replace(/,\s*}/g, '}').replace(/,\s*\]/g, ']');
 
   return cleaned;
-};
-
-/**
- * Generate an SEO Optimized Daily Newsletter with Narrative Continuity
- * Uses Google Search Grounding for live trends and RAG context for memory.
- */
-export const generateDailyNewsletter = async (
-  pastContentContext: string,
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<{ title: string, themes: string, content: string, suggestedReviews: MovieSuggestion[], suggestedResearchTopics: string[] }> => {
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  
-  const prompt = `**ROLE**
-You are the Editor-in-Chief for the @GreyBrainer Daily Newsletter. Your readers are cinephiles and industry professionals who value "Morphokinetic" analysis, vulnerability, and deep cultural insights into Indian and global cinema.
-
-**OBJECTIVE**
-Write today's edition of the daily newsletter (${today}). It must be SEO-optimized, highly engaging, and form a continuous narrative with our past dispatches. 
-
-**LIVE GOOGLE SEARCH REQUIREMENT**
-Search Google right now to find:
-1. What are the top 3 trending stories in the Indian cinema ecosystem today?
-2. What notable movies or web series are releasing this week or later this month?
-
-**RAG CONTEXT (WHAT WE WROTE RECENTLY)**
-Here is the context of what we've written over the past 7 days:
-${pastContentContext}
-*(Note: If the past context mentions a movie or trend, DO NOT repeat the same analysis. Instead, build upon it extending the narrative.)*
-
-**OUTPUT STRUCTURE**
-Your output MUST be a valid JSON object with this exact structure:
-{
-  "title": "[Catchy, SEO-Friendly Newsletter Title]",
-  "themes": "[Comma-separated SEO keywords/themes covered in this issue]",
-  "content": "[The full newsletter content in clean Markdown string. CRITICAL: Use \\n for newlines and escape all double quotes with \\\" within this string.]",
-  "suggestedReviews": [
-    {
-      "title": "Movie or Series Title",
-      "year": "YYYY (optional)",
-      "type": "Movie|Series (optional)",
-      "description": "1 sentence: why this is worth a deeper Greybrainer review this week"
-    }
-  ],
-  "suggestedResearchTopics": [
-    "Short research angle/topic phrased as a headline"
-  ]
-}
-
-**IMPORTANT JSON RULES:**
-1. The entire response must be a single, valid JSON object.
-2. The "content" field is a single string containing Markdown. 
-   CRITICAL: You MUST escape all internal double quotes within the markdown string as \\\" (e.g., "he said \"hello\"") and all newlines as \\n.
-3. Do not include any text before or after the JSON object.
-4. If you fail to escape internal double quotes, the JSON will be invalid and the system will fail.
-
-**THE NEWSLETTER CONTENT FORMAT (Markdown)**
-# [The H1 Title Again]
-*(Start with a vulnerable, personal, or punchy 2-sentence hook that acknowledges what day/week it is and sets the thematic tone)*
-
-## 📰 The Ecosystem Pulse
-*(Synthesize the top news you found via Google Search. Group it into a single cohesive narrative rather than just listing news. Explain the "Grey Area" or why this news matters to the industry's evolution.)*
-
-## 🔗 The Narrative Thread
-*(This is where you MUST interlink with our past content. Create a thematic bridge between today's news and what we wrote in the RAG Context.)*
-
-## 🍿 On The Horizon
-*(Highlight one upcoming release found via your search. Provide a brief "Grey Anticipation" - not just what it is, but what it represents for the genre or the lead actor's career trajectory.)*
-
-## 🔮 The Grey Verdict & Question
-*(End with a bold take on today's landscape and pose a thought-provoking question to the readers to drive engagement/comments.)*
-
-**CRITICAL CONSTRAINTS:**
-- **FACTUAL ACCURACY:** Do not hallucinate. Only report news, trends, and release dates that you have explicitly verified using the Google Search tool. If the search results are ambiguous, be honest about the uncertainty.
-- **Zero Repetition:** Do not re-explain concepts we covered in the Past Context. 
-- **SEO Optimization:** Naturally weave the keywords into the H2 headers and body text.
-- **Skimmability:** Use bullet points, bold text for emphasis.
-- **Strict JSON:** You must output ONLY valid JSON, parseable by JSON.parse(). Ensure all double quotes in "content" are escaped.`;
-
-  return runGeminiWithFallback(
-    'Daily Newsletter Engine',
-    prompt,
-    {
-      temperature: 0.7,
-      maxOutputTokens: 4000,
-      responseMimeType: 'application/json'
-    },
-    (responseText) => {
-      try {
-        const jsonStr = extractJsonPayloadFromModelText(responseText);
-        const parsed = JSON.parse(jsonStr) as {
-          title?: unknown;
-          themes?: unknown;
-          content?: unknown;
-          suggestedReviews?: unknown;
-          suggestedResearchTopics?: unknown;
-        };
-        if (typeof parsed?.title !== 'string' || typeof parsed?.themes !== 'string' || typeof parsed?.content !== 'string') {
-          throw new Error('Newsletter JSON missing required string fields');
-        }
-        const suggestedReviews: MovieSuggestion[] = Array.isArray(parsed?.suggestedReviews)
-          ? (parsed.suggestedReviews as any[])
-              .filter((m) => m && typeof m === 'object')
-              .map((m) => ({
-                title: typeof (m as any).title === 'string' ? (m as any).title.trim() : '',
-                year: typeof (m as any).year === 'string' ? (m as any).year.trim() : undefined,
-                director: typeof (m as any).director === 'string' ? (m as any).director.trim() : undefined,
-                type: (m as any).type === 'Movie' || (m as any).type === 'Series' ? (m as any).type : undefined,
-                description: typeof (m as any).description === 'string' ? (m as any).description.trim() : undefined,
-              }))
-              .filter((m) => typeof m.title === 'string' && m.title.length > 0)
-          : [];
-
-        const suggestedResearchTopics: string[] = Array.isArray(parsed?.suggestedResearchTopics)
-          ? (parsed.suggestedResearchTopics as any[])
-              .filter((t) => typeof t === 'string' && t.trim().length > 0)
-              .map((t) => (t as string).trim())
-          : [];
-
-        return {
-          title: parsed.title,
-          themes: parsed.themes,
-          content: parsed.content,
-          suggestedReviews,
-          suggestedResearchTopics,
-        };
-      } catch (e) {
-        console.error('Failed to parse Daily Newsletter JSON', e, responseText);
-        throw new Error('Failed to generate proper newsletter format. Please try again.');
-      }
-    },
-    logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[]
-  );
-};
-
-export const extractNewsletterSuggestionsFromContent = async (
-  newsletter: { title?: string; themes?: string; content: string },
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<{ suggestedReviews: MovieSuggestion[]; suggestedResearchTopics: string[] }> => {
-  const prompt = `You are an editorial assistant for @GreyBrainer.
-
-Given the newsletter content below, extract:
-1) Suggested movies/series to review next (title + optional year/type + 1 sentence why).
-2) Suggested research topics (headline-style).
-
-OUTPUT MUST be valid JSON only (no markdown fences) with exactly:
-{
-  "suggestedReviews": [
-    { "title": "string", "year": "YYYY (optional)", "type": "Movie|Series (optional)", "description": "string (optional)" }
-  ],
-  "suggestedResearchTopics": ["string"]
-}
-
-NEWSLETTER TITLE: ${newsletter.title || ''}
-THEMES/SEO: ${newsletter.themes || ''}
-CONTENT (markdown):
-${newsletter.content.substring(0, 12000)}
-`;
-
-  return runGeminiWithFallback(
-    'Newsletter Suggestions Extraction',
-    prompt,
-    { 
-      temperature: 0.2, 
-      maxOutputTokens: 2048,
-      responseMimeType: 'application/json'
-    },
-    (responseText) => {
-      const jsonStr = extractJsonPayloadFromModelText(responseText);
-      const parsed = JSON.parse(jsonStr) as {
-        suggestedReviews?: unknown;
-        suggestedResearchTopics?: unknown;
-      };
-
-      const suggestedReviews: MovieSuggestion[] = Array.isArray(parsed?.suggestedReviews)
-        ? (parsed.suggestedReviews as any[])
-            .filter((m) => m && typeof m === 'object')
-            .map((m) => ({
-              title: typeof (m as any).title === 'string' ? (m as any).title.trim() : '',
-              year: typeof (m as any).year === 'string' ? (m as any).year.trim() : undefined,
-              director: typeof (m as any).director === 'string' ? (m as any).director.trim() : undefined,
-              type: (m as any).type === 'Movie' || (m as any).type === 'Series' ? (m as any).type : undefined,
-              description: typeof (m as any).description === 'string' ? (m as any).description.trim() : undefined,
-            }))
-            .filter((m) => typeof m.title === 'string' && m.title.length > 0)
-        : [];
-
-      const suggestedResearchTopics: string[] = Array.isArray(parsed?.suggestedResearchTopics)
-        ? (parsed.suggestedResearchTopics as any[])
-            .filter((t) => typeof t === 'string' && t.trim().length > 0)
-            .map((t) => (t as string).trim())
-        : [];
-
-      return { suggestedReviews, suggestedResearchTopics };
-    },
-    logTokenUsage
-  );
-};
-
-export const generateDistributionPackForNewsletter = async (
-  newsletter: { title: string; themes: string; content: string; suggestedReviews?: MovieSuggestion[]; suggestedResearchTopics?: string[] },
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<DistributionPack> => {
-  const prompt = `**ROLE**
-You are the Head of Growth & Social Strategy for @GreyBrainer. Your brand voice is "Cinematic Academic" — high-brow, data-driven, yet punchy and provocative.
-
-**OBJECTIVE**
-Convert the newsletter content into a high-performance Distribution Pack for our social ecosystem:
-- X (Twitter): @GreyBrainer
-- LinkedIn: GreyBrainer AI
-- Instagram: @greybrainer.ai
-- YouTube: GreyBrainer AI (Community)
-
-**VOICE DNA (INJECT THIS)**
-- Sentences: Mix of short, punchy hooks and deep, insightful follow-ups.
-- Tone: "The Post-Weekend Pulse" style — analytical, objective, but with a "Social Spark."
-- Vocabulary: Use terms like "Morphokinetic," "Legacy Closure," "Franchise Bloat," and "Digital Fences."
-
-**INPUT:**
-- Title: ${newsletter.title}
-- Themes/SEO keywords: ${newsletter.themes}
-- Suggested Reviews: ${(newsletter.suggestedReviews || []).map(m => (m.year ? `${m.title} (${m.year})` : m.title)).join(', ')}
-- Suggested Research Topics: ${(newsletter.suggestedResearchTopics || []).join(' | ')}
-- Content (markdown excerpt): ${newsletter.content.substring(0, 4500)}
-
-**OUTPUT REQUIREMENTS:**
-1. **Carousel Plan (Instagram/LinkedIn)**: 7-10 slides. Each slide needs a headline, body text, and a specific Visual Prompt for an AI image generator (e.g., Midjourney/DALL-E) to ensure visual continuity.
-2. **Platform-Native Copy**:
-   - **X (Thread)**: 5-7 tweets. Strong hook on Tweet 1.
-   - **LinkedIn**: Thought-leadership style, focusing on the "Critical View" and "Industry Impact."
-   - **Instagram**: Hook-first caption, emoji-rich but professional.
-3. **IST Windows**: All times in IST.
-4. **CRITICAL**: You MUST escape all internal double quotes within the JSON values as \\\" (e.g., "he said \"hello\"").
-
-**OUTPUT JSON SHAPE (Strict valid JSON only - DO NOT use markdown code blocks or backticks):**
-{
-  "primaryKeyword": "string",
-  "secondaryKeywords": ["string"],
-  "longTailQueries": ["string"],
-  "slug": "string",
-  "metaTitle": "string",
-  "metaDescription": "string",
-  "headlines": ["string"],
-  "twitterThread": ["string"],
-  "linkedinPost": "string",
-  "instagramCaption": "string",
-  "hashtags": ["#tag"],
-  "quoteCards": ["string"],
-  "internalLinksPlan": ["string"],
-  "voiceDNA": "Cinematic Academic with focus on [today's primary theme]",
-  "carouselPlan": [
-    { "slideNumber": 1, "headline": "string", "bodyText": "string", "visualPrompt": "string", "overlayStyle": "string" }
-  ],
-  "abTesting": {
-    "versionA": { "strategy": "Educational", "copy": "string", "hook": "string" },
-    "versionB": { "strategy": "Contrarian/Provocative", "copy": "string", "hook": "string" }
-  },
-  "postingPlan": [
-    { "platform": "Medium|LinkedIn|X|Instagram|YouTube|Newsletter|Other", "handle": "@GreyBrainer|GreyBrainer AI|@greybrainer.ai", "postType": "string", "copy": "string", "bestTimeLocal": "string (IST)", "goal": "string" }
-  ]
-}`;
-
-  return runGeminiWithFallback(
-    `Distribution Pack (Newsletter): ${newsletter.title}`,
-    prompt,
-    { 
-      temperature: 0.4, 
-      maxOutputTokens: 3500,
-      responseMimeType: 'application/json'
-    },
-    (responseText) => {
-      const jsonStr = extractJsonPayloadFromModelText(responseText);
-      const parsed = JSON.parse(jsonStr) as Partial<DistributionPack>;
-
-      const toStringArray = (v: unknown): string[] =>
-        Array.isArray(v) ? v.filter((x) => typeof x === 'string').map((x) => (x as string).trim()).filter(Boolean) : [];
-
-      const carouselPlan = Array.isArray(parsed.carouselPlan) ? parsed.carouselPlan : [];
-      const normalizedCarouselPlan = carouselPlan
-        .filter((s: any) => s && typeof s === 'object')
-        .map((s: any) => ({
-          slideNumber: Number(s.slideNumber) || 0,
-          headline: typeof s.headline === 'string' ? s.headline.trim() : '',
-          bodyText: typeof s.bodyText === 'string' ? s.bodyText.trim() : '',
-          visualPrompt: typeof s.visualPrompt === 'string' ? s.visualPrompt.trim() : '',
-          overlayStyle: typeof s.overlayStyle === 'string' ? s.overlayStyle.trim() : 'center-bold',
-        }));
-
-      const postingPlan = Array.isArray((parsed as any).postingPlan) ? (parsed as any).postingPlan : [];
-      const normalizedPostingPlan = postingPlan
-        .filter((p: any) => p && typeof p === 'object')
-        .map((p: any) => ({
-          platform: p.platform,
-          handle: typeof p.handle === 'string' ? p.handle.trim() : '',
-          postType: typeof p.postType === 'string' ? p.postType.trim() : '',
-          copy: typeof p.copy === 'string' ? p.copy.trim() : '',
-          bestTimeLocal: typeof p.bestTimeLocal === 'string' ? p.bestTimeLocal.trim() : '',
-          goal: typeof p.goal === 'string' ? p.goal.trim() : '',
-        }))
-        .filter((p: any) => typeof p.platform === 'string' && p.platform && p.postType && p.copy);
-
-      const pack: DistributionPack = {
-        primaryKeyword: typeof parsed.primaryKeyword === 'string' ? parsed.primaryKeyword.trim() : '',
-        secondaryKeywords: toStringArray(parsed.secondaryKeywords),
-        longTailQueries: toStringArray(parsed.longTailQueries),
-        slug: typeof parsed.slug === 'string' ? parsed.slug.trim() : '',
-        metaTitle: typeof parsed.metaTitle === 'string' ? parsed.metaTitle.trim() : '',
-        metaDescription: typeof parsed.metaDescription === 'string' ? parsed.metaDescription.trim() : '',
-        headlines: toStringArray(parsed.headlines),
-        twitterThread: toStringArray(parsed.twitterThread),
-        linkedinPost: typeof parsed.linkedinPost === 'string' ? parsed.linkedinPost.trim() : '',
-        instagramCaption: typeof parsed.instagramCaption === 'string' ? parsed.instagramCaption.trim() : '',
-        hashtags: toStringArray(parsed.hashtags),
-        quoteCards: toStringArray(parsed.quoteCards),
-        internalLinksPlan: toStringArray(parsed.internalLinksPlan),
-        carouselPlan: normalizedCarouselPlan,
-        voiceDNA: typeof parsed.voiceDNA === 'string' ? parsed.voiceDNA.trim() : '',
-        abTesting: parsed.abTesting,
-        postingPlan: normalizedPostingPlan as any,
-      };
-
-      if (!pack.primaryKeyword || !pack.slug || !pack.metaTitle || !pack.metaDescription) {
-        console.warn('Distribution pack missing fields, falling back to defaults:', pack);
-        pack.primaryKeyword = pack.primaryKeyword || 'Greybrainer Analysis';
-        pack.slug = pack.slug || 'greybrainer-analysis-' + Date.now();
-        pack.metaTitle = pack.metaTitle || 'Greybrainer Strategic Insight';
-        pack.metaDescription = pack.metaDescription || 'Strategic insights and analysis from Greybrainer AI.';
-      }
-      return pack;
-    },
-    logTokenUsage
-  );
 };
 
 export const generateDistributionPackForResearch = async (

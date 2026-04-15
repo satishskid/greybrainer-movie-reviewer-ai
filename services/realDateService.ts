@@ -1,4 +1,7 @@
 import { extractJsonPayloadFromModelText } from './geminiService';
+import { GoogleGenerativeAI } from '../utils/googleGenAICompat';
+import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
+import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
 
 /**
  * Service to get real current date from external APIs
@@ -106,10 +109,6 @@ export class RealDateService {
     try {
       // This would use the existing Google Search service if available
       // For now, we'll use Gemini to get current date info
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
-      const { getGeminiApiKeyString } = await import('../utils/geminiKeyStorage');
-      const { getSelectedGeminiModel } = await import('../utils/geminiModelStorage');
-      
       const apiKey = getGeminiApiKeyString();
       if (!apiKey) throw new Error('No Gemini API key available');
       
