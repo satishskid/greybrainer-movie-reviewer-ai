@@ -9,9 +9,9 @@ import { LayerAnalysisCard } from './components/LayerAnalysisCard';
 import { ReportDisplay } from './components/ReportDisplay';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { SparklesIcon } from './components/icons/SparklesIcon';
-import { ReviewStage, LayerAnalysisData, ReviewLayer, PersonnelData, SummaryReportData, MagicFactorAnalysis, CreativeSparkResult, TokenUsageEntry, TokenBudgetConfig, ActualPerformanceData, ScriptIdeaInput, MagicQuotientAnalysis, MovieAnalysisInput, MorphokineticsAnalysis, MonthlyScoreboardItem, FinancialAnalysisData, MovieSuggestion } from './types';
+import { ReviewStage, LayerAnalysisData, ReviewLayer, PersonnelData, SummaryReportData, MagicFactorAnalysis, CreativeSparkResult, TokenUsageEntry, TokenBudgetConfig, ActualPerformanceData, ScriptIdeaInput, MagicQuotientAnalysis, MovieAnalysisInput, MorphokineticsAnalysis, MonthlyScoreboardItem, FinancialAnalysisData } from './types';
 import { initialLayerAnalyses, LAYER_DEFINITIONS, REVIEW_STAGES_OPTIONS, MAX_SCORE, COMMON_GENRES, INITIAL_TOKEN_BUDGET_CONFIG, CHARS_PER_TOKEN_ESTIMATE, MAX_TOKEN_LOG_ENTRIES, MOCK_MONTHLY_SCOREBOARD_DATA } from './constants';
-import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini, searchMovies } from './services/geminiService';
+import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini } from './services/geminiService';
 import { AdminService } from './services/adminService';
 import { PersonnelDisplay } from './components/PersonnelDisplay';
 import { CreativeSparkGenerator } from './components/CreativeSparkGenerator';
@@ -27,8 +27,68 @@ import { GreybrainerComparison } from './components/GreybrainerComparison';
 
 import { GoogleSearchKeyManager } from './components/GoogleSearchKeyManager';
 import { AdminSettings } from './components/AdminSettings';
+import { buildGeminiQuotaMessage, isGeminiQuotaError } from './utils/geminiQuotaMessaging';
 
 import { AuthWrapper } from './components/AuthWrapper';
+
+const buildLocalFallbackSummaryReport = (
+  movieTitle: string,
+  layerAnalyses: LayerAnalysisData[],
+  personnelData: PersonnelData,
+  financialAnalysisData: FinancialAnalysisData | null,
+): SummaryReportData => {
+  const scoredLayers = layerAnalyses.filter((layer) => typeof layer.userScore === 'number');
+  const overallScore = scoredLayers.length > 0
+    ? scoredLayers.reduce((sum, layer) => sum + (layer.userScore as number), 0) / scoredLayers.length
+    : null;
+
+  const strongestLayer = [...scoredLayers].sort((left, right) => (right.userScore as number) - (left.userScore as number))[0];
+  const weakestLayer = [...scoredLayers].sort((left, right) => (left.userScore as number) - (right.userScore as number))[0];
+
+  const keyTakeaways = layerAnalyses
+    .filter((layer) => layer.editedText)
+    .map((layer) => {
+      const firstParagraph = layer.editedText.split('\n').map((line) => line.trim()).find(Boolean) || 'Analysis available in the layer card.';
+      return `- ${layer.title}: ${firstParagraph}`;
+    })
+    .join('\n');
+
+  const improvementSuggestions = layerAnalyses
+    .flatMap((layer) => Array.isArray(layer.improvementSuggestions)
+      ? layer.improvementSuggestions
+      : layer.improvementSuggestions
+        ? [layer.improvementSuggestions]
+        : [])
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+
+  const personnelSummary = [
+    personnelData.director ? `Director: ${personnelData.director}` : null,
+    personnelData.mainCast?.length ? `Main cast: ${personnelData.mainCast.join(', ')}` : null,
+  ].filter(Boolean).join('\n');
+
+  const financialSummary = financialAnalysisData?.qualitativeROIAnalysis
+    ? `\n\nFinancial perspective:\n${financialAnalysisData.qualitativeROIAnalysis}`
+    : '';
+
+  const reportText = [
+    `Greybrainer generated this fallback summary for ${movieTitle} because the Gemini final-report quota is temporarily exhausted. The layer analyses below are still available and scored, so this summary synthesizes them locally to keep the report workflow moving.`,
+    overallScore !== null ? `Current overall Greybrainer score: ${overallScore.toFixed(1)}/${MAX_SCORE}.` : 'Layer scores are available in the ring visualization below.',
+    strongestLayer ? `Strongest current signal: ${strongestLayer.title}.` : null,
+    weakestLayer && weakestLayer !== strongestLayer ? `Most fragile layer right now: ${weakestLayer.title}.` : null,
+    personnelSummary || null,
+    keyTakeaways ? `\nKey takeaways:\n${keyTakeaways}` : null,
+    financialSummary || null,
+  ].filter(Boolean).join('\n\n');
+
+  return {
+    reportText,
+    overallImprovementSuggestions: improvementSuggestions.length > 0 ? improvementSuggestions : undefined,
+    financialAnalysis: financialAnalysisData || undefined,
+    isFallbackResult: true,
+  };
+};
 
 const App: React.FC = () => {
   const [movieInput, setMovieInput] = useState<MovieAnalysisInput>({
@@ -256,17 +316,6 @@ const App: React.FC = () => {
     await analyzeMovieFlowInternal(movieInput.movieTitle.trim());
   }, [movieInput.movieTitle, analyzeMovieFlowInternal]);
 
-  const handleGetSuggestions = useCallback(async (title: string): Promise<MovieSuggestion[]> => {
-    try {
-      return await searchMovies(title, logTokenUsage);
-    } catch (error) {
-      console.error('Error getting movie title suggestions:', error);
-      return [];
-    }
-  }, [logTokenUsage]);
-
-
-
   const handleEditLayerText = (layerId: ReviewLayer, newText: string) => setLayerAnalyses(prev => prev.map(l => l.id === layerId ? { ...l, editedText: newText } : l));
   const handleLayerScoreChange = (layerId: ReviewLayer, score?: number) => setLayerAnalyses(prev => prev.map(l => l.id === layerId ? { ...l, userScore: score } : l));
 
@@ -329,10 +378,22 @@ const App: React.FC = () => {
         movieInput.director
       );
       setSummaryReport(reportData);
+      setOverallError(null);
     } catch (error) {
       console.error('Error generating final report:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error generating report.';
-      setOverallError(errorMessage);
+
+      if (isGeminiQuotaError(errorMessage)) {
+        setSummaryReport(buildLocalFallbackSummaryReport(
+          movieInput.movieTitle,
+          layerAnalyses,
+          personnelData,
+          currentFinancialData,
+        ));
+        setOverallError(`${errorMessage} Greybrainer created a local fallback report from the completed layer analyses in the meantime.`);
+      } else {
+        setOverallError(errorMessage);
+      }
     }
     setIsGeneratingReport(false);
   }, [movieInput, layerAnalyses, personnelData, financialAnalysisData, logTokenUsage]);
@@ -448,7 +509,6 @@ const App: React.FC = () => {
                 reviewStages={REVIEW_STAGES_OPTIONS}
                 onAnalyze={handleAnalyzeMovie}
                 isAnalyzing={isAnalyzingLayers}
-                onGetSuggestions={handleGetSuggestions}
                 financialAnalysisData={financialAnalysisData}
                 onFetchBudgetEstimate={() => fetchBudgetEstimate()}
                 onApplyBudgetEstimate={applyBudgetEstimate}

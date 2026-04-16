@@ -235,7 +235,7 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
       </div>
 
       {/* Debug Section - Only for development */}
-      {process.env.NODE_ENV === 'development' && (
+      {import.meta.env.DEV && (
         <div className="max-w-7xl mx-auto p-4">
           <GeminiDebugTest />
         </div>

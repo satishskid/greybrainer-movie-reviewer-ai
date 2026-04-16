@@ -4,6 +4,9 @@ import { MAX_SCORE, MAGIC_QUOTIENT_DISCLAIMER } from '../constants';
 import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
 import { modelConfigService } from './modelConfigService';
+import { getEditorialMovieSuggestions } from './editorialSignalsService';
+import { googleSearchService } from './googleSearchService';
+import { buildGeminiQuotaMessage, isGeminiQuotaError } from '../utils/geminiQuotaMessaging';
 
 // --- IP PROTECTION & COMMERCIAL SERVICE NOTE ---
 // For a commercial application requiring IP protection and robust user management/metering:
@@ -25,6 +28,8 @@ const getGeminiAI = (): GoogleGenerativeAI => {
 };
 
 export type LogTokenUsageFn = (operation: string, inputChars: number, outputChars: number) => void;
+
+const GOOGLE_SEARCH_TOOL = [{ googleSearch: {} }] as any[];
 
 export async function runGeminiWithFallback<T>(
   operationName: string,
@@ -116,21 +121,26 @@ export async function runGeminiWithFallback<T>(
     }
   }
 
-  throw new Error(`[${operationName}] All Gemini attempts failed. Last error: ${lastError?.message || 'Unknown error'}`);
+  const lastErrorMessage = lastError?.message || 'Unknown error';
+  if (isGeminiQuotaError(lastErrorMessage)) {
+    throw new Error(buildGeminiQuotaMessage(lastErrorMessage, { context: `[${operationName}]` }));
+  }
+
+  throw new Error(`[${operationName}] All Gemini attempts failed. Last error: ${lastErrorMessage}`);
 }
 
 const handleGeminiError = (error: Error, operation: string): never => {
-  const errorMessage = error.message.toLowerCase();
+  const errorMessage = error.message;
 
-  if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
-    throw new Error('Gemini API has daily usage limits. Please try again later.');
+  if (isGeminiQuotaError(errorMessage)) {
+    throw new Error(buildGeminiQuotaMessage(errorMessage, { context: `Gemini API error in ${operation}:` }));
   }
 
-  if (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID')) {
+  if (errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID')) {
     throw new Error('Invalid Gemini API Key. Please check your API key configuration.');
   }
 
-  throw new Error(`Gemini API error in ${operation}: ${error.message}`);
+  throw new Error(`Gemini API error in ${operation}: ${errorMessage}`);
 };
 
 interface CharacterIdea {
@@ -240,7 +250,253 @@ const getDynamicDateRange = () => {
   };
 };
 
+const normalizeMovieSearchText = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
+const getMeaningfulQueryTokens = (value: string): string[] =>
+  normalizeMovieSearchText(value)
+    .split(' ')
+    .filter((token) => token.length >= 2);
+
+const parseSuggestionYear = (year?: string): number | undefined => {
+  if (!year) {
+    return undefined;
+  }
+
+  const match = year.match(/\d{4}/);
+  if (!match) {
+    return undefined;
+  }
+
+  const parsedYear = Number.parseInt(match[0], 10);
+  return Number.isFinite(parsedYear) ? parsedYear : undefined;
+};
+
+const scoreMovieSuggestion = (
+  query: string,
+  suggestion: MovieSuggestion,
+  currentYear: number,
+): number => {
+  const normalizedQuery = normalizeMovieSearchText(query);
+  const normalizedTitle = normalizeMovieSearchText(suggestion.title || '');
+  const queryTokens = normalizedQuery.split(' ').filter(Boolean);
+  const suggestionYear = parseSuggestionYear(suggestion.year);
+
+  let score = 0;
+
+  if (normalizedTitle === normalizedQuery) {
+    score += 300;
+  } else if (normalizedTitle.startsWith(normalizedQuery)) {
+    score += 220;
+  } else if (normalizedTitle.includes(normalizedQuery)) {
+    score += 160;
+  }
+
+  const matchedTokens = queryTokens.filter(token => normalizedTitle.includes(token)).length;
+  score += matchedTokens * 20;
+
+  if (suggestionYear !== undefined) {
+    const age = currentYear - suggestionYear;
+
+    if (age < 0) {
+      score += 80;
+    } else if (age === 0) {
+      score += 140;
+    } else if (age === 1) {
+      score += 120;
+    } else if (age === 2) {
+      score += 95;
+    } else if (age <= 5) {
+      score += 70 - age * 8;
+    } else if (age <= 10) {
+      score += 20;
+    } else {
+      score -= Math.min(35, age - 10);
+    }
+  } else {
+    score -= 15;
+  }
+
+  if (suggestion.type === 'Movie') {
+    score += 5;
+  }
+
+  return score;
+};
+
+const isSuggestionRelevantToQuery = (query: string, suggestion: MovieSuggestion): boolean => {
+  const normalizedQuery = normalizeMovieSearchText(query);
+  const normalizedTitle = normalizeMovieSearchText(suggestion.title || '');
+
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  if (normalizedTitle.includes(normalizedQuery) || normalizedQuery.includes(normalizedTitle)) {
+    return true;
+  }
+
+  const queryTokens = getMeaningfulQueryTokens(query);
+  if (queryTokens.length === 0) {
+    return false;
+  }
+
+  const matchedTokens = queryTokens.filter((token) => normalizedTitle.includes(token));
+
+  if (queryTokens.length === 1) {
+    return matchedTokens.length === 1;
+  }
+
+  return matchedTokens.length >= Math.ceil(queryTokens.length / 2);
+};
+
+const filterSuggestionsForQuery = (query: string, suggestions: MovieSuggestion[]): MovieSuggestion[] => {
+  const normalizedQuery = normalizeMovieSearchText(query);
+  if (!normalizedQuery) {
+    return suggestions;
+  }
+
+  return suggestions.filter((suggestion) => isSuggestionRelevantToQuery(normalizedQuery, suggestion));
+};
+
+const rankMovieSuggestions = (
+  query: string,
+  suggestions: MovieSuggestion[],
+  currentYear: number,
+): MovieSuggestion[] => {
+  return [...suggestions].sort((left, right) => {
+    const scoreDifference = scoreMovieSuggestion(query, right, currentYear) - scoreMovieSuggestion(query, left, currentYear);
+    if (scoreDifference !== 0) {
+      return scoreDifference;
+    }
+
+    const rightYear = parseSuggestionYear(right.year) ?? 0;
+    const leftYear = parseSuggestionYear(left.year) ?? 0;
+    if (rightYear !== leftYear) {
+      return rightYear - leftYear;
+    }
+
+    return left.title.localeCompare(right.title);
+  });
+};
+
+const dedupeMovieSuggestions = (suggestions: MovieSuggestion[]): MovieSuggestion[] => {
+  const seen = new Set<string>();
+
+  return suggestions.filter((suggestion) => {
+    const key = `${suggestion.title}_${suggestion.year || ''}`.trim().toLowerCase();
+    if (!key || seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+};
+
+const mergeMovieSuggestions = (...groups: MovieSuggestion[][]): MovieSuggestion[] => {
+  return dedupeMovieSuggestions(groups.flat().filter((suggestion) => suggestion?.title?.trim()));
+};
+
+const parseMovieSuggestionArray = (responseText: string): MovieSuggestion[] => {
+  const cleanJson = extractJsonPayloadFromModelText(responseText);
+  const parsed = JSON.parse(cleanJson);
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed
+    .filter((item) => item && typeof item === 'object' && typeof item.title === 'string')
+    .map((item) => ({
+      title: item.title.trim(),
+      year: typeof item.year === 'string' ? item.year.trim() : undefined,
+      director: typeof item.director === 'string' ? item.director.trim() : undefined,
+      type: item.type === 'Series' ? 'Series' : 'Movie',
+      description: typeof item.description === 'string' ? item.description.trim() : undefined,
+      source: typeof item.source === 'string' ? item.source.trim() : 'Grounded search',
+    }))
+    .filter((item) => item.title.length > 0);
+};
+
+const getGroundedMovieSuggestions = async (
+  query: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<MovieSuggestion[]> => {
+  const trimmedQuery = query.trim();
+  const { currentDate, currentYear, previousYear } = getDynamicDateRange();
+
+  const prompt = trimmedQuery
+    ? `
+You are Greybrainer's movie autocomplete engine.
+Current Date: ${currentDate}
+User typed: "${trimmedQuery}"
+
+Use Google Search grounding to find real, existing movie or series titles matching this partial query.
+
+Rules:
+- Only include titles you can verify from search results.
+- Prefer current/recent results from ${previousYear}-${currentYear} when the query is ambiguous.
+- Do not invent titles.
+- If nothing credible matches, return an empty array.
+- Return up to 8 results.
+
+For each result return:
+- title
+- year
+- director
+- type (Movie or Series)
+- description
+- source
+
+Return valid JSON only.
+Example:
+[
+  {
+    "title": "Toaster",
+    "year": "${currentYear}",
+    "director": "Example Director",
+    "type": "Movie",
+    "description": "Recent release matching the typed query.",
+    "source": "Grounded search"
+  }
+]
+    `.trim()
+    : `
+You are Greybrainer's daily review starter picker.
+Current Date: ${currentDate}
+
+Use Google Search grounding to find real, current movie and series titles worth reviewing right now.
+
+Rules:
+- Only include titles you can verify from search results.
+- Prioritize theatrical releases, fresh OTT releases, and strong current conversation from ${previousYear}-${currentYear}.
+- Focus on Indian cinema first, then major global titles.
+- Do not invent titles.
+- Return up to 8 results.
+
+For each result return:
+- title
+- year
+- director
+- type (Movie or Series)
+- description
+- source
+
+Return valid JSON only.
+    `.trim();
+
+  return runGeminiWithFallback(
+    trimmedQuery ? 'Grounded Movie Suggestions' : 'Grounded Recent Suggestions',
+    prompt,
+    { temperature: 0.1, maxOutputTokens: 700 },
+    (responseText) => dedupeMovieSuggestions(parseMovieSuggestionArray(responseText)).slice(0, 8),
+    logTokenUsage,
+    GOOGLE_SEARCH_TOOL
+  );
+};
 
 const parseMainCast = (text: string): string[] | undefined => {
   const match = text.match(/Main Cast:\s*([\w\s,]+)/i);
@@ -730,7 +986,7 @@ export const fetchMovieFinancialsWithGemini = async (
       }
     },
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] // Enable Google Search for financials
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -852,7 +1108,7 @@ Generate insight:
     },
     (responseText) => responseText.trim(),
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[] // Using as any[] to bypass Tool type definition limitations
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -978,7 +1234,7 @@ Generate the full publication-ready article now:
     },
     (responseText) => responseText.trim(),
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[] // Using as any[] to bypass Tool type definition limitations
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -1051,7 +1307,7 @@ Generate insight:
     },
     (responseText) => responseText.trim(),
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[] // Using as any[] to bypass Tool type definition limitations
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -1113,7 +1369,7 @@ export const analyzeLayerWithGemini = async (
       };
     },
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] // Enable Google Search for layer analysis
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -1248,7 +1504,7 @@ export const generateFinalReportWithGemini = async (
     { temperature: 0.7 },
     (responseText) => parseFinalReportAndMore(responseText.trim(), financialData),
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[]
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -1864,7 +2120,7 @@ Begin your analysis:
       };
     },
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] // Enable Google Search for personnel analysis
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -2114,6 +2370,7 @@ User input: "${userInput}"
 Current Date: ${currentYear}
 
 Find and suggest the most likely movie/series matches for this input. **PRIORITIZE ${currentYear} RELEASES AND CURRENT FILMS** but also include relevant classics if they match well.
+Use Google Search to verify that every suggested title actually exists. Do not invent or speculate.
 
 **RELEASE STATUS GUIDANCE:** 
 - Only mark content as "unreleased" or "upcoming" if you have specific knowledge of a future release date
@@ -2147,6 +2404,7 @@ Provide 8-12 most likely matches as a numbered list, ordered by relevance (recen
 ...
 
 Focus on real, existing movies and series. **Strongly prioritize ${previousYear}-${currentYear} releases and current year films** and currently popular titles. Include release years when helpful for disambiguation.
+If you cannot verify a likely match, leave it out. If nothing credible is found, return an empty list.
 
 Begin matching:
   `.trim();
@@ -2171,9 +2429,10 @@ Begin matching:
         }
       });
       
-      return matches.length > 0 ? matches.slice(0, 12) : [userInput];
+      return matches.slice(0, 12);
     },
-    logTokenUsage
+    logTokenUsage,
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -2294,63 +2553,57 @@ export const searchMovies = async (
   query: string,
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<MovieSuggestion[]> => {
-  if (!query || query.trim().length < 2) {
-    return [];
+  const trimmedQuery = query.trim();
+
+  const { currentYear } = getDynamicDateRange();
+  const editorialFallback = getEditorialMovieSuggestions(trimmedQuery, 8);
+
+  if (!trimmedQuery) {
+    try {
+      const groundedRecentSuggestions = await getGroundedMovieSuggestions('', logTokenUsage);
+      return rankMovieSuggestions('', mergeMovieSuggestions(groundedRecentSuggestions, editorialFallback), currentYear).slice(0, 8);
+    } catch (error) {
+      console.warn('Grounded recent suggestions unavailable, using editorial starters:', error);
+      return editorialFallback;
+    }
   }
 
-  const { currentDate, currentYear, previousYear } = getDynamicDateRange();
+  let verifiedSuggestions: MovieSuggestion[] = [];
 
-  const prompt = `
-You are a movie database assistant. The user is searching for: "${query}"
-Current Date: ${currentDate}
+  try {
+    const googleSuggestions = await googleSearchService.suggestMovies(trimmedQuery, 8);
+    verifiedSuggestions = googleSuggestions.map((suggestion) => ({
+      title: suggestion.title,
+      year: suggestion.year,
+      source: suggestion.source || 'Google Search',
+    }));
+  } catch (error) {
+    console.warn('Verified Google search suggestions unavailable, falling back to curated matches:', error);
+  }
 
-List up to 5 movies or TV series that match this query.
-CONTEXT: The user is primarily interested in Indian cinema (Bollywood, Tollywood, etc.) and recent global releases. If the title is ambiguous, prioritize Indian movies or recent releases from late ${previousYear}/${currentYear}.
+  try {
+    const groundedSuggestions = await getGroundedMovieSuggestions(trimmedQuery, logTokenUsage);
+    verifiedSuggestions = mergeMovieSuggestions(verifiedSuggestions, groundedSuggestions);
+  } catch (error) {
+    console.warn('Structured grounded suggestions unavailable:', error);
+  }
 
-IMPORTANT: Use your Google Search tool to find the most up-to-date information, especially for movies released in the last few months.
-
-For each match, provide:
-- Title
-- Year of release
-- Director (or Creator for series)
-- Type (Movie or Series)
-- A very brief one-line description (max 10 words) to help identify it.
-
-Format the output as a JSON array of objects.
-Example JSON format:
-[
-  { "title": "Avatar", "year": "2009", "director": "James Cameron", "type": "Movie", "description": "Paraplegic Marine on alien planet Pandora." },
-  { "title": "Avatar: The Last Airbender", "year": "2005", "director": "Michael Dante DiMartino", "type": "Series", "description": "Aang must master four elements." }
-]
-
-Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
-  `.trim();
-
-  return runGeminiWithFallback(
-    'Movie Search',
-    prompt,
-    { temperature: 0.3 },
-    (responseText) => {
-      try {
-        const cleanJson = extractJsonPayloadFromModelText(responseText);
-        const suggestions: MovieSuggestion[] = JSON.parse(cleanJson);
-        return suggestions;
-      } catch (e) {
-        console.error('Failed to parse search JSON:', e);
-        throw e; // Let runGeminiWithFallback handle retry/fallback
-      }
-    },
-    logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[]
-  ).catch(async () => {
-    // Custom catch for searchMovies to provide its own fallback to suggestMovieTitles
+  if (verifiedSuggestions.length === 0) {
     try {
-      const simpleSuggestions = await suggestMovieTitles(query, logTokenUsage);
-      return simpleSuggestions.map(s => ({ title: s }));
-    } catch (e) {
-      return [];
+      const groundedMatches = await findMovieMatches(trimmedQuery, logTokenUsage);
+      verifiedSuggestions = groundedMatches.map((title) => ({
+        title,
+        source: 'Grounded match',
+      }));
+    } catch (error) {
+      console.warn('Grounded Gemini title matching unavailable:', error);
     }
-  });
+  }
+
+  const mergedSuggestions = mergeMovieSuggestions(verifiedSuggestions, editorialFallback);
+  const filteredSuggestions = filterSuggestionsForQuery(trimmedQuery, mergedSuggestions);
+
+  return rankMovieSuggestions(trimmedQuery, filteredSuggestions, currentYear).slice(0, 8);
 };
 
 export const lookupMovieByImdbId = async (

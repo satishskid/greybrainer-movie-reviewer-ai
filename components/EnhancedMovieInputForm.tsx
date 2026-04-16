@@ -1,9 +1,8 @@
 // Simplified movie input form with basic search and IMDb ID lookup
 import React, { useState, useEffect, useCallback } from 'react';
-import { FinancialAnalysisData, ReviewStage, MovieAnalysisInput, MovieSuggestion } from '../types';
+import { FinancialAnalysisData, ReviewStage, MovieAnalysisInput } from '../types';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { LoadingSpinner } from './LoadingSpinner';
-import { LightBulbIcon } from './icons/LightBulbIcon';
 import { lookupMovieByImdbId } from '../services/geminiService';
 
 interface EnhancedMovieInputFormProps {
@@ -12,7 +11,6 @@ interface EnhancedMovieInputFormProps {
   reviewStages: { value: ReviewStage; label: string }[];
   onAnalyze: () => void;
   isAnalyzing: boolean;
-  onGetSuggestions?: (title: string) => Promise<MovieSuggestion[]>;
   financialAnalysisData?: FinancialAnalysisData | null;
   onFetchBudgetEstimate?: () => void;
   onApplyBudgetEstimate?: (budgetUsd: number) => void;
@@ -24,7 +22,6 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
   reviewStages,
   onAnalyze,
   isAnalyzing,
-  onGetSuggestions,
   financialAnalysisData,
   onFetchBudgetEstimate,
   onApplyBudgetEstimate,
@@ -36,16 +33,7 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
   const [isLookingUp, setIsLookingUp] = useState(false);
   const [idError, setIdError] = useState('');
   const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
-  
-  // Original search states
-  const [suggestions, setSuggestions] = useState<MovieSuggestion[]>([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [isLoadingSuggestions, setIsLoadingSuggestions] = useState(false);
-  const [originalInput, setOriginalInput] = useState('');
-  const [debounceTimer, setDebounceTimer] = useState<number | null>(null);
-  const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState(-1);
   const [showBudgetEstimates, setShowBudgetEstimates] = useState(false);
-  const inputContainerRef = React.useRef<HTMLDivElement>(null);
 
   // Simple IMDb ID lookup using Gemini API
   const lookupMovieById = useCallback(async (id: string) => {
@@ -109,115 +97,14 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
     setIsLookingUp(false);
   };
 
-  // Original search functionality (simplified)
-  const debouncedGetSuggestions = useCallback(
-    async (title: string) => {
-      if (!onGetSuggestions || title.trim().length < 2) {
-        setSuggestions([]);
-        setShowSuggestions(false);
-        return;
-      }
-
-      setIsLoadingSuggestions(true);
-      try {
-        const suggestionResults = await onGetSuggestions(title.trim());
-        if (suggestionResults && suggestionResults.length > 0) {
-          // Filter out exact matches if needed, or just show all
-          // For rich objects, we probably want to show them even if title matches, to show year/director
-          setSuggestions(suggestionResults);
-          setOriginalInput(title.trim());
-          setShowSuggestions(true);
-        } else {
-          setSuggestions([]);
-          setShowSuggestions(false);
-        }
-      } catch (error) {
-        console.error('Error fetching suggestions:', error);
-        setSuggestions([]);
-        setShowSuggestions(false);
-      } finally {
-        setIsLoadingSuggestions(false);
-      }
-    },
-    [onGetSuggestions]
-  );
-
-  // Debounce effect for search
-  useEffect(() => {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-    }
-    setSelectedSuggestionIndex(-1);
-
-    const timer = window.setTimeout(() => {
-      if (movieInput.movieTitle.trim() && inputMode === 'search') {
-        debouncedGetSuggestions(movieInput.movieTitle);
-      } else {
-        setSuggestions([]);
-        setShowSuggestions(false);
-        setIsLoadingSuggestions(false);
-      }
-    }, 800);
-
-    setDebounceTimer(timer);
-
-    return () => {
-      clearTimeout(timer);
-    };
-  }, [movieInput.movieTitle, debouncedGetSuggestions, inputMode]);
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (debounceTimer) {
-        clearTimeout(debounceTimer);
-      }
-    };
-  }, [debounceTimer]);
-
-  // Click outside handler
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (inputContainerRef.current && !inputContainerRef.current.contains(event.target as Node)) {
-        setShowSuggestions(false);
-        setSelectedSuggestionIndex(-1);
-      }
-    };
-
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, []);
-
   // Handle input change
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
+
     setMovieInput({
       ...movieInput,
       [name]: name === 'productionBudget' ? (value === '' ? undefined : parseFloat(value)) : value,
     });
-  };
-
-  // Handle suggestion select
-  const handleSuggestionSelect = (suggestion: MovieSuggestion) => {
-    if (debounceTimer) {
-      clearTimeout(debounceTimer);
-      setDebounceTimer(null);
-    }
-    setIsLoadingSuggestions(false);
-    setSelectedSuggestionIndex(-1);
-
-    const titleWithYear = suggestion.year ? `${suggestion.title} (${suggestion.year})` : suggestion.title;
-
-    setMovieInput({
-      ...movieInput,
-      movieTitle: titleWithYear,
-      year: suggestion.year,
-      director: suggestion.director,
-    });
-    setSuggestions([]);
-    setShowSuggestions(false);
   };
 
   useEffect(() => {
@@ -225,39 +112,6 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
       setInputMode('search');
     }
   }, [showAdvancedOptions, inputMode]);
-
-  // Handle key down for keyboard navigation
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (!showSuggestions || suggestions.length === 0) return;
-
-    switch (e.key) {
-      case 'ArrowDown':
-        e.preventDefault();
-        setSelectedSuggestionIndex(prev => 
-          prev < suggestions.length - 1 ? prev + 1 : prev
-        );
-        break;
-      case 'ArrowUp':
-        e.preventDefault();
-        setSelectedSuggestionIndex(prev => prev > 0 ? prev - 1 : -1);
-        break;
-      case 'Enter':
-        e.preventDefault();
-        if (selectedSuggestionIndex >= 0) {
-          handleSuggestionSelect(suggestions[selectedSuggestionIndex]);
-        }
-        break;
-      case 'Escape':
-        e.preventDefault();
-        setShowSuggestions(false);
-        setSelectedSuggestionIndex(-1);
-        break;
-      case 'Tab':
-        setShowSuggestions(false);
-        setSelectedSuggestionIndex(-1);
-        break;
-    }
-  };
 
   return (
     <div className="p-6 bg-slate-800/70 rounded-xl shadow-2xl mb-8 border border-slate-700">
@@ -391,85 +245,25 @@ export const EnhancedMovieInputForm: React.FC<EnhancedMovieInputFormProps> = ({
 
         {/* Search Input Mode */}
         {inputMode === 'search' && (
-          <div className="md:col-span-1 relative" ref={inputContainerRef}>
+          <div className="md:col-span-1 relative">
             <label htmlFor="movieTitle" className="block text-sm font-medium text-indigo-300 mb-1">
               Movie/Series Title <span className="text-red-400">*</span>
             </label>
-            <div className="relative">
-              <input
-                type="text"
-                id="movieTitle"
-                name="movieTitle"
-                value={movieInput.movieTitle}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                placeholder="e.g., Dune: Part Two"
-                className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-slate-100 placeholder-slate-400"
-                aria-label="Movie or Series Title Input"
-                required
-                autoComplete="off"
-              />
-              {isLoadingSuggestions && (
-                <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
-                  <LoadingSpinner size="sm" />
-                </div>
-              )}
-            </div>
-
-            {/* Real-time Suggestions Dropdown */}
-            {showSuggestions && suggestions.length > 0 && (
-              <div className="absolute z-10 w-full mt-1 bg-slate-700 border border-slate-600 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                <div className="p-2 border-b border-slate-600">
-                  <div className="flex items-center justify-between text-xs text-slate-400">
-                    <div className="flex items-center">
-                      <LightBulbIcon className="w-3 h-3 mr-1" />
-                      <span>Suggestions for "{originalInput}"</span>
-                    </div>
-                    <span className="text-xs">↑↓ navigate • Enter select • Esc dismiss</span>
-                  </div>
-                </div>
-                <div className="py-1">
-                  {suggestions.map((suggestion, index) => (
-                    <button
-                      key={index}
-                      onClick={() => handleSuggestionSelect(suggestion)}
-                      className={`w-full text-left px-3 py-2 text-sm transition-colors flex items-center justify-between group ${
-                        selectedSuggestionIndex === index
-                          ? 'bg-indigo-600 text-white'
-                          : 'text-slate-200 hover:bg-slate-600'
-                      }`}
-                    >
-                      <div className="flex-1">
-                        <div className="font-medium">{suggestion.title} {suggestion.year && <span className="opacity-75">({suggestion.year})</span>}</div>
-                        <div className="text-xs opacity-75">{suggestion.type} • {suggestion.director}</div>
-                        {suggestion.description && <div className="text-xs opacity-60 truncate">{suggestion.description}</div>}
-                      </div>
-                      {index === 0 && (
-                        <span className="text-xs bg-green-600 px-2 py-0.5 rounded-full opacity-75 group-hover:opacity-100 ml-2">
-                          Best Match
-                        </span>
-                      )}
-                      {selectedSuggestionIndex === index && (
-                        <span className="text-xs bg-indigo-400 px-2 py-0.5 rounded-full ml-2">
-                          Selected
-                        </span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-                <div className="p-2 border-t border-slate-600">
-                  <button
-                    onClick={() => {
-                      setShowSuggestions(false);
-                      setSelectedSuggestionIndex(-1);
-                    }}
-                    className="w-full text-xs text-slate-400 hover:text-slate-300 py-1"
-                  >
-                    Dismiss suggestions (Esc)
-                  </button>
-                </div>
-              </div>
-            )}
+            <input
+              type="text"
+              id="movieTitle"
+              name="movieTitle"
+              value={movieInput.movieTitle}
+              onChange={handleInputChange}
+              placeholder="e.g., Dune: Part Two"
+              className="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-colors text-slate-100 placeholder-slate-400"
+              aria-label="Movie or Series Title Input"
+              required
+              autoComplete="off"
+            />
+            <p className="mt-2 text-xs text-slate-400">
+              Autosuggestions are disabled on this stable release to preserve Gemini capacity for full reviews.
+            </p>
           </div>
         )}
 

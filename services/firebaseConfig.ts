@@ -23,7 +23,17 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
 export const functions = getFunctions(app);
-export const analytics = getAnalytics(app);
+
+let analyticsInstance: ReturnType<typeof getAnalytics> | null = null;
+try {
+  if (typeof window !== 'undefined') {
+    analyticsInstance = getAnalytics(app);
+  }
+} catch (error) {
+  console.warn('Firebase analytics unavailable in this environment:', error);
+}
+
+export const analytics = analyticsInstance;
 
 // Google Auth Provider
 const googleProvider = new GoogleAuthProvider();
