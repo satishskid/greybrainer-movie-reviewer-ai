@@ -74,42 +74,47 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 rounded-xl border border-slate-700 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-50 p-4">
+      <div className="w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl border border-fuchsia-500/20 bg-slate-950/95 shadow-2xl shadow-fuchsia-950/20 backdrop-blur-xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-slate-700">
+        <div className="border-b border-fuchsia-500/20 p-6">
+          <div className="mb-4 inline-flex rounded-full border border-fuchsia-400/30 bg-fuchsia-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-fuchsia-200">
+            Groq Lab Settings
+          </div>
+          <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-slate-100">Settings</h2>
-            <p className="text-sm text-slate-400">Core engine configuration and required keys</p>
+            <h2 className="text-xl font-semibold text-white">Sandbox Settings</h2>
+            <p className="text-sm text-slate-400">Experiment-only keys, worker controls, and diagnostics for the Groq lab branch</p>
           </div>
           <div className="flex items-center gap-3">
             {isAdmin && (
               <button
                 type="button"
                 onClick={() => setShowAdvanced((v) => !v)}
-                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                className="px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-900 text-slate-300 hover:bg-slate-800 border border-slate-700 transition-colors"
               >
                 {showAdvanced ? 'Hide admin' : 'Admin'}
               </button>
             )}
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 transition-colors"
+            className="text-slate-400 hover:text-fuchsia-200 transition-colors"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           </button>
           </div>
+          </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-slate-700">
+        <div className="flex border-b border-fuchsia-500/10 bg-slate-950/70">
           <button
             onClick={() => setActiveTab('keys')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'keys'
-                ? 'text-indigo-400 border-b-2 border-indigo-400'
+                ? 'text-fuchsia-300 border-b-2 border-fuchsia-400 bg-fuchsia-500/5'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -119,7 +124,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
             onClick={() => setActiveTab('help')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${
               activeTab === 'help'
-                ? 'text-indigo-400 border-b-2 border-indigo-400'
+                ? 'text-fuchsia-300 border-b-2 border-fuchsia-400 bg-fuchsia-500/5'
                 : 'text-slate-400 hover:text-slate-200'
             }`}
           >
@@ -131,7 +136,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
                 onClick={() => setActiveTab('admin')}
                 className={`px-6 py-3 text-sm font-medium transition-colors ${
                   activeTab === 'admin'
-                    ? 'text-indigo-400 border-b-2 border-indigo-400'
+                    ? 'text-fuchsia-300 border-b-2 border-fuchsia-400 bg-fuchsia-500/5'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -141,7 +146,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
                 onClick={() => setActiveTab('omnichannel')}
                 className={`px-6 py-3 text-sm font-medium transition-colors ${
                   activeTab === 'omnichannel'
-                    ? 'text-indigo-400 border-b-2 border-indigo-400'
+                    ? 'text-fuchsia-300 border-b-2 border-fuchsia-400 bg-fuchsia-500/5'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -151,7 +156,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
                 onClick={() => setActiveTab('health')}
                 className={`px-6 py-3 text-sm font-medium transition-colors ${
                   activeTab === 'health'
-                    ? 'text-indigo-400 border-b-2 border-indigo-400'
+                    ? 'text-fuchsia-300 border-b-2 border-fuchsia-400 bg-fuchsia-500/5'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -161,7 +166,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
                 onClick={() => setActiveTab('diagnostics')}
                 className={`px-6 py-3 text-sm font-medium transition-colors ${
                   activeTab === 'diagnostics'
-                    ? 'text-indigo-400 border-b-2 border-indigo-400'
+                    ? 'text-fuchsia-300 border-b-2 border-fuchsia-400 bg-fuchsia-500/5'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -171,7 +176,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
                 onClick={() => setActiveTab('scoreboard')}
                 className={`px-6 py-3 text-sm font-medium transition-colors ${
                   activeTab === 'scoreboard'
-                    ? 'text-indigo-400 border-b-2 border-indigo-400'
+                    ? 'text-fuchsia-300 border-b-2 border-fuchsia-400 bg-fuchsia-500/5'
                     : 'text-slate-400 hover:text-slate-200'
                 }`}
               >
@@ -185,37 +190,40 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
           {activeTab === 'keys' && (
             <div>
-              <h3 className="text-lg font-medium text-slate-100 mb-6">API Key Configuration</h3>
+              <div className="mb-6 rounded-2xl border border-fuchsia-500/15 bg-slate-900/55 p-4">
+                <h3 className="text-lg font-medium text-white mb-2">Sandbox Key Configuration</h3>
+                <p className="text-sm text-slate-400">Use these keys only for Groq-lab testing, hybrid drafting validation, and non-production Cloudflare publish flows.</p>
+              </div>
               
               <div className="space-y-6">
                 {/* Gemini API Key */}
-                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                <div className="bg-slate-900/70 rounded-xl p-4 border border-fuchsia-500/10">
                   <h4 className="text-md font-medium text-slate-200 mb-3">🤖 Deep Research Gemini BYOK</h4>
                   <p className="text-sm text-slate-400 mb-4">Used in the browser for human-initiated deep research and movie analysis.</p>
                   <GeminiKeyManager />
                 </div>
 
-                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                <div className="bg-slate-900/70 rounded-xl p-4 border border-fuchsia-500/10">
                   <h4 className="text-md font-medium text-slate-200 mb-3">⚡ Experimental Groq Drafting BYOK</h4>
                   <p className="text-sm text-slate-400 mb-4">Used only on this sandbox branch after Gemini defines structure, constraints, and quality checks.</p>
                   <GroqKeyManager />
                 </div>
 
-                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                <div className="bg-slate-900/70 rounded-xl p-4 border border-fuchsia-500/10">
                   <h4 className="text-md font-medium text-slate-200 mb-3">☁️ Cloudflare Worker Flow & AI Gateway</h4>
                   <p className="text-sm text-slate-400 mb-4">Worker-side key vault, scheduled worker generation, and Cloudflare AI Gateway routing status.</p>
                   <CloudflareByokManager ownerEmail={currentUser?.email ?? null} />
                 </div>
 
                 {/* Google Search API Key */}
-                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                <div className="bg-slate-900/70 rounded-xl p-4 border border-fuchsia-500/10">
                   <h4 className="text-md font-medium text-slate-200 mb-3">🔍 Google Search API Key</h4>
                   <p className="text-sm text-slate-400 mb-4">Optional: Enables movie data search and suggestions</p>
                   <GoogleSearchKeyManager />
                 </div>
 
                 {/* Firecrawl API Key */}
-                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                <div className="bg-slate-900/70 rounded-xl p-4 border border-fuchsia-500/10">
                   <h4 className="text-md font-medium text-slate-200 mb-3">🕸️ Firecrawl API Key</h4>
                   <p className="text-sm text-slate-400 mb-4">Optional: Enables deep web scraping for competitive intelligence</p>
                   <FirecrawlKeyManager />
@@ -226,9 +234,9 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
 
           {activeTab === 'help' && (
             <div>
-              <h3 className="text-lg font-medium text-slate-100 mb-4">Quick Start</h3>
+              <h3 className="text-lg font-medium text-slate-100 mb-4">Sandbox Quick Start</h3>
 
-              <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+              <div className="bg-slate-900/70 rounded-xl p-4 border border-fuchsia-500/10">
                 <div className="text-sm text-slate-300 leading-6 space-y-4">
                   <div>
                     <div className="text-slate-100 font-medium mb-1">For content writers</div>
@@ -247,6 +255,7 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
                     <div className="text-slate-100 font-medium mb-1">What Settings does</div>
                     <div><span className="text-slate-200">Keys:</span> stores your personal Gemini/Google Search keys in this browser.</div>
                     <div><span className="text-slate-200">Admin/Health/Diagnostics:</span> troubleshooting (admins only).</div>
+                    <div><span className="text-slate-200">Sandbox warning:</span> this UI is intentionally different from stable production.</div>
                   </div>
                 </div>
               </div>

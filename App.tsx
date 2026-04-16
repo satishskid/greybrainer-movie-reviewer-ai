@@ -481,7 +481,7 @@ const App: React.FC = () => {
   return (
     <AuthWrapper>
       {(authUser) => (
-        <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-slate-100">
+        <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top,_rgba(168,85,247,0.16),_transparent_28%),linear-gradient(135deg,_#160f25_0%,_#111827_45%,_#0b1220_100%)] text-slate-100">
           <Header
             onToggleTokenDashboard={() => setShowTokenDashboard(prev => !prev)}
           />
@@ -492,11 +492,39 @@ const App: React.FC = () => {
               )}
 
 
+              <div className="mb-6 rounded-2xl border border-fuchsia-500/20 bg-slate-900/55 backdrop-blur-sm p-5 shadow-lg shadow-fuchsia-950/10">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="mb-2 inline-flex rounded-full border border-fuchsia-400/30 bg-fuchsia-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-fuchsia-200">
+                      Experimental UI Shell
+                    </div>
+                    <h2 className="text-2xl font-semibold text-white">Post-login sandbox workspace</h2>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                      This branch is reserved for hybrid Gemini → Groq → Gemini drafting tests, Cloudflare Pages lab publishing, and UI experiments that should not resemble the stable Netlify experience.
+                    </p>
+                  </div>
+                  <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-3 lg:min-w-[360px]">
+                    <div className="rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.2em] text-fuchsia-300">Branch</div>
+                      <div className="mt-1 font-medium text-slate-100">`experiment/gemini-groq-sandbox`</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.2em] text-fuchsia-300">Deploy</div>
+                      <div className="mt-1 font-medium text-slate-100">Cloudflare lab</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.2em] text-fuchsia-300">Identity</div>
+                      <div className="mt-1 font-medium text-slate-100">Groq sandbox</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-end mb-6">
                 <button
                   onClick={() => setShowSettings(true)}
                   type="button"
-                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2 border border-fuchsia-500/20"
                   title="Settings & Configuration"
                 >
                   ⚙️ Settings

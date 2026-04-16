@@ -96,7 +96,7 @@ export const GeminiKeyManager: React.FC<GeminiKeyManagerProps> = ({ className = 
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(true)}
-        className="flex items-center space-x-2 px-3 py-2 text-sm text-slate-300 hover:text-slate-100 hover:bg-slate-700/50 rounded-lg transition-colors duration-200"
+        className="flex items-center space-x-2 px-3 py-2 text-sm text-slate-300 hover:text-fuchsia-100 hover:bg-fuchsia-500/10 border border-transparent hover:border-fuchsia-500/20 rounded-lg transition-colors duration-200"
       >
         <KeyIcon className="w-4 h-4" />
         <span>Gemini API Key</span>
@@ -112,14 +112,17 @@ export const GeminiKeyManager: React.FC<GeminiKeyManagerProps> = ({ className = 
       {/* Modal */}
       {isOpen && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50">
-          <div className="bg-slate-800 rounded-xl shadow-2xl p-6 w-full max-w-md border border-slate-700">
+          <div className="bg-slate-950 rounded-2xl shadow-2xl p-6 w-full max-w-md border border-fuchsia-500/20">
+            <div className="mb-4 inline-flex rounded-full border border-fuchsia-400/30 bg-fuchsia-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-fuchsia-200">
+              Sandbox Gemini BYOK
+            </div>
             <div className="flex items-center space-x-3 mb-6">
-              <div className="w-10 h-10 bg-indigo-600 rounded-full flex items-center justify-center">
+              <div className="w-10 h-10 bg-gradient-to-br from-fuchsia-500 to-violet-600 rounded-2xl flex items-center justify-center">
                 <KeyIcon className="w-5 h-5 text-white" />
               </div>
               <div>
                 <h2 className="text-lg font-semibold text-slate-100">Manage Gemini API Key</h2>
-                <p className="text-sm text-slate-400">Update your personal Gemini API key</p>
+                <p className="text-sm text-slate-400">Used for planning, verification, and deep research in the lab environment</p>
               </div>
             </div>
 
@@ -151,7 +154,7 @@ export const GeminiKeyManager: React.FC<GeminiKeyManagerProps> = ({ className = 
                     id="apiKey"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
-                    className="w-full px-4 py-3 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent pr-12"
+                    className="w-full px-4 py-3 bg-slate-900 border border-slate-700 rounded-xl text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 focus:border-transparent pr-12"
                     placeholder="Enter your Gemini API key"
                   />
                   <button
@@ -164,16 +167,16 @@ export const GeminiKeyManager: React.FC<GeminiKeyManagerProps> = ({ className = 
                 </div>
               </div>
 
-              <div className="bg-slate-700/50 rounded-lg p-3">
+              <div className="bg-slate-900/60 rounded-xl p-3 border border-fuchsia-500/10">
                 <div className="flex items-start space-x-2">
-                  <InformationCircleIcon className="w-4 h-4 text-blue-400 mt-0.5 flex-shrink-0" />
+                  <InformationCircleIcon className="w-4 h-4 text-fuchsia-400 mt-0.5 flex-shrink-0" />
                   <div className="text-xs text-slate-300">
                     <p className="mb-1">Get your API key from Google AI Studio:</p>
                     <a 
                       href="https://aistudio.google.com/app/apikey" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-blue-400 hover:text-blue-300 underline"
+                      className="text-fuchsia-400 hover:text-fuchsia-300 underline"
                     >
                       https://aistudio.google.com/app/apikey
                     </a>
@@ -197,7 +200,7 @@ export const GeminiKeyManager: React.FC<GeminiKeyManagerProps> = ({ className = 
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200"
+                  className="flex-1 bg-gradient-to-r from-fuchsia-600 to-violet-600 hover:from-fuchsia-500 hover:to-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2 px-4 rounded-xl transition-colors duration-200"
                 >
                   {isSaving ? 'Saving...' : 'Save Key'}
                 </button>
