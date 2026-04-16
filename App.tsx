@@ -9,9 +9,9 @@ import { LayerAnalysisCard } from './components/LayerAnalysisCard';
 import { ReportDisplay } from './components/ReportDisplay';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { SparklesIcon } from './components/icons/SparklesIcon';
-import { ReviewStage, LayerAnalysisData, ReviewLayer, PersonnelData, SummaryReportData, MagicFactorAnalysis, CreativeSparkResult, TokenUsageEntry, TokenBudgetConfig, ActualPerformanceData, ScriptIdeaInput, MagicQuotientAnalysis, MovieAnalysisInput, MorphokineticsAnalysis, MonthlyScoreboardItem, FinancialAnalysisData, MovieSuggestion } from './types';
+import { ReviewStage, LayerAnalysisData, ReviewLayer, PersonnelData, SummaryReportData, MagicFactorAnalysis, CreativeSparkResult, TokenUsageEntry, TokenBudgetConfig, ActualPerformanceData, ScriptIdeaInput, MagicQuotientAnalysis, MovieAnalysisInput, MorphokineticsAnalysis, MonthlyScoreboardItem, FinancialAnalysisData } from './types';
 import { initialLayerAnalyses, LAYER_DEFINITIONS, REVIEW_STAGES_OPTIONS, MAX_SCORE, COMMON_GENRES, INITIAL_TOKEN_BUDGET_CONFIG, CHARS_PER_TOKEN_ESTIMATE, MAX_TOKEN_LOG_ENTRIES, MOCK_MONTHLY_SCOREBOARD_DATA } from './constants';
-import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini, searchMovies } from './services/geminiService';
+import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini } from './services/geminiService';
 import { AdminService } from './services/adminService';
 import { PersonnelDisplay } from './components/PersonnelDisplay';
 import { CreativeSparkGenerator } from './components/CreativeSparkGenerator';
@@ -27,8 +27,68 @@ import { GreybrainerComparison } from './components/GreybrainerComparison';
 
 import { GoogleSearchKeyManager } from './components/GoogleSearchKeyManager';
 import { AdminSettings } from './components/AdminSettings';
+import { buildGeminiQuotaMessage, isGeminiQuotaError } from './utils/geminiQuotaMessaging';
 
 import { AuthWrapper } from './components/AuthWrapper';
+
+const buildLocalFallbackSummaryReport = (
+  movieTitle: string,
+  layerAnalyses: LayerAnalysisData[],
+  personnelData: PersonnelData,
+  financialAnalysisData: FinancialAnalysisData | null,
+): SummaryReportData => {
+  const scoredLayers = layerAnalyses.filter((layer) => typeof layer.userScore === 'number');
+  const overallScore = scoredLayers.length > 0
+    ? scoredLayers.reduce((sum, layer) => sum + (layer.userScore as number), 0) / scoredLayers.length
+    : null;
+
+  const strongestLayer = [...scoredLayers].sort((left, right) => (right.userScore as number) - (left.userScore as number))[0];
+  const weakestLayer = [...scoredLayers].sort((left, right) => (left.userScore as number) - (right.userScore as number))[0];
+
+  const keyTakeaways = layerAnalyses
+    .filter((layer) => layer.editedText)
+    .map((layer) => {
+      const firstParagraph = layer.editedText.split('\n').map((line) => line.trim()).find(Boolean) || 'Analysis available in the layer card.';
+      return `- ${layer.title}: ${firstParagraph}`;
+    })
+    .join('\n');
+
+  const improvementSuggestions = layerAnalyses
+    .flatMap((layer) => Array.isArray(layer.improvementSuggestions)
+      ? layer.improvementSuggestions
+      : layer.improvementSuggestions
+        ? [layer.improvementSuggestions]
+        : [])
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 5);
+
+  const personnelSummary = [
+    personnelData.director ? `Director: ${personnelData.director}` : null,
+    personnelData.mainCast?.length ? `Main cast: ${personnelData.mainCast.join(', ')}` : null,
+  ].filter(Boolean).join('\n');
+
+  const financialSummary = financialAnalysisData?.qualitativeROIAnalysis
+    ? `\n\nFinancial perspective:\n${financialAnalysisData.qualitativeROIAnalysis}`
+    : '';
+
+  const reportText = [
+    `Greybrainer generated this fallback summary for ${movieTitle} because the Gemini final-report quota is temporarily exhausted. The layer analyses below are still available and scored, so this summary synthesizes them locally to keep the report workflow moving.`,
+    overallScore !== null ? `Current overall Greybrainer score: ${overallScore.toFixed(1)}/${MAX_SCORE}.` : 'Layer scores are available in the ring visualization below.',
+    strongestLayer ? `Strongest current signal: ${strongestLayer.title}.` : null,
+    weakestLayer && weakestLayer !== strongestLayer ? `Most fragile layer right now: ${weakestLayer.title}.` : null,
+    personnelSummary || null,
+    keyTakeaways ? `\nKey takeaways:\n${keyTakeaways}` : null,
+    financialSummary || null,
+  ].filter(Boolean).join('\n\n');
+
+  return {
+    reportText,
+    overallImprovementSuggestions: improvementSuggestions.length > 0 ? improvementSuggestions : undefined,
+    financialAnalysis: financialAnalysisData || undefined,
+    isFallbackResult: true,
+  };
+};
 
 const App: React.FC = () => {
   const [movieInput, setMovieInput] = useState<MovieAnalysisInput>({
@@ -256,17 +316,6 @@ const App: React.FC = () => {
     await analyzeMovieFlowInternal(movieInput.movieTitle.trim());
   }, [movieInput.movieTitle, analyzeMovieFlowInternal]);
 
-  const handleGetSuggestions = useCallback(async (title: string): Promise<MovieSuggestion[]> => {
-    try {
-      return await searchMovies(title, logTokenUsage);
-    } catch (error) {
-      console.error('Error getting movie title suggestions:', error);
-      return [];
-    }
-  }, [logTokenUsage]);
-
-
-
   const handleEditLayerText = (layerId: ReviewLayer, newText: string) => setLayerAnalyses(prev => prev.map(l => l.id === layerId ? { ...l, editedText: newText } : l));
   const handleLayerScoreChange = (layerId: ReviewLayer, score?: number) => setLayerAnalyses(prev => prev.map(l => l.id === layerId ? { ...l, userScore: score } : l));
 
@@ -329,10 +378,22 @@ const App: React.FC = () => {
         movieInput.director
       );
       setSummaryReport(reportData);
+      setOverallError(null);
     } catch (error) {
       console.error('Error generating final report:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error generating report.';
-      setOverallError(errorMessage);
+
+      if (isGeminiQuotaError(errorMessage)) {
+        setSummaryReport(buildLocalFallbackSummaryReport(
+          movieInput.movieTitle,
+          layerAnalyses,
+          personnelData,
+          currentFinancialData,
+        ));
+        setOverallError(`${errorMessage} Greybrainer created a local fallback report from the completed layer analyses in the meantime.`);
+      } else {
+        setOverallError(errorMessage);
+      }
     }
     setIsGeneratingReport(false);
   }, [movieInput, layerAnalyses, personnelData, financialAnalysisData, logTokenUsage]);
@@ -420,7 +481,7 @@ const App: React.FC = () => {
   return (
     <AuthWrapper>
       {(authUser) => (
-        <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-slate-100">
+        <div className="min-h-screen flex flex-col bg-[radial-gradient(circle_at_top,_rgba(168,85,247,0.16),_transparent_28%),linear-gradient(135deg,_#160f25_0%,_#111827_45%,_#0b1220_100%)] text-slate-100">
           <Header
             onToggleTokenDashboard={() => setShowTokenDashboard(prev => !prev)}
           />
@@ -431,11 +492,39 @@ const App: React.FC = () => {
               )}
 
 
+              <div className="mb-6 rounded-2xl border border-fuchsia-500/20 bg-slate-900/55 backdrop-blur-sm p-5 shadow-lg shadow-fuchsia-950/10">
+                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div>
+                    <div className="mb-2 inline-flex rounded-full border border-fuchsia-400/30 bg-fuchsia-500/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.22em] text-fuchsia-200">
+                      Experimental UI Shell
+                    </div>
+                    <h2 className="text-2xl font-semibold text-white">Post-login sandbox workspace</h2>
+                    <p className="mt-2 max-w-2xl text-sm leading-6 text-slate-300">
+                      This branch is reserved for hybrid Gemini → Groq → Gemini drafting tests, Cloudflare Pages lab publishing, and UI experiments that should not resemble the stable Netlify experience.
+                    </p>
+                  </div>
+                  <div className="grid gap-2 text-sm text-slate-300 sm:grid-cols-3 lg:min-w-[360px]">
+                    <div className="rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.2em] text-fuchsia-300">Branch</div>
+                      <div className="mt-1 font-medium text-slate-100">`experiment/gemini-groq-sandbox`</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.2em] text-fuchsia-300">Deploy</div>
+                      <div className="mt-1 font-medium text-slate-100">Cloudflare lab</div>
+                    </div>
+                    <div className="rounded-xl border border-slate-700 bg-slate-800/70 px-3 py-3">
+                      <div className="text-[11px] uppercase tracking-[0.2em] text-fuchsia-300">Identity</div>
+                      <div className="mt-1 font-medium text-slate-100">Groq sandbox</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-end mb-6">
                 <button
                   onClick={() => setShowSettings(true)}
                   type="button"
-                  className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2"
+                  className="px-4 py-2 bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-sm rounded-lg transition-colors flex items-center gap-2 border border-fuchsia-500/20"
                   title="Settings & Configuration"
                 >
                   ⚙️ Settings
@@ -448,7 +537,6 @@ const App: React.FC = () => {
                 reviewStages={REVIEW_STAGES_OPTIONS}
                 onAnalyze={handleAnalyzeMovie}
                 isAnalyzing={isAnalyzingLayers}
-                onGetSuggestions={handleGetSuggestions}
                 financialAnalysisData={financialAnalysisData}
                 onFetchBudgetEstimate={() => fetchBudgetEstimate()}
                 onApplyBudgetEstimate={applyBudgetEstimate}

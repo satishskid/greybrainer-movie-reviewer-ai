@@ -15,6 +15,7 @@ Our platform is built upon the **"Greybrainer Movie Magic Theory,"** a systemati
 - [Project Structure](#project-structure)
 - [Getting Started (Local Development)](#getting-started-local-development)
 - [Deployment Guide](#deployment-guide)
+- [Operator Deployment Docs](#operator-deployment-docs)
 - [API Strategy: Fallbacks & Recommendations](#api-strategy-fallbacks--recommendations)
 - [Protecting Your Intellectual Property](#protecting-your-intellectual-property)
 
@@ -195,6 +196,13 @@ These platforms make deploying frontend applications incredibly simple.
     *   `VITE_GROQ_API_KEY`: Your Groq API Key.
 5.  **Deploy:** Trigger a new deployment. The platform will build your project and deploy the contents of the `dist` folder.
 6.  **Auto-deploy:** Future changes deploy automatically when you push commits to the connected Git branch.
+
+## Operator Deployment Docs
+
+For the Cloudflare editorial website flow and safe lab-vs-production separation, use these operator docs:
+
+- [LAB_DEPLOYMENT_CHECKLIST.md](./LAB_DEPLOYMENT_CHECKLIST.md) — step-by-step lab setup for `greybrainer-groq-lab.pages.dev`, worker env values, and click-to-publish smoke testing.
+- [lens-site/README.md](./lens-site/README.md) — Astro site deployment commands, production vs lab Pages targets, and publishing notes.
 
 ## AI Engine: Dual-Engine Architecture with BYOK System
 

@@ -66,6 +66,11 @@ const normalizeTools = (tools?: any[]) => {
   if (!tools?.length) return undefined;
   return tools.map((tool) => {
     if (!tool || typeof tool !== 'object') return tool;
+
+    if ('googleSearchRetrieval' in tool) {
+      return { googleSearch: {} };
+    }
+
     return { ...tool };
   });
 };

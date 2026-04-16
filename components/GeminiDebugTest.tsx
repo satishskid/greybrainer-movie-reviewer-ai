@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { getGeminiApiKeyString, hasGeminiApiKey, isGeminiKeyValidated } from '../utils/geminiKeyStorage';
 import { GoogleGenerativeAI } from '../utils/googleGenAICompat';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
+import { buildGeminiQuotaMessage, extractRetryDelaySeconds, formatRetryTimeLabel, isGeminiQuotaError } from '../utils/geminiQuotaMessaging';
 
 const GeminiDebugTest: React.FC = () => {
   const [testResult, setTestResult] = useState<string>('');
@@ -41,9 +42,23 @@ const GeminiDebugTest: React.FC = () => {
       result += 'SUCCESS: Gemini API is working correctly!';
       
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const retryAfterSeconds = extractRetryDelaySeconds(errorMessage);
       let result = `Debug Test Results:\n`;
-      result += `ERROR: ${error instanceof Error ? error.message : 'Unknown error'}\n`;
-      result += 'This might explain the "hallucination" issue.';
+
+      if (isGeminiQuotaError(errorMessage)) {
+        result += `STATUS: Gemini quota/rate limit reached\n`;
+        result += `DETAILS: ${errorMessage}\n`;
+        if (retryAfterSeconds) {
+          result += `RETRY AFTER: ~${Math.ceil(retryAfterSeconds)} seconds\n`;
+          result += `TRY AGAIN AROUND: ${formatRetryTimeLabel(retryAfterSeconds)} local time\n`;
+        }
+        result += `IMPACT: ${buildGeminiQuotaMessage(errorMessage)} Live Gemini-powered analysis may temporarily fail or fall back until then.`;
+      } else {
+        result += `ERROR: ${errorMessage}\n`;
+        result += 'IMPACT: This is a runtime/API issue unrelated to the local UI shell.';
+      }
+
       setTestResult(result);
     } finally {
       setIsLoading(false);

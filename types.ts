@@ -55,6 +55,7 @@ export interface MovieSuggestion {
   director?: string;
   type?: 'Movie' | 'Series';
   description?: string;
+  source?: string;
 }
 
 export enum ReviewLayer {

@@ -21,6 +21,8 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
   const [loginError, setLoginError] = useState('');
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [showGeminiKeyPrompt, setShowGeminiKeyPrompt] = useState(false);
+  const sandboxLabel = 'Greybrainer Groq Lab';
+  const sandboxSubtitle = 'Experimental publishing sandbox';
 
   useEffect(() => {
     const unsubscribe = firebaseAuthService.onAuthStateChanged((user: GreybrainerUser | null) => {
@@ -77,10 +79,10 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(168,85,247,0.24),_transparent_35%),linear-gradient(135deg,_#160f25_0%,_#111827_45%,_#0b1220_100%)] flex items-center justify-center">
         <div className="text-center">
           <LoadingSpinner />
-          <p className="text-slate-300 mt-4">Checking authentication...</p>
+          <p className="text-purple-200 mt-4">Loading sandbox access…</p>
         </div>
       </div>
     );
@@ -88,19 +90,40 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-        <div className="bg-slate-800 rounded-xl shadow-2xl p-8 w-full max-w-md border border-slate-700">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(168,85,247,0.24),_transparent_35%),linear-gradient(135deg,_#160f25_0%,_#111827_45%,_#0b1220_100%)] flex items-center justify-center p-4">
+        <div className="bg-slate-900/88 backdrop-blur-xl rounded-2xl shadow-2xl p-8 w-full max-w-lg border border-purple-500/20">
           <div className="text-center mb-8">
-            <div className="mx-auto w-16 h-16 bg-indigo-600 rounded-full flex items-center justify-center mb-4">
+            <div className="inline-flex items-center rounded-full border border-fuchsia-400/30 bg-fuchsia-500/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.24em] text-fuchsia-200 mb-5">
+              Sandbox • Not Stable Netlify
+            </div>
+            <div className="mx-auto w-16 h-16 bg-gradient-to-br from-fuchsia-500 to-violet-600 rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-fuchsia-950/40">
               <LockClosedIcon className="w-8 h-8 text-white" />
             </div>
-            <h1 className="text-2xl font-bold text-slate-100 mb-2">Greybrainer AI</h1>
-            <p className="text-slate-400">Movie Reviewer Access</p>
+            <h1 className="text-3xl font-bold text-white mb-2">{sandboxLabel}</h1>
+            <p className="text-fuchsia-100/85 font-medium">{sandboxSubtitle}</p>
+            <p className="text-slate-400 text-sm mt-3 max-w-sm mx-auto leading-6">
+              Separate login surface for Gemini → Groq → Gemini publishing tests. This lab environment is intentionally distinct from the stable Netlify app.
+            </p>
+          </div>
+
+          <div className="mb-6 grid gap-3 rounded-xl border border-slate-700/70 bg-slate-800/50 p-4 text-sm text-slate-300 md:grid-cols-3">
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.22em] text-fuchsia-300 mb-1">Branch</div>
+              <div className="font-medium text-slate-100">`experiment/gemini-groq-sandbox`</div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.22em] text-fuchsia-300 mb-1">Mode</div>
+              <div className="font-medium text-slate-100">Hybrid draft lab</div>
+            </div>
+            <div>
+              <div className="text-[11px] uppercase tracking-[0.22em] text-fuchsia-300 mb-1">Deploy target</div>
+              <div className="font-medium text-slate-100">Cloudflare Pages lab</div>
+            </div>
           </div>
 
           <div className="space-y-6">
             {loginError && (
-              <div className="bg-red-900/50 border border-red-700 rounded-lg p-3">
+              <div className="bg-red-900/40 border border-red-700 rounded-lg p-3">
                 <p className="text-red-300 text-sm">{loginError}</p>
               </div>
             )}
@@ -108,7 +131,7 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
             <button
               onClick={handleGoogleLogin}
               disabled={isLoggingIn}
-              className="w-full bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 font-medium py-3 px-4 rounded-lg transition-colors duration-200 flex items-center justify-center space-x-3 border border-gray-300"
+              className="w-full bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-900 font-medium py-3 px-4 rounded-xl transition-colors duration-200 flex items-center justify-center space-x-3 border border-gray-300 shadow-sm"
             >
               {isLoggingIn ? (
                 <>
@@ -130,9 +153,9 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
 
             {/* Divider */}
             <div className="flex items-center space-x-3">
-              <div className="flex-1 h-px bg-slate-600"></div>
-              <span className="text-slate-500 text-sm">or</span>
-              <div className="flex-1 h-px bg-slate-600"></div>
+              <div className="flex-1 h-px bg-slate-700"></div>
+              <span className="text-slate-500 text-sm">or use lab credentials</span>
+              <div className="flex-1 h-px bg-slate-700"></div>
             </div>
 
             {/* Email/Password Form */}
@@ -145,7 +168,7 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="your@email.com"
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 focus:border-transparent"
                 />
               </div>
               <div>
@@ -156,24 +179,24 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-slate-700 border border-slate-600 rounded-lg px-4 py-2.5 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                  className="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2.5 text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-fuchsia-500 focus:border-transparent"
                 />
               </div>
               <button
                 type="submit"
                 disabled={isLoggingIn}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-lg transition-colors duration-200"
+                className="w-full bg-gradient-to-r from-fuchsia-600 to-violet-600 hover:from-fuchsia-500 hover:to-violet-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium py-2.5 px-4 rounded-xl transition-colors duration-200"
               >
                 {isLoggingIn ? 'Signing In...' : 'Sign In with Email'}
               </button>
             </form>
           </div>
 
-          <div className="mt-6 pt-6 border-t border-slate-700">
-            <p className="text-xs text-slate-500 text-center">
-              Access is restricted to authorized users only.
+          <div className="mt-6 pt-6 border-t border-slate-800">
+            <p className="text-xs text-slate-500 text-center leading-5">
+              Lab access is restricted to authorized evaluators only.
               <br />
-              Contact administrator for access.
+              Stable production remains separate on Netlify.
             </p>
           </div>
         </div>
@@ -192,7 +215,7 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
   // Show Gemini key prompt if user is authenticated but no API key is stored
   if (user && showGeminiKeyPrompt) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+      <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(168,85,247,0.24),_transparent_35%),linear-gradient(135deg,_#160f25_0%,_#111827_45%,_#0b1220_100%)]">
         <GeminiKeyPrompt 
           isOpen={true}
           onSubmit={handleGeminiKeySubmit}
@@ -204,12 +227,12 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
 
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(168,85,247,0.18),_transparent_30%),linear-gradient(135deg,_#160f25_0%,_#111827_45%,_#0b1220_100%)]">
       {/* User Info Bar */}
-      <div className="bg-slate-800/50 border-b border-slate-700 px-4 py-2">
+      <div className="bg-slate-900/50 border-b border-fuchsia-500/20 px-4 py-2">
         <div className="max-w-7xl mx-auto flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 bg-indigo-600 rounded-full flex items-center justify-center">
+            <div className="w-8 h-8 bg-gradient-to-br from-fuchsia-500 to-violet-600 rounded-full flex items-center justify-center">
               <span className="text-white text-sm font-medium">
                 {(user.displayName || user.email)?.charAt(0).toUpperCase()}
               </span>
@@ -222,6 +245,9 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
                 {user.role} • {user.department}
               </span>
             </div>
+            <span className="hidden sm:inline-flex rounded-full border border-fuchsia-400/30 bg-fuchsia-500/10 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.2em] text-fuchsia-200">
+              Groq Lab
+            </span>
           </div>
           <div className="flex items-center space-x-4">
             <button
@@ -235,7 +261,7 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
       </div>
 
       {/* Debug Section - Only for development */}
-      {process.env.NODE_ENV === 'development' && (
+      {import.meta.env.DEV && (
         <div className="max-w-7xl mx-auto p-4">
           <GeminiDebugTest />
         </div>
