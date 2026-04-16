@@ -6,7 +6,9 @@
     "dev": "astro dev --port 4321",
     "build": "astro build",
     "preview": "astro preview",
-    "deploy": "astro build && wrangler pages deploy dist --project-name cinema-greybrain --branch main",
+    "deploy": "npm run deploy:prod",
+    "deploy:prod": "astro build && wrangler pages deploy dist --project-name cinema-greybrain --branch main",
+    "deploy:lab": "astro build && wrangler pages deploy dist --project-name greybrainer-groq-lab --branch main",
     "deploy:preview": "astro build && wrangler pages deploy dist --project-name cinema-greybrain --branch preview"
   }
 }
