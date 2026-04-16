@@ -2,6 +2,7 @@ import { GoogleGenerativeAI, GenerateContentResult } from "../utils/googleGenAIC
 import { ReviewLayer, ReviewStage, LayerAnalysisData, GroundingChunkWeb, GroundingMetadata, PersonnelData, SummaryReportData, CreativeSparkResult, VonnegutShapeData, PlotPoint, ScriptIdeaInput, MagicQuotientAnalysis, MorphokineticsAnalysis, FinancialAnalysisData, SocialSnippets, MovieSuggestion, DistributionPack } from '../types';
 import { MAX_SCORE, MAGIC_QUOTIENT_DISCLAIMER } from '../constants';
 import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
+import { getGroqApiKeyString } from '../utils/groqKeyStorage';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
 import { modelConfigService } from './modelConfigService';
 import { getEditorialMovieSuggestions } from './editorialSignalsService';
@@ -30,6 +31,289 @@ const getGeminiAI = (): GoogleGenerativeAI => {
 export type LogTokenUsageFn = (operation: string, inputChars: number, outputChars: number) => void;
 
 const GOOGLE_SEARCH_TOOL = [{ googleSearch: {} }] as any[];
+const GROQ_API_BASE_URL = import.meta.env.VITE_GROQ_API_BASE_URL?.trim() || 'https://api.groq.com/openai/v1/chat/completions';
+
+interface HybridDraftSectionPlan {
+  heading: string;
+  purpose: string;
+  approxWords: number;
+  mustInclude: string[];
+}
+
+interface HybridDraftPlan {
+  workingTitle: string;
+  targetAudience: string;
+  targetLength: string;
+  styleGuardrails: string[];
+  bannedPatterns: string[];
+  evidencePacket: string[];
+  sections: HybridDraftSectionPlan[];
+  qualityChecklist: string[];
+}
+
+interface HybridDraftVerificationResult {
+  approved: boolean;
+  score: number;
+  issues: string[];
+  revisedDraft: string;
+}
+
+const parseJsonFromModel = <T>(responseText: string): T => {
+  const jsonPayload = extractJsonPayloadFromModelText(responseText);
+  return JSON.parse(jsonPayload) as T;
+};
+
+const getGroqModelCandidates = (): string[] => {
+  const configuredModel = import.meta.env.VITE_GROQ_MODEL?.trim();
+  return [configuredModel, 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'].filter(Boolean) as string[];
+};
+
+const runGroqDraftWithFallback = async (
+  operationName: string,
+  prompt: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string> => {
+  const apiKey = getGroqApiKeyString();
+  if (!apiKey) {
+    throw new Error('Groq API key not found. Please provide your API key to continue.');
+  }
+
+  let lastError: string | null = null;
+
+  for (const model of getGroqModelCandidates()) {
+    try {
+      const response = await fetch(GROQ_API_BASE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.35,
+          max_tokens: 4096,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a precise editorial drafter. Follow the provided contract exactly, preserve structure, and never invent unsupported facts.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Groq ${response.status}: ${errorText}`);
+      }
+
+      const payload = await response.json();
+      const content = payload?.choices?.[0]?.message?.content?.trim();
+      if (!content) {
+        throw new Error(`Groq returned an empty draft for ${operationName}.`);
+      }
+
+      logTokenUsage?.(`${operationName} (Groq Draft)`, prompt.length, content.length);
+      return content;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'Unknown Groq error';
+      console.warn(`⚠️ [${operationName}] Groq model failed, trying next candidate:`, error);
+    }
+  }
+
+  throw new Error(lastError || `Groq failed during ${operationName}.`);
+};
+
+const sanitizeHybridPlan = (plan: Partial<HybridDraftPlan>): HybridDraftPlan => {
+  const sections = Array.isArray(plan.sections) && plan.sections.length > 0
+    ? plan.sections.map((section) => ({
+        heading: String(section?.heading || 'Untitled Section').trim(),
+        purpose: String(section?.purpose || 'Deliver the next part of the argument.').trim(),
+        approxWords: Number(section?.approxWords) || 150,
+        mustInclude: Array.isArray(section?.mustInclude)
+          ? section.mustInclude.map((item) => String(item).trim()).filter(Boolean)
+          : [],
+      }))
+    : [
+        {
+          heading: 'Main Argument',
+          purpose: 'Present the strongest grounded version of the argument.',
+          approxWords: 300,
+          mustInclude: [],
+        },
+      ];
+
+  return {
+    workingTitle: String(plan.workingTitle || 'Greybrainer Draft').trim(),
+    targetAudience: String(plan.targetAudience || 'Film professionals and serious readers').trim(),
+    targetLength: String(plan.targetLength || 'Medium-length article').trim(),
+    styleGuardrails: Array.isArray(plan.styleGuardrails) ? plan.styleGuardrails.map((item) => String(item).trim()).filter(Boolean) : [],
+    bannedPatterns: Array.isArray(plan.bannedPatterns) ? plan.bannedPatterns.map((item) => String(item).trim()).filter(Boolean) : [],
+    evidencePacket: Array.isArray(plan.evidencePacket) ? plan.evidencePacket.map((item) => String(item).trim()).filter(Boolean) : [],
+    sections,
+    qualityChecklist: Array.isArray(plan.qualityChecklist) ? plan.qualityChecklist.map((item) => String(item).trim()).filter(Boolean) : [],
+  };
+};
+
+const createHybridDraftPlan = async (
+  operationName: string,
+  sourceMaterial: string,
+  brief: string,
+  logTokenUsage?: LogTokenUsageFn,
+  tools?: any[],
+): Promise<HybridDraftPlan> => {
+  const prompt = `
+You are the Greybrainer planning model. Build a strict drafting contract for a secondary writer model.
+
+SOURCE MATERIAL:
+${sourceMaterial}
+
+TASK BRIEF:
+${brief}
+
+Return valid JSON only with this schema:
+{
+  "workingTitle": "string",
+  "targetAudience": "string",
+  "targetLength": "string",
+  "styleGuardrails": ["string"],
+  "bannedPatterns": ["string"],
+  "evidencePacket": ["string"],
+  "sections": [
+    {
+      "heading": "string",
+      "purpose": "string",
+      "approxWords": 180,
+      "mustInclude": ["string"]
+    }
+  ],
+  "qualityChecklist": ["string"]
+}
+
+Rules:
+- Do NOT draft the article.
+- Include only claims supported by the source material or grounded evidence you can verify.
+- Use evidencePacket to list the facts, examples, and comparative anchors the writer is allowed to mention.
+- bannedPatterns must explicitly forbid invented facts, fake quotes, filler transitions, and repetitive hype.
+- qualityChecklist must be concrete and testable.
+  `.trim();
+
+  return runGeminiWithFallback(
+    `${operationName} Planner`,
+    prompt,
+    { temperature: 0.2, maxOutputTokens: 1800 },
+    (responseText) => sanitizeHybridPlan(parseJsonFromModel<Partial<HybridDraftPlan>>(responseText)),
+    logTokenUsage,
+    tools
+  );
+};
+
+const verifyHybridDraft = async (
+  operationName: string,
+  sourceMaterial: string,
+  plan: HybridDraftPlan,
+  draft: string,
+  logTokenUsage?: LogTokenUsageFn,
+  tools?: any[],
+): Promise<HybridDraftVerificationResult> => {
+  const prompt = `
+You are Greybrainer's final quality gate.
+
+SOURCE MATERIAL:
+${sourceMaterial}
+
+PLAN JSON:
+${JSON.stringify(plan, null, 2)}
+
+DRAFT TO CHECK:
+${draft}
+
+Evaluate whether the draft follows the plan exactly and whether every significant claim is supported by the source material or the evidence packet.
+
+Return valid JSON only in this schema:
+{
+  "approved": true,
+  "score": 92,
+  "issues": ["string"],
+  "revisedDraft": "full corrected draft text"
+}
+
+Rules:
+- If the draft is good, still return the finalized polished draft in revisedDraft.
+- If the draft drifts, revise it fully so it complies.
+- Remove unsupported facts rather than embellishing.
+- Keep the structure clear and scannable.
+  `.trim();
+
+  return runGeminiWithFallback(
+    `${operationName} Quality Verification`,
+    prompt,
+    { temperature: 0.15, maxOutputTokens: 4096 },
+    (responseText) => {
+      const parsed = parseJsonFromModel<Partial<HybridDraftVerificationResult>>(responseText);
+      return {
+        approved: Boolean(parsed.approved),
+        score: Number(parsed.score) || 0,
+        issues: Array.isArray(parsed.issues) ? parsed.issues.map((item) => String(item).trim()).filter(Boolean) : [],
+        revisedDraft: String(parsed.revisedDraft || '').trim(),
+      };
+    },
+    logTokenUsage,
+    tools
+  );
+};
+
+const generateHybridPublicationText = async (
+  operationName: string,
+  sourceMaterial: string,
+  planningBrief: string,
+  fallbackGenerator: () => Promise<string>,
+  logTokenUsage?: LogTokenUsageFn,
+  tools?: any[],
+): Promise<string> => {
+  if (!getGroqApiKeyString()) {
+    return fallbackGenerator();
+  }
+
+  try {
+    const plan = await createHybridDraftPlan(operationName, sourceMaterial, planningBrief, logTokenUsage, tools);
+    const groqPrompt = `
+You are writing a Greybrainer publication draft.
+
+PLAN JSON:
+${JSON.stringify(plan, null, 2)}
+
+SOURCE MATERIAL:
+${sourceMaterial}
+
+Instructions:
+- Follow the section order exactly.
+- Use only the evidencePacket and source material for claims.
+- If support is weak, write cautiously or omit the claim.
+- Do not mention the plan or metadata.
+- Return only the finished draft.
+    `.trim();
+
+    const draft = await runGroqDraftWithFallback(operationName, groqPrompt, logTokenUsage);
+    const verified = await verifyHybridDraft(operationName, sourceMaterial, plan, draft, logTokenUsage, tools);
+
+    if (verified.revisedDraft) {
+      return verified.revisedDraft;
+    }
+
+    if (verified.approved) {
+      return draft;
+    }
+
+    throw new Error(verified.issues.join('; ') || `${operationName} verification failed.`);
+  } catch (error) {
+    console.warn(`⚠️ [${operationName}] Hybrid generation failed, falling back to Gemini-only flow:`, error);
+    return fallbackGenerator();
+  }
+};
 
 export async function runGeminiWithFallback<T>(
   operationName: string,
@@ -1223,16 +1507,23 @@ SEO/VIRAL ELEMENTS:
 Generate the full publication-ready article now:
   `.trim();
   
-  return runGeminiWithFallback(
+  return generateHybridPublicationText(
     'Expanded Publication Insight',
-    prompt,
-    {
-      temperature: 0.8,
-      topP: 0.95,
-      topK: 60,
-      maxOutputTokens: 4096,
-    },
-    (responseText) => responseText.trim(),
+    originalInsight,
+    'Write a publication-ready long-form opinion piece. Preserve Greybrainer methodology positioning, keep the argument evidence-based, and make the article readable and publication-ready.',
+    () => runGeminiWithFallback(
+      'Expanded Publication Insight',
+      prompt,
+      {
+        temperature: 0.8,
+        topP: 0.95,
+        topK: 60,
+        maxOutputTokens: 4096,
+      },
+      (responseText) => responseText.trim(),
+      logTokenUsage,
+      GOOGLE_SEARCH_TOOL
+    ),
     logTokenUsage,
     GOOGLE_SEARCH_TOOL
   );
@@ -1702,14 +1993,20 @@ When publishing this post to Medium (@GreyBrainer), please:
 
 **Generate the Grey Editor essay now, following the template exactly.**`;
 
-  return runGeminiWithFallback(
+  return generateHybridPublicationText(
     'Grey Editor Blog Generation',
-    prompt,
-    {
-      temperature: 0.9,
-      maxOutputTokens: 2048
-    },
-    (responseText) => responseText.trim(),
+    `${pureAnalysis}\n\nScore: ${score}/${maxScore}${morphokineticsInsight ? `\n\nMorphokinetics Insight:\n${morphokineticsInsight}` : ''}`,
+    'Write a sharp public-facing Grey Editor essay with strong hierarchy, short paragraphs, and no invented facts. Keep the score, verdict framing, and argument structure coherent.',
+    () => runGeminiWithFallback(
+      'Grey Editor Blog Generation',
+      prompt,
+      {
+        temperature: 0.9,
+        maxOutputTokens: 2048
+      },
+      (responseText) => responseText.trim(),
+      logTokenUsage
+    ),
     logTokenUsage
   );
 };
@@ -2535,16 +2832,24 @@ export const generateDetailedReportFromInsightWithGemini = async (
     Maintain a professional, analytical, and objective tone. While data can be illustrative, prioritize credible information.
     The output should be the full text of the report. Format with clear paragraph breaks. You can use simple headings for sections if it improves readability (e.g., "## Introduction"), but avoid complex markdown.
   `;
-  return runGeminiWithFallback(
+  return generateHybridPublicationText(
     'Detailed Insight Report Generation',
-    prompt,
-    {
-      temperature: 0.7,
-      topP: 0.85,
-      topK: 60,
-    },
-    (responseText) => responseText.trim(),
-    logTokenUsage
+    insightText,
+    'Expand the insight into a structured research report for industry professionals. Keep it evidence-based, sectioned, and free of unsupported examples.',
+    () => runGeminiWithFallback(
+      'Detailed Insight Report Generation',
+      prompt,
+      {
+        temperature: 0.7,
+        topP: 0.85,
+        topK: 60,
+      },
+      (responseText) => responseText.trim(),
+      logTokenUsage,
+      GOOGLE_SEARCH_TOOL
+    ),
+    logTokenUsage,
+    GOOGLE_SEARCH_TOOL
   );
 };
 

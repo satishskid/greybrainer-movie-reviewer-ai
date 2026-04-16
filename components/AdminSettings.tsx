@@ -4,6 +4,7 @@ import { FeatureVerificationTest } from './FeatureVerificationTest';
 import { FirebaseAdminDashboard } from './FirebaseAdminDashboard';
 import { CloudflareByokManager } from './CloudflareByokManager';
 import { GeminiKeyManager } from './GeminiKeyManager';
+import { GroqKeyManager } from './GroqKeyManager';
 import { GoogleSearchKeyManager } from './GoogleSearchKeyManager';
 import { FirecrawlKeyManager } from './FirecrawlKeyManager';
 import { getSelectedGeminiModel, getModelInfo } from '../utils/geminiModelStorage';
@@ -192,6 +193,12 @@ export const AdminSettings: React.FC<AdminSettingsProps> = ({ isOpen, initialTab
                   <h4 className="text-md font-medium text-slate-200 mb-3">🤖 Deep Research Gemini BYOK</h4>
                   <p className="text-sm text-slate-400 mb-4">Used in the browser for human-initiated deep research and movie analysis.</p>
                   <GeminiKeyManager />
+                </div>
+
+                <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
+                  <h4 className="text-md font-medium text-slate-200 mb-3">⚡ Experimental Groq Drafting BYOK</h4>
+                  <p className="text-sm text-slate-400 mb-4">Used only on this sandbox branch after Gemini defines structure, constraints, and quality checks.</p>
+                  <GroqKeyManager />
                 </div>
 
                 <div className="bg-slate-800 rounded-lg p-4 border border-slate-700">
