@@ -23,6 +23,20 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
   const [showGeminiKeyPrompt, setShowGeminiKeyPrompt] = useState(false);
 
   useEffect(() => {
+    // Check for redirect results first (especially on mobile)
+    const checkRedirect = async () => {
+      try {
+        const redirectUser = await firebaseAuthService.handleRedirectResult();
+        if (redirectUser) {
+          setUser(redirectUser);
+        }
+      } catch (error: any) {
+        setLoginError(error.message || 'Login failed during redirect.');
+      }
+    };
+
+    checkRedirect();
+
     const unsubscribe = firebaseAuthService.onAuthStateChanged((user: GreybrainerUser | null) => {
       setUser(user);
       setLoading(false);
@@ -42,7 +56,15 @@ export const AuthWrapper: React.FC<AuthWrapperProps> = ({ children }) => {
     setLoginError('');
 
     try {
-      await firebaseAuthService.signInWithGoogle();
+      const loggedInUser = await firebaseAuthService.signInWithGoogle();
+      if (loggedInUser) {
+        setUser(loggedInUser);
+        
+        // Check for API keys if login was successful
+        if (!hasGeminiApiKey()) {
+          setShowGeminiKeyPrompt(true);
+        }
+      }
     } catch (error: any) {
       setLoginError(error.message || 'Login failed. Please check your credentials.');
     } finally {
