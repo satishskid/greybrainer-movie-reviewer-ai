@@ -22,6 +22,8 @@ import { ShareIcon } from './icons/ShareIcon';
 import { generateGenericPublisherEditorial } from '../services/geminiService';
 import { SparklesIcon } from './icons/SparklesIcon'; // Added import
 import { saveDraft, saveDraftVersion } from '../services/omnichannelDraftService';
+import { db } from '../services/firebaseConfig';
+import { collection, addDoc } from 'firebase/firestore';
 
 
 interface ReportDisplayProps {
@@ -330,8 +332,9 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
       zip.file(`${safeTitle}_report.md`, markdownContent);
 
       // 1.5. Generate Publisher AI Editorial
+      let editorialContent = "";
       try {
-        const editorialContent = await generateGenericPublisherEditorial(title, markdownContent);
+        editorialContent = await generateGenericPublisherEditorial(title, markdownContent);
         zip.file(`${safeTitle}_publisher_editorial.md`, editorialContent);
       } catch (e) {
         console.error("Failed to generate publisher editorial:", e);
@@ -344,6 +347,22 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
         if (socialSnippets.twitter) socialContent += `## Twitter / X:\n${socialSnippets.twitter}\n\n`;
         if (socialSnippets.linkedin) socialContent += `## LinkedIn:\n${socialSnippets.linkedin}\n\n`;
         zip.file(`${safeTitle}_social.md`, socialContent);
+      }
+
+      // 2.5 Archive to Firebase (Free Tier Spark Plan)
+      try {
+        await addDoc(collection(db, 'published_research'), {
+          title: title,
+          type: 'research_export',
+          content: markdownContent,
+          editorial: editorialContent || null,
+          socials: socialSnippets || null,
+          createdAt: new Date(),
+          status: 'archived',
+          createdBy: currentUserEmail || 'system'
+        });
+      } catch (err) {
+        console.error("Failed to archive research to Firebase:", err);
       }
 
       // 3. Capture Concentric Rings
