@@ -78,6 +78,20 @@ service cloud.firestore {
       allow create, update: if request.auth != null && (isAdmin() || isEditor());
       allow delete: if request.auth != null && isAdmin();
     }
+
+    // Published Research collection - powers the Greybrainer Movies public website
+    match /published_research/{docId} {
+      // PUBLIC: Anyone can read published articles (needed for the public website)
+      allow read: if resource.data.status == 'published';
+
+      // AUTHENTICATED: Editors/admins can read all (including drafts, for the Writer Hub)
+      allow read: if request.auth != null && (isAdmin() || isEditor());
+
+      // WRITE: Only editors/admins or the engine (authenticated users) can create/update
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && (isAdmin() || isEditor());
+      allow delete: if request.auth != null && isAdmin();
+    }
     
     // Helper functions
     function isAdmin() {
