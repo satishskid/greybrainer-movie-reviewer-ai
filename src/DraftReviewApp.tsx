@@ -377,7 +377,7 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
         blogMarkdown: markdown,
         createdBy: currentUserEmail ?? null,
         editorNotes: currentVersion.editorNotes ?? null,
-        reviewStage: draft.reviewStage ?? null,
+        reviewStage: draft.reviewStage ?? undefined,
         seoDescription: seoDescription || null,
         seoTitle: seoTitle || null,
         socials: currentVersion.socials ?? null,

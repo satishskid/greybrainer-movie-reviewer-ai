@@ -3,6 +3,9 @@ import { ScaleIcon } from './icons/ScaleIcon';
 import { LoadingSpinner } from './LoadingSpinner';
 import { generateGreybrainerComparisonWithGemini, analyzeMovieMorphokinetics, LogTokenUsageFn } from '../services/geminiService';
 import { ClipboardIcon } from './icons/ClipboardIcon';
+import { DownloadIcon } from './icons/DownloadIcon';
+import JSZip from 'jszip';
+import { generateGenericPublisherEditorial } from '../services/geminiService';
 import { ReadMoreLess } from './ReadMoreLess';
 import { MorphokineticsAnalysis, MorphokineticMoment } from '../types';
 import { MotionIcon } from './icons/MotionIcon';
@@ -24,6 +27,7 @@ export const GreybrainerComparison: React.FC<GreybrainerComparisonProps> = ({ lo
   const [isGeneratingComparison, setIsGeneratingComparison] = useState<boolean>(false);
   const [comparisonError, setComparisonError] = useState<string | null>(null);
   const [copied, setCopied] = useState<boolean>(false);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
   
   // Morphokinetics state
   const [morphokinetics1, setMorphokinetics1] = useState<MorphokineticsAnalysis | null>(null);
@@ -94,6 +98,38 @@ export const GreybrainerComparison: React.FC<GreybrainerComparisonProps> = ({ lo
     }).catch(err => {
       console.error('Failed to copy comparison: ', err);
     });
+  };
+
+  const handlePublisherAndZipExport = async () => {
+    if (!comparisonResult) return;
+    setIsExporting(true);
+    try {
+      // 1. Generate Editorial Content via Publisher AI
+      const titleCombo = `${item1.title} vs ${item2.title}`;
+      const editorialText = await generateGenericPublisherEditorial(titleCombo, comparisonResult, logTokenUsage);
+      
+      // 2. Create ZIP
+      const zip = new JSZip();
+      const safeTitle = titleCombo.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      
+      zip.file(`${safeTitle}_raw_comparison.md`, comparisonResult);
+      zip.file(`${safeTitle}_publisher_editorial.md`, editorialText);
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${safeTitle}_greybrainer_export.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Failed to export ZIP. See console.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const typeOptions: ComparisonItem['type'][] = ['Movie', 'Series', 'Scene', 'Artist', 'Director'];
@@ -238,14 +274,25 @@ export const GreybrainerComparison: React.FC<GreybrainerComparisonProps> = ({ lo
           <div className="mt-6 pt-4 border-t border-slate-700/50">
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-lg font-semibold text-blue-200">Comparison Analysis</h3>
-              <button
-                onClick={handleCopyComparison}
-                className="flex items-center px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-md shadow transition-colors"
-                title="Copy comparison analysis"
-              >
-                <ClipboardIcon className="w-3 h-3 mr-1.5" />
-                {copied ? 'Copied!' : 'Copy Analysis'}
-              </button>
+              <div className="flex space-x-2">
+                <button
+                  onClick={handlePublisherAndZipExport}
+                  disabled={isExporting}
+                  className="flex items-center px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium rounded-md shadow transition-colors disabled:opacity-50"
+                  title="Generate Editorial with Publisher AI & Download ZIP"
+                >
+                  <DownloadIcon className="w-3 h-3 mr-1.5" />
+                  {isExporting ? 'Zipping...' : 'Publisher AI & ZIP'}
+                </button>
+                <button
+                  onClick={handleCopyComparison}
+                  className="flex items-center px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                  title="Copy comparison analysis"
+                >
+                  <ClipboardIcon className="w-3 h-3 mr-1.5" />
+                  {copied ? 'Copied!' : 'Copy Analysis'}
+                </button>
+              </div>
             </div>
             <div className="p-4 bg-slate-700/50 rounded-lg border border-slate-600/70">
               <ReadMoreLess 

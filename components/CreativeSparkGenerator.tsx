@@ -4,6 +4,9 @@ import { CreativeSparkResult, CharacterIdea, SceneIdea } from '../types';
 import { LoadingSpinner } from './LoadingSpinner';
 import { SparklesIcon } from './icons/SparklesIcon';
 import { FilmIcon } from './icons/FilmIcon';
+import { DownloadIcon } from './icons/DownloadIcon';
+import JSZip from 'jszip';
+import { generateGenericPublisherEditorial } from '../services/geminiService';
 import { StoryMindMap } from './StoryMindMap'; // Import the new component
 
 interface CreativeSparkGeneratorProps {
@@ -32,6 +35,7 @@ export const CreativeSparkGenerator: React.FC<CreativeSparkGeneratorProps> = ({
   const [selectedGenre, setSelectedGenre] = useState<string>(genres[0] || '');
   const [inspirationText, setInspirationText] = useState<string>('');
   const [enhancementPrompt, setEnhancementPrompt] = useState<string>('');
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,6 +47,38 @@ export const CreativeSparkGenerator: React.FC<CreativeSparkGeneratorProps> = ({
     e.preventDefault();
     if (!enhancementPrompt.trim() || !selectedIdea) return;
     onEnhanceIdea(enhancementPrompt.trim());
+  };
+
+  const handlePublisherAndZipExport = async () => {
+    if (!selectedIdea) return;
+    setIsExporting(true);
+    try {
+      const ideaName = `Creative Spark Idea ${selectedIdea.id.slice(0,4)}`;
+      const rawAnalysis = JSON.stringify(selectedIdea, null, 2);
+      
+      const editorialText = await generateGenericPublisherEditorial(ideaName, rawAnalysis);
+      
+      const zip = new JSZip();
+      const safeTitle = ideaName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      
+      zip.file(`${safeTitle}_raw.json`, rawAnalysis);
+      zip.file(`${safeTitle}_publisher_editorial.md`, editorialText);
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${safeTitle}_export.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Failed to export ZIP. See console.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -132,12 +168,23 @@ export const CreativeSparkGenerator: React.FC<CreativeSparkGeneratorProps> = ({
       {selectedIdea && (
         <div className="mt-8 pt-6 border-t border-slate-700">
           <h3 className="text-xl font-semibold text-purple-200 mb-3">Selected Idea for Enhancement:</h3>
-           <button
-                onClick={() => onSelectIdea('')} // Crude way to deselect, ideally improve state management in App.tsx
-                className="mb-4 px-3 py-1.5 text-xs bg-slate-600 hover:bg-slate-500 text-white font-medium rounded-md shadow"
+           <div className="flex items-center justify-between mb-4">
+             <button
+                  onClick={() => onSelectIdea('')} // Crude way to deselect, ideally improve state management in App.tsx
+                  className="px-3 py-1.5 text-xs bg-slate-600 hover:bg-slate-500 text-white font-medium rounded-md shadow"
+                >
+                  ← Back to Idea List
+              </button>
+              <button
+                onClick={handlePublisherAndZipExport}
+                disabled={isExporting}
+                className="flex items-center px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium rounded-md shadow transition-colors disabled:opacity-50"
+                title="Generate Editorial with Publisher AI & Download ZIP"
               >
-                ← Back to Idea List
-            </button>
+                <DownloadIcon className="w-3 h-3 mr-1.5" />
+                {isExporting ? 'Zipping...' : 'Publisher AI & ZIP'}
+              </button>
+           </div>
           <div className="space-y-4 p-4 bg-slate-700/80 rounded-lg">
             <div>
               <h4 className="text-md font-semibold text-purple-300 mb-1">Logline:</h4>

@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import JSZip from 'jszip';
+import { toPng } from 'html-to-image';
 import { ClipboardIcon } from './icons/ClipboardIcon';
 import { DownloadIcon } from './icons/DownloadIcon'; // New Icon
 import { LayerAnalysisData, GroundingChunkWeb, PersonnelData, SummaryReportData, ActualPerformanceData, FinancialAnalysisData, MorphokineticsAnalysis } from '../types'; 
@@ -58,6 +60,7 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [saveDraftError, setSaveDraftError] = useState<string | null>(null);
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
+  const [isExportingZip, setIsExportingZip] = useState(false);
 
   useEffect(() => {
     setLocalActualPerformance(initialActualPerformance || {});
@@ -315,6 +318,61 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadZip = async () => {
+    setIsExportingZip(true);
+    try {
+      const zip = new JSZip();
+      const safeTitle = title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+
+      // 1. Add Markdown Report
+      const markdownContent = generateMarkdownReport();
+      zip.file(`${safeTitle}_report.md`, markdownContent);
+
+      // 2. Add Social Snippets (if available)
+      if (socialSnippets && (socialSnippets.twitter || socialSnippets.linkedin)) {
+        let socialContent = `# Social Media Posts for ${title}\n\n`;
+        if (socialSnippets.twitter) socialContent += `## Twitter / X:\n${socialSnippets.twitter}\n\n`;
+        if (socialSnippets.linkedin) socialContent += `## LinkedIn:\n${socialSnippets.linkedin}\n\n`;
+        zip.file(`${safeTitle}_social.md`, socialContent);
+      }
+
+      // 3. Capture Concentric Rings
+      const ringsElement = document.getElementById('concentric-rings-chart');
+      if (ringsElement) {
+        // Delay slightly to ensure rendering
+        await new Promise(r => setTimeout(r, 100));
+        const ringsDataUrl = await toPng(ringsElement, { backgroundColor: '#1e293b' });
+        const base64Data = ringsDataUrl.replace(/^data:image\/png;base64,/, "");
+        zip.file(`${safeTitle}_concentric_rings.png`, base64Data, { base64: true });
+      }
+
+      // 4. Capture Morphokinetics (if available)
+      const morphoElement = document.getElementById('morphokinetics-chart');
+      if (morphoElement) {
+        const morphoDataUrl = await toPng(morphoElement, { backgroundColor: '#1e293b' });
+        const base64Data = morphoDataUrl.replace(/^data:image\/png;base64,/, "");
+        zip.file(`${safeTitle}_morphokinetics.png`, base64Data, { base64: true });
+      }
+
+      // Generate and download zip
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${safeTitle}_greybrainer_export.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error("Error generating zip export:", error);
+      alert("Failed to generate zip export. See console for details.");
+    } finally {
+      setIsExportingZip(false);
+    }
+  };
+
   const handleSaveDraft = async () => {
     setIsSavingDraft(true);
     setSaveDraftError(null);
@@ -418,6 +476,17 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
             >
               <DownloadIcon className="w-4 h-4 mr-2" />
               Download Markdown
+            </button>
+            <button
+              onClick={handleDownloadZip}
+              disabled={isExportingZip}
+              className={`flex items-center justify-center px-4 py-2 text-white text-sm font-medium rounded-lg shadow-md transition-colors duration-150 w-full sm:w-auto ${
+                isExportingZip ? 'bg-amber-700 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500'
+              }`}
+              title="Download single zip with markdown, social posts, and screenshot images of charts"
+            >
+              <DownloadIcon className="w-4 h-4 mr-2" />
+              {isExportingZip ? 'Zipping...' : 'Download All (ZIP)'}
             </button>
         </div>
       </div>

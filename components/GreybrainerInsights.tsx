@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
 import { LoadingSpinner } from './LoadingSpinner';
-import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, generateMovieAnchoredInsightWithGemini, generateExpandedPublicationInsight, generateGreybrainerResearch, generateGreyVerdictEditorial, generateDistributionPackForResearch, LogTokenUsageFn } from '../services/geminiService';
+import { generateGreybrainerInsightWithGemini, generateDetailedReportFromInsightWithGemini, generateMovieAnchoredInsightWithGemini, generateGenericPublisherEditorial, generateGreybrainerResearch, generateGreyVerdictEditorial, generateDistributionPackForResearch, LogTokenUsageFn } from '../services/geminiService';
 import { RefreshIcon } from './icons/RefreshIcon';
 import { DocumentTextIcon } from './icons/DocumentTextIcon'; // New Icon for detailed report
 import { ClipboardIcon } from './icons/ClipboardIcon';
@@ -14,6 +14,7 @@ import { DistributionPack, MovieSuggestion } from '../types';
 import { SocialDistributionDashboard } from './SocialDistributionDashboard';
 import { trendIntelligenceService } from '../services/trendIntelligenceService';
 import { hasFirecrawlApiKey } from '../utils/firecrawlKeyStorage';
+import JSZip from 'jszip';
 
 interface GreybrainerInsightsProps {
   logTokenUsage?: LogTokenUsageFn;
@@ -159,7 +160,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
     setArticleError(null);
     setExpandedArticle(null);
     try {
-      const article = await generateExpandedPublicationInsight(dynamicInsightText, logTokenUsage);
+      const article = await generateGenericPublisherEditorial("Quick Insight", dynamicInsightText, logTokenUsage);
       setExpandedArticle(article);
     } catch (err) {
       console.error("Failed to generate expanded article:", err);
@@ -179,20 +180,33 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
     });
   };
 
-  const handleDownloadExpandedArticle = () => {
-    if (!expandedArticle) return;
+  const handleDownloadExpandedArticle = async () => {
+    if (!expandedArticle || !dynamicInsightText) return;
     
-    const markdownContent = expandedArticle.replace(/\n\s*\n/g, '\n\n'); 
-    const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const safeInsightStart = dynamicInsightText?.substring(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'insight';
-    link.download = `publication_article_${safeInsightStart}.md`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    try {
+      const zip = new JSZip();
+      const safeInsightStart = dynamicInsightText?.substring(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'insight';
+      
+      zip.file(`quick_insight_raw.md`, dynamicInsightText);
+      zip.file(`publisher_editorial.md`, expandedArticle);
+      
+      if (detailedReportText) {
+        zip.file(`detailed_report.md`, detailedReportText);
+      }
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `publication_pack_${safeInsightStart}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Failed to export ZIP.");
+    }
   };
 
   // Movie-anchored publication expansion handlers
@@ -203,7 +217,7 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
     setMovieArticleError(null);
     setExpandedMovieArticle(null);
     try {
-      const article = await generateExpandedPublicationInsight(movieAnchoredInsight, logTokenUsage);
+      const article = await generateGenericPublisherEditorial(`Movie Analysis: ${selectedMovie}`, movieAnchoredInsight, logTokenUsage);
       setExpandedMovieArticle(article);
     } catch (err) {
       console.error("Failed to generate expanded movie article:", err);
@@ -223,20 +237,29 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
     });
   };
 
-  const handleDownloadExpandedMovieArticle = () => {
-    if (!expandedMovieArticle) return;
+  const handleDownloadExpandedMovieArticle = async () => {
+    if (!expandedMovieArticle || !movieAnchoredInsight) return;
     
-    const markdownContent = expandedMovieArticle.replace(/\n\s*\n/g, '\n\n'); 
-    const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    const safeMovieTitle = selectedMovie.substring(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'movie';
-    link.download = `publication_article_${safeMovieTitle}.md`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    try {
+      const zip = new JSZip();
+      const safeMovieTitle = selectedMovie.substring(0, 20).replace(/[^a-z0-9]/gi, '_').toLowerCase() || 'movie';
+      
+      zip.file(`movie_analysis_raw.md`, movieAnchoredInsight);
+      zip.file(`publisher_editorial.md`, expandedMovieArticle);
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `movie_publication_pack_${safeMovieTitle}.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Failed to export ZIP.");
+    }
   };
 
   // Movie-anchored insight handler
@@ -578,11 +601,11 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                   </button>
                   <button
                     onClick={handleDownloadExpandedArticle}
-                    className="flex items-center px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-md shadow transition-colors"
-                    title="Download as Markdown"
+                    className="flex items-center px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                    title="Download Publisher AI & Insight ZIP"
                   >
                     <DownloadIcon className="w-3 h-3 mr-1.5" />
-                    Download Article
+                    Download Publisher ZIP
                   </button>
                   <div className="ml-auto text-xs text-slate-400 flex items-center">
                     <FileText className="w-3 h-3 mr-1" />
@@ -779,11 +802,11 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
                       </button>
                       <button
                         onClick={handleDownloadExpandedMovieArticle}
-                        className="flex items-center px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium rounded-md shadow transition-colors"
-                        title="Download as Markdown"
+                        className="flex items-center px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium rounded-md shadow transition-colors"
+                        title="Download Publisher AI & Movie Analysis ZIP"
                       >
                         <DownloadIcon className="w-3 h-3 mr-1.5" />
-                        Download Article
+                        Download Publisher ZIP
                       </button>
                       <div className="ml-auto text-xs text-slate-400 flex items-center">
                         <FileText className="w-3 h-3 mr-1" />
