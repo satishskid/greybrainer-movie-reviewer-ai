@@ -19,6 +19,7 @@ import { TwitterIcon } from './icons/TwitterIcon';
 import { LinkedInIcon } from './icons/LinkedInIcon';
 import { PublishableAnalysisReport } from './PublishableAnalysisReport';
 import { ShareIcon } from './icons/ShareIcon';
+import { generateGenericPublisherEditorial } from '../services/geminiService';
 import { SparklesIcon } from './icons/SparklesIcon'; // Added import
 import { saveDraft, saveDraftVersion } from '../services/omnichannelDraftService';
 
@@ -328,6 +329,15 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
       const markdownContent = generateMarkdownReport();
       zip.file(`${safeTitle}_report.md`, markdownContent);
 
+      // 1.5. Generate Publisher AI Editorial
+      try {
+        const editorialContent = await generateGenericPublisherEditorial(title, markdownContent);
+        zip.file(`${safeTitle}_publisher_editorial.md`, editorialContent);
+      } catch (e) {
+        console.error("Failed to generate publisher editorial:", e);
+        zip.file(`${safeTitle}_publisher_editorial_error.md`, "Failed to generate publisher editorial. Ensure API keys are set.");
+      }
+
       // 2. Add Social Snippets (if available)
       if (socialSnippets && (socialSnippets.twitter || socialSnippets.linkedin)) {
         let socialContent = `# Social Media Posts for ${title}\n\n`;
@@ -483,10 +493,10 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
               className={`flex items-center justify-center px-4 py-2 text-white text-sm font-medium rounded-lg shadow-md transition-colors duration-150 w-full sm:w-auto ${
                 isExportingZip ? 'bg-amber-700 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500'
               }`}
-              title="Download single zip with markdown, social posts, and screenshot images of charts"
+              title="Download single zip with markdown, publisher editorial, social posts, and screenshot images of charts"
             >
               <DownloadIcon className="w-4 h-4 mr-2" />
-              {isExportingZip ? 'Zipping...' : 'Download All (ZIP)'}
+              {isExportingZip ? 'Publishing & Zipping...' : 'Download All (ZIP)'}
             </button>
         </div>
       </div>
