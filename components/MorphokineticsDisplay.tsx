@@ -98,7 +98,7 @@ export const MorphokineticsDisplay: React.FC<MorphokineticsDisplayProps> = ({ an
 
       <div className="mb-6">
         <h3 className="text-lg font-semibold text-teal-300 mb-3">Intensity & Emotional Arc Visualization:</h3>
-        <div className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/50 relative">
+        <div id="morphokinetics-chart" className="bg-slate-800/60 p-3 rounded-lg border border-slate-700/50 relative">
           <svg width="100%" viewBox={`0 0 ${SVG_WIDTH} ${SVG_HEIGHT}`} aria-labelledby="morphokinetics-chart-title" role="img">
             <title id="morphokinetics-chart-title">Movie Intensity and Emotional Arc</title>
 
