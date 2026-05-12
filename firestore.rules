@@ -97,19 +97,22 @@ service cloud.firestore {
     function isAdmin() {
       return request.auth.token.email in [
         'satish@skids.health',
-        'satish.rath@gmail.com', 
+        'satish.rath@gmail.com',
+        'satishskid@gmail.com',
         'rath.satish@gmail.com',
         'mousamkumarp@gmail.com',
         'dr.satish@greybrain.ai',
-      'digi.social@greybrain.ai',
-      'social@skids.health',
-      'support@skids.health'
+        'digi.social@greybrain.ai',
+        'social@skids.health',
+        'support@skids.health'
       ];
     }
     
     function isEditor() {
       return request.auth.token.email in [
         'drpratichi@skids.health',
+        'skids.social01@gmail.com',
+        'saminamishra@gmail.com',
         'saminamisra@gmail.com',
         'support@skids.health'
       ] || isAdmin();
