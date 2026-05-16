@@ -460,11 +460,11 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
 
   return (
     <div className="mt-10 p-6 bg-slate-800/80 rounded-xl shadow-2xl border border-slate-700">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <h2 className="text-2xl md:text-3xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 mb-3 sm:mb-0">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6">
+        <h2 className="text-2xl md:text-3xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 mb-3 xl:mb-0">
           Greybrainer Report: <span className="italic">{title}</span>
         </h2>
-        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+        <div className="flex flex-row flex-wrap gap-2 w-full xl:w-auto xl:justify-end">
             <button
               onClick={handleSaveDraft}
               disabled={isSavingDraft}
