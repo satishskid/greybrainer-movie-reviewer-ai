@@ -2448,6 +2448,46 @@ ${morphokineticsInsight || 'N/A'}
 };
 
 /**
+ * Extract a core cultural theme or industry trend from a movie review
+ * This bridges the review engine to the newsletter continuous narrative.
+ */
+export const extractNewsletterThemeFromReview = async (
+  movieTitle: string,
+  summaryReportText: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string> => {
+  const prompt = `**ROLE**
+You are the Editor-in-Chief of the Greybrainer Newsletter.
+Your job is to look at a movie review we just completed and extract the CORE CULTURAL THEME, SOCIETAL TREND, or INDUSTRY SHIFT that the movie represents.
+
+**CONTEXT**
+We do not just write standalone movie reviews. We use movies as a lens to explore broader trends.
+We just reviewed: "${movieTitle}"
+Here is the core summary of the review:
+${summaryReportText}
+
+**TASK**
+Based on the review above, what is the ONE overarching theme or trend that this movie signifies?
+Do not summarize the movie. Do not give me a list.
+Give me a SINGLE, powerful, 1-2 sentence statement that defines the trend.
+
+Examples of good outputs:
+- "The rise of corporate exhaustion and the fantasy of extreme anti-work rebellion."
+- "The weaponization of nostalgia to mask creatively bankrupt legacy franchises."
+- "The audience's growing appetite for flawed, morally grey protagonists over sanitized heroes."
+
+Extract the theme now:`;
+
+  return runGeminiWithFallback(
+    'Extract Newsletter Theme',
+    prompt,
+    { temperature: 0.7, maxOutputTokens: 200 },
+    (text) => text.trim(),
+    logTokenUsage
+  );
+};
+
+/**
  * Generate Greybrainer Research & Trending Engine report
  * Analyzes trending topics, understands Medium audience, and creates continuous narrative
  */

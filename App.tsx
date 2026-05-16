@@ -562,6 +562,8 @@ const App: React.FC = () => {
 
               <GreybrainerInsights
                 logTokenUsage={logTokenUsage}
+                analyzedMovieTitle={movieInput.movieTitle}
+                analyzedMovieSummary={summaryReport?.reportText}
               />
               <GreybrainerComparison logTokenUsage={logTokenUsage} />
               {/* Monthly Scoreboard temporarily disabled due to network issues */}
