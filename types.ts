@@ -153,6 +153,7 @@ export interface SummaryReportData {
   actualPerformance?: ActualPerformanceData; 
   financialAnalysis?: FinancialAnalysisData; // Added
   pixarStyleScenes?: string[]; // Added for visual descriptions
+  creatorInsights?: string; // B2B Creator's Blueprint
   isFallbackResult?: boolean; 
 }
 

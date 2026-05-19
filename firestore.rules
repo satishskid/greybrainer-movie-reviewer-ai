@@ -114,7 +114,8 @@ service cloud.firestore {
         'skids.social01@gmail.com',
         'saminamishra@gmail.com',
         'saminamisra@gmail.com',
-        'support@skids.health'
+        'support@skids.health',
+        'mousampatel816@gmail.com'
       ] || isAdmin();
     }
     

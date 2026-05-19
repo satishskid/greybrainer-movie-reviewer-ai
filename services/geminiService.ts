@@ -3594,3 +3594,66 @@ OUTPUT JSON SHAPE:
     logTokenUsage
   );
 };
+
+export const generateCreatorInsights = async (
+  movieTitle: string,
+  layerAnalyses: LayerAnalysisData[],
+  overallSuggestions?: string | string[],
+  logTokenUsage?: LogTokenUsageFn
+): Promise<string> => {
+  const aggregatedImprovements: string[] = [];
+  
+  if (overallSuggestions) {
+    aggregatedImprovements.push("## Overall Suggestions:");
+    if (Array.isArray(overallSuggestions)) {
+      aggregatedImprovements.push(...overallSuggestions.map(s => `- ${s}`));
+    } else {
+      aggregatedImprovements.push(overallSuggestions);
+    }
+  }
+
+  layerAnalyses.forEach(layer => {
+    if (layer.improvementSuggestions) {
+      aggregatedImprovements.push(`\n## ${layer.title} Improvements:`);
+      if (Array.isArray(layer.improvementSuggestions)) {
+        aggregatedImprovements.push(...layer.improvementSuggestions.map(s => `- ${s}`));
+      } else {
+        aggregatedImprovements.push(layer.improvementSuggestions);
+      }
+    }
+  });
+
+  const improvementsText = aggregatedImprovements.join("\n");
+
+  const prompt = `
+You are an elite script doctor, film consultant, and editor-in-chief for a premium B2B filmmaking publication (like a hybrid of Masterclass and The Hollywood Reporter).
+
+We have performed a deep AI analysis on the movie: "${movieTitle}".
+Below are the raw, unfiltered "Improvement Suggestions" aggregated from our Story, Conceptualization, and Performance layer analyses.
+
+YOUR TASK:
+Transform these raw bullets into a highly engaging, SEO-optimized "Creator's Blueprint" (a Case Study / Follow-on Blog) specifically targeted at producers, screenwriters, and cine-makers. 
+This is meant to be their go-to guide for learning what went wrong or how it could have been elevated.
+
+RAW IMPROVEMENTS:
+${improvementsText}
+
+REQUIREMENTS:
+1. **Hook & Title**: Start with a catchy, SEO-optimized title (Markdown #) and a compelling hook paragraph.
+2. **Actionable Takeaways**: Structure the post using clear, professional subheadings (Markdown ##). Do not just list the flaws; frame them as "Lessons for Filmmakers" or "How to Fix X".
+3. **Tone**: Professional, constructive, analytical, and authoritative. 
+4. **Formatting**: Use Markdown formatting natively (bolding, lists, blockquotes if useful).
+5. **Length**: Medium-length blog post (approx 400-600 words).
+6. **No fluff**: Get straight to the strategic insights.
+
+Return ONLY the raw Markdown text for this blog post.
+  `.trim();
+
+  return runGeminiWithFallback(
+    'Creator Insights Generation',
+    prompt,
+    { temperature: 0.7 },
+    (responseText) => responseText.trim(),
+    logTokenUsage
+  );
+};

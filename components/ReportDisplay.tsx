@@ -24,6 +24,8 @@ import { SparklesIcon } from './icons/SparklesIcon'; // Added import
 import { saveDraft, saveDraftVersion } from '../services/omnichannelDraftService';
 import { db } from '../services/firebaseConfig';
 import { collection, addDoc } from 'firebase/firestore';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 
 interface ReportDisplayProps {
@@ -93,6 +95,19 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
                 createdBy: currentUserEmail || 'system',
                 autoArchived: true
             }).catch(err => console.error("Auto-archive to Hub failed:", err));
+
+            if (summaryReportData.creatorInsights) {
+              addDoc(collection(db, 'published_research'), {
+                  title: `${title} - Creator's Blueprint`,
+                  type: 'creator_insights',
+                  content: summaryReportData.creatorInsights,
+                  socials: null,
+                  createdAt: new Date(),
+                  status: 'draft',
+                  createdBy: currentUserEmail || 'system',
+                  autoArchived: true
+              }).catch(err => console.error("Auto-archive creator insights to Hub failed:", err));
+            }
         }, 1000);
     }
   }, [title, summaryReportData, currentUserEmail]);
@@ -353,6 +368,10 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
       // 1. Add Markdown Report
       const markdownContent = generateMarkdownReport();
       zip.file(`${safeTitle}_report.md`, markdownContent);
+
+      if (summaryReportData.creatorInsights) {
+        zip.file(`${safeTitle}_creator_insights.md`, summaryReportData.creatorInsights);
+      }
 
       // 1.5. Generate Publisher AI Editorial
       let editorialContent = "";
@@ -753,6 +772,18 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
             </div>
             <div className="ml-0 md:ml-9">
                  {renderSuggestions(overallImprovementSuggestions, "text-sky-200 whitespace-pre-wrap text-sm leading-relaxed", "gb-content-area")}
+            </div>
+        </div>
+      )}
+
+      {summaryReportData.creatorInsights && (
+         <div className="my-6 p-4 bg-amber-900/40 border border-amber-700/60 rounded-lg">
+            <div className="flex items-center mb-4 border-b border-amber-800/50 pb-2">
+                <SparklesIcon className="w-6 h-6 text-amber-400 mr-3 flex-shrink-0" />
+                <h3 className="text-xl font-bold text-amber-300">Creator's Blueprint (B2B Insights)</h3>
+            </div>
+            <div className="prose prose-invert prose-amber max-w-none text-sm gb-content-area text-amber-100">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryReportData.creatorInsights}</ReactMarkdown>
             </div>
         </div>
       )}
