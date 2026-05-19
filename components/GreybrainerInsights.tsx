@@ -7,6 +7,7 @@ import { DownloadIcon } from './icons/DownloadIcon';
 import { ReadMoreLess } from './ReadMoreLess';
 import { FileText, Newspaper, Target, Sparkles, Globe, BrainCircuit } from 'lucide-react';
 import { trendIntelligenceService } from '../services/trendIntelligenceService';
+import { autoArchiveToHub, auth } from '../services/firebaseConfig';
 
 interface GreybrainerInsightsProps {
   logTokenUsage?: LogTokenUsageFn;
@@ -66,16 +67,20 @@ export const GreybrainerInsights: React.FC<GreybrainerInsightsProps> = ({
         if (lens === 'research') {
             const report = await generateGreybrainerResearch(unifiedInput, undefined, logTokenUsage);
             setOutputResult(report);
+            await autoArchiveToHub(analyzedMovieTitle || "Research", 'research', report, auth.currentUser?.email);
         } else if (lens === 'verdict') {
             const editorial = await generateGreyVerdictEditorial(analyzedMovieTitle || "Current Trend", unifiedInput, undefined, logTokenUsage);
             setOutputResult(editorial);
+            await autoArchiveToHub(analyzedMovieTitle || "Verdict", 'editorial', editorial, auth.currentUser?.email);
         } else if (lens === 'editorial') {
             const editorial = await generateGenericPublisherEditorial("Newsletter Editorial", unifiedInput, logTokenUsage);
             setOutputResult(editorial);
+            await autoArchiveToHub("Newsletter Editorial", 'editorial', editorial, auth.currentUser?.email);
         } else if (lens === 'intelligence') {
             const urls = unifiedInput.split('\n').filter(u => u.trim().startsWith('http'));
             const report = await trendIntelligenceService.runAnalysisCycle(urls.length > 0 ? urls : undefined);
             setIntelligenceReport(report);
+            await autoArchiveToHub("Trend Intelligence", 'intelligence', JSON.stringify(report, null, 2), auth.currentUser?.email);
         }
     } catch (err) {
         setGenerationError(err instanceof Error ? err.message : "Failed to generate output.");

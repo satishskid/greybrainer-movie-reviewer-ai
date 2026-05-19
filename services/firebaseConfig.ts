@@ -67,7 +67,8 @@ const ADMIN_EMAILS = [
 const EDITOR_EMAILS = [
   'drpratichi@skids.health',
   'saminamisra@gmail.com',
-  'support@skids.health'
+  'support@skids.health',
+  'mousampatel816@gmail.com'
 ];
 
 // Authentication Service
@@ -478,3 +479,19 @@ export const subscriptionService = new SubscriptionService();
 
 // Export auth state listener
 export { onAuthStateChanged } from 'firebase/auth';
+
+export const autoArchiveToHub = async (title: string, type: string, content: string, currentUserEmail?: string | null) => {
+  try {
+    await addDoc(collection(db, 'published_research'), {
+      title: title,
+      type: type,
+      content: content,
+      createdAt: new Date(),
+      status: 'draft',
+      createdBy: currentUserEmail || 'system'
+    });
+    console.log(`Auto-archived ${type} to Hub`);
+  } catch (err) {
+    console.error("Failed to auto-archive to Firebase:", err);
+  }
+};

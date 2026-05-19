@@ -74,6 +74,29 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
     }
   }, [initialActualPerformance]);
 
+  // Auto-archive to Hub on generation
+  const hasAutoArchivedRef = React.useRef(false);
+  useEffect(() => {
+    if (!hasAutoArchivedRef.current && title && summaryReportData) {
+        hasAutoArchivedRef.current = true;
+        
+        // Use a timeout to ensure all rendering/state is settled before grabbing markdown
+        setTimeout(() => {
+            const markdownContent = generateMarkdownReport();
+            addDoc(collection(db, 'published_research'), {
+                title: title,
+                type: 'research_export',
+                content: markdownContent,
+                socials: summaryReportData.socialSnippets || null,
+                createdAt: new Date(),
+                status: 'draft',
+                createdBy: currentUserEmail || 'system',
+                autoArchived: true
+            }).catch(err => console.error("Auto-archive to Hub failed:", err));
+        }, 1000);
+    }
+  }, [title, summaryReportData, currentUserEmail]);
+
   const { reportText, socialSnippets, overallImprovementSuggestions } = summaryReportData;
 
   const overallScore = useMemo(() => {
