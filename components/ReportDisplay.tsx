@@ -83,13 +83,48 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
         hasAutoArchivedRef.current = true;
         
         // Use a timeout to ensure all rendering/state is settled before grabbing markdown
-        setTimeout(() => {
+        setTimeout(async () => {
             const markdownContent = generateMarkdownReport();
+
+            const simplifiedLayerAnalyses = layerAnalyses.map(la => ({
+                id: la.id,
+                title: la.title,
+                shortTitle: la.shortTitle,
+                userScore: la.userScore ?? null,
+                aiSuggestedScore: la.aiSuggestedScore ?? null
+            }));
+
+            const simplifiedMorpho = morphokineticsAnalysis ? {
+                keyMoments: morphokineticsAnalysis.keyMoments || [],
+                overallSummary: morphokineticsAnalysis.overallSummary || ""
+            } : null;
+
+            let ringsBase64 = null;
+            let morphoBase64 = null;
+            try {
+                const ringsElement = document.getElementById('concentric-rings-chart');
+                if (ringsElement) {
+                    ringsBase64 = await toPng(ringsElement, { backgroundColor: '#1e293b' });
+                }
+                const morphoElement = document.getElementById('morphokinetics-chart');
+                if (morphoElement) {
+                    morphoBase64 = await toPng(morphoElement, { backgroundColor: '#1e293b' });
+                }
+            } catch (e) {
+                console.warn("Failed to capture chart images for archive:", e);
+            }
+
             addDoc(collection(db, 'published_research'), {
                 title: title,
                 type: 'research_export',
                 content: markdownContent,
                 socials: summaryReportData.socialSnippets || null,
+                layerData: simplifiedLayerAnalyses,
+                morphoData: simplifiedMorpho,
+                images: {
+                  rings: ringsBase64,
+                  morpho: morphoBase64
+                },
                 createdAt: new Date(),
                 status: 'draft',
                 createdBy: currentUserEmail || 'system',
@@ -393,12 +428,27 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
 
       // 2.5 Archive to Firebase (Free Tier Spark Plan)
       try {
+        const simplifiedLayerAnalyses = layerAnalyses.map(la => ({
+            id: la.id,
+            title: la.title,
+            shortTitle: la.shortTitle,
+            userScore: la.userScore ?? null,
+            aiSuggestedScore: la.aiSuggestedScore ?? null
+        }));
+
+        const simplifiedMorpho = morphokineticsAnalysis ? {
+            keyMoments: morphokineticsAnalysis.keyMoments || [],
+            overallSummary: morphokineticsAnalysis.overallSummary || ""
+        } : null;
+
         await addDoc(collection(db, 'published_research'), {
           title: title,
           type: 'research_export',
           content: markdownContent,
           editorial: editorialContent || null,
           socials: socialSnippets || null,
+          layerData: simplifiedLayerAnalyses,
+          morphoData: simplifiedMorpho,
           createdAt: new Date(),
           status: 'archived',
           createdBy: currentUserEmail || 'system'
