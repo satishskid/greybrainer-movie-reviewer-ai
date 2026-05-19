@@ -376,9 +376,10 @@ export async function runGeminiWithFallback<T>(
 
       const isToolError = errorMsg.includes('tool') || errorMsg.includes('400') || errorMsg.includes('search');
       const isQuotaError = error.status === 429 || errorMsg.includes('429') || errorMsg.includes('quota');
+      const isForbiddenError = error.status === 403 || errorMsg.includes('403') || errorMsg.includes('forbidden') || errorMsg.includes('permission_denied');
 
-      if (isModelError || isQuotaError || (isToolError && tools && tools.length > 0)) {
-        console.warn(`⚠️ [${operationName}] Model ${modelName} error (${isToolError ? 'tool issue' : isQuotaError ? 'quota' : 'not found'}), trying next fallback...`);
+      if (isModelError || isQuotaError || isForbiddenError || (isToolError && tools && tools.length > 0)) {
+        console.warn(`⚠️ [${operationName}] Model ${modelName} error (${isToolError ? 'tool issue' : isQuotaError ? 'quota' : isForbiddenError ? 'forbidden' : 'not found'}), trying next fallback...`);
         lastError = error;
         continue;
       }
