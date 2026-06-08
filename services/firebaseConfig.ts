@@ -68,7 +68,8 @@ const EDITOR_EMAILS = [
   'drpratichi@skids.health',
   'saminamisra@gmail.com',
   'support@skids.health',
-  'mousampatel816@gmail.com'
+  'mousampatel816@gmail.com',
+  'pranitskid@gmail.com'
 ];
 
 // Authentication Service
