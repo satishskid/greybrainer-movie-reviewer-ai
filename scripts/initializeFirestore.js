@@ -46,6 +46,14 @@ async function initializeDatabase() {
         department: 'AI Research'
       },
       {
+        email: 'digi.social@greybrain.ai',
+        role: 'admin',
+        isActive: true,
+        addedBy: 'system',
+        addedAt: new Date(),
+        department: 'AI Research'
+      },
+      {
         email: 'drpratichi@skids.health',
         role: 'editor',
         isActive: true,

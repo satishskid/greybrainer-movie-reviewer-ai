@@ -1,0 +1,91 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Footer from '../components/Footer.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import { getEntryHref } from '../data/editorials';
+import { getLensEntries } from '../data/manifest';
+
+const entries = await getLensEntries();
+const archiveItems = entries.map((entry) => ({
+  title: entry.title,
+  href: getEntryHref(entry),
+  contentType: entry.contentType,
+  category: entry.category,
+  dek: entry.dek,
+  publishedAt: entry.publishedAt,
+  thumbnailEyebrow: entry.thumbnailEyebrow ?? entry.category,
+  thumbnailImageUrl: entry.thumbnailImageUrl ?? null,
+  heroGradient: entry.heroGradient,
+  platform: entry.platform ?? entry.releaseFocus,
+  score: entry.overallScore ? `${entry.overallScore.toFixed(1)}/10` : entry.runTime,
+}));
+---
+
+<BaseLayout
+  title="Greybrainer Lens | Archive"
+  description="Browse the full Greybrainer Lens archive across briefs, research studies, and quantified reviews."
+>
+  <SiteHeader />
+  <section class="shell archive-hero">
+    <span class="section-kicker">Archive</span>
+    <h1>Browse the full public Greybrainer archive by format.</h1>
+    <p>
+      The archive should tell the truth about the publication: daily briefs for momentum, research for category ownership, and
+      quantified reviews for flagship authority.
+    </p>
+    <div class="archive-filters">
+      <button class="archive-filter is-active" data-filter="all">All</button>
+      <button class="archive-filter" data-filter="brief">Briefs</button>
+      <button class="archive-filter" data-filter="study">Research</button>
+      <button class="archive-filter" data-filter="review">Reviews</button>
+    </div>
+  </section>
+
+  <section class="shell archive-grid" data-archive-grid>
+    {archiveItems.map((item) => (
+      <article class="archive-card" data-archive-item data-content-type={item.contentType}>
+        <a
+          class="shelf-thumb"
+          href={item.href}
+          style={`--thumb-gradient: ${item.heroGradient};${item.thumbnailImageUrl ? `--thumb-image: url('${item.thumbnailImageUrl}');` : ''}`}
+        >
+          <div class="shelf-thumb__overlay"></div>
+          <div class="shelf-thumb__content">
+            <span class="signal-label">{item.thumbnailEyebrow}</span>
+            <strong>{item.title}</strong>
+            <span>{item.platform}</span>
+          </div>
+        </a>
+        <div class="shelf-card__meta">
+          <span>{item.category}</span>
+          <span>{item.score}</span>
+        </div>
+        <p>{item.dek}</p>
+        <div class="shelf-card__footer">
+          <span>{item.publishedAt}</span>
+          <a href={item.href}>Open</a>
+        </div>
+      </article>
+    ))}
+  </section>
+
+  <script is:inline>
+    const filterButtons = Array.from(document.querySelectorAll('[data-filter]'));
+    const archiveItemsEls = Array.from(document.querySelectorAll('[data-archive-item]'));
+
+    filterButtons.forEach((button) => {
+      button.addEventListener('click', () => {
+        const filter = button.getAttribute('data-filter');
+
+        filterButtons.forEach((candidate) => candidate.classList.remove('is-active'));
+        button.classList.add('is-active');
+
+        archiveItemsEls.forEach((item) => {
+          const type = item.getAttribute('data-content-type');
+          item.style.display = filter === 'all' || type === filter ? '' : 'none';
+        });
+      });
+    });
+  </script>
+  <Footer />
+</BaseLayout>

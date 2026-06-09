@@ -48,7 +48,7 @@ export const ConcentricRingsVisualization: React.FC<ConcentricRingsVisualization
 
 
   return (
-    <div className="flex justify-center items-center p-4 my-6" aria-label="Concentric rings visualization of movie review layers and scores">
+    <div id="concentric-rings-chart" className="flex justify-center items-center p-4 my-6" aria-label="Concentric rings visualization of movie review layers and scores">
       <svg width={svgSize} height={svgSize} viewBox={`0 0 ${svgSize} ${svgSize}`} className="transform -rotate-90"> {/* Rotate to start arc from top */}
         {orderedLayers.map((layer) => {
           const radius = radiiMapping[layer.id];

@@ -73,7 +73,7 @@ All code properly uses dynamic model selection via `getSelectedGeminiModel()`:
 
 ### **Model Selection Flow**
 ```
-User Request → getSelectedGeminiModel() → ModelConfigService → GoogleGenerativeAI
+User Request → getSelectedGeminiModel() → ModelConfigService → Google Gen AI compatibility layer
 ```
 
 ### **Error Handling & Fallbacks**

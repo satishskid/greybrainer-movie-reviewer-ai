@@ -1,0 +1,143 @@
+---
+interface SectionAnchor {
+  id: string;
+  label: string;
+  wordCount: number;
+}
+
+interface Props {
+  anchors: SectionAnchor[];
+  estimatedReadTime?: string;
+}
+
+const { anchors, estimatedReadTime } = Astro.props;
+if (!anchors.length) return;
+---
+
+<nav class="section-scanner" aria-label="Article sections">
+  {estimatedReadTime && (
+    <div class="section-scanner__time">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" />
+      </svg>
+      <span>{estimatedReadTime}</span>
+    </div>
+  )}
+  <div class="section-scanner__label">Sections</div>
+  <ol class="section-scanner__list">
+    {anchors.map((anchor) => (
+      <li>
+        <a class="section-scanner__link" href={`#${anchor.id}`} data-section-link={anchor.id}>
+          <span class="section-scanner__name">{anchor.label}</span>
+          <span class="section-scanner__wc">{anchor.wordCount}w</span>
+        </a>
+      </li>
+    ))}
+  </ol>
+</nav>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const links = document.querySelectorAll('[data-section-link]') as NodeListOf<HTMLAnchorElement>;
+    if (!links.length) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting) {
+            links.forEach((link) => link.classList.remove('is-active'));
+            const activeLink = document.querySelector(`[data-section-link="${entry.target.id}"]`);
+            activeLink?.classList.add('is-active');
+          }
+        }
+      },
+      { rootMargin: '-20% 0px -60% 0px', threshold: 0 }
+    );
+
+    links.forEach((link) => {
+      const targetId = link.dataset.sectionLink;
+      const section = targetId ? document.getElementById(targetId) : null;
+      if (section) observer.observe(section);
+    });
+  });
+</script>
+
+<style>
+  .section-scanner {
+    position: sticky;
+    top: 6rem;
+    padding: 1rem 0;
+  }
+
+  .section-scanner__time {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--sans);
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--accent);
+    margin-bottom: 1rem;
+  }
+
+  .section-scanner__label {
+    font-family: var(--sans);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 0.5rem;
+  }
+
+  .section-scanner__list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    border-left: 2px solid rgba(255, 255, 255, 0.06);
+  }
+
+  .section-scanner__list li {
+    margin: 0;
+  }
+
+  .section-scanner__link {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 0.5rem;
+    padding: 0.4rem 0 0.4rem 0.8rem;
+    font-family: var(--sans);
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    border-left: 2px solid transparent;
+    margin-left: -2px;
+    transition: all 160ms ease;
+  }
+
+  .section-scanner__link:hover {
+    color: var(--text);
+    border-left-color: rgba(255, 255, 255, 0.2);
+  }
+
+  .section-scanner__link.is-active {
+    color: var(--accent-light);
+    border-left-color: var(--accent);
+    font-weight: 600;
+  }
+
+  .section-scanner__name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .section-scanner__wc {
+    font-size: 0.65rem;
+    color: rgba(255, 255, 255, 0.25);
+    flex-shrink: 0;
+  }
+</style>

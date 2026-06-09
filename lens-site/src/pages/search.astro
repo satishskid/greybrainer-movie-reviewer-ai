@@ -1,0 +1,88 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Footer from '../components/Footer.astro';
+import SiteHeader from '../components/SiteHeader.astro';
+import { getEntryHref } from '../data/editorials';
+import { getLensEntries } from '../data/manifest';
+
+const entries = await getLensEntries();
+const searchItems = entries.map((entry) => ({
+  slug: entry.slug,
+  href: getEntryHref(entry),
+  contentType: entry.contentType,
+  title: entry.title,
+  category: entry.category,
+  dek: entry.dek,
+  tags: entry.tags.join(' '),
+  score: entry.overallScore ? entry.overallScore.toFixed(1) : '',
+}));
+---
+
+<BaseLayout
+  title="Greybrainer Lens | Search"
+  description="Search the Greybrainer Lens archive across quantified reviews, briefs, and screen studies."
+>
+  <SiteHeader />
+  <section class="shell archive-hero">
+    <span class="section-kicker">Search</span>
+    <h1>Find a film, theme, platform, or Greybrainer signal.</h1>
+    <p>
+      This is the first archive search surface. It is built for title, platform, and theme lookup now, and can later sit in front of a
+      richer Cloudflare semantic search layer.
+    </p>
+    <div class="archive-signals">
+      <div class="signal-card">
+        <span class="signal-label">Briefs</span>
+        <strong>{searchItems.filter((item) => item.contentType === 'brief').length}</strong>
+      </div>
+      <div class="signal-card">
+        <span class="signal-label">Research</span>
+        <strong>{searchItems.filter((item) => item.contentType === 'study').length}</strong>
+      </div>
+      <div class="signal-card">
+        <span class="signal-label">Reviews</span>
+        <strong>{searchItems.filter((item) => item.contentType === 'review').length}</strong>
+      </div>
+    </div>
+  </section>
+
+  <section class="shell search-shell">
+    <label class="search-field" for="lens-search">
+      <span class="signal-label">Search Lens</span>
+      <input id="lens-search" type="search" placeholder="Try: Accused, Prime Video, bureaucracy, morphokinetics" />
+    </label>
+
+    <div class="search-results" data-search-results>
+      {searchItems.map((item) => (
+        <article
+          class="search-card"
+          data-search-item
+          data-search-text={`${item.title} ${item.category} ${item.dek} ${item.tags} ${item.score}`.toLowerCase()}
+        >
+          <div class="shelf-card__meta">
+            <span>{item.category}</span>
+            <span>{item.score ? `${item.score}/10` : item.contentType === 'brief' ? 'Brief' : 'Research'}</span>
+          </div>
+          <h2><a href={item.href}>{item.title}</a></h2>
+          <p>{item.dek}</p>
+        </article>
+      ))}
+    </div>
+  </section>
+
+  <script is:inline>
+    const input = document.getElementById('lens-search');
+    const items = Array.from(document.querySelectorAll('[data-search-item]'));
+
+    const filterItems = () => {
+      const query = (input?.value || '').trim().toLowerCase();
+      items.forEach((item) => {
+        const haystack = item.getAttribute('data-search-text') || '';
+        item.style.display = haystack.includes(query) ? '' : 'none';
+      });
+    };
+
+    input?.addEventListener('input', filterItems);
+  </script>
+  <Footer />
+</BaseLayout>

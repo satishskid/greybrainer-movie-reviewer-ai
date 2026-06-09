@@ -1,0 +1,204 @@
+---
+import type { LensEntry } from '../data/editorials';
+import { getEntryHref, getEntrySectionHref } from '../data/editorials';
+
+interface Props {
+  entries: LensEntry[];
+}
+
+const { entries } = Astro.props;
+
+function getPrimaryLabel(entry: LensEntry) {
+  if (entry.contentType === 'review') return 'Read the Review';
+  if (entry.contentType === 'brief') return 'Read the Brief';
+  return 'Read the Research';
+}
+
+function getSecondaryLabel(entry: LensEntry) {
+  if (entry.contentType === 'review') return 'Browse Reviews';
+  if (entry.contentType === 'brief') return 'Browse Briefs';
+  return 'Browse Research';
+}
+
+function getHookText(entry: LensEntry): string {
+  return entry.summaryHook ?? entry.sections?.[0]?.body?.[0] ?? entry.dek ?? '';
+}
+
+function getTypeBadgeLabel(entry: LensEntry): string {
+  if (entry.contentType === 'brief') return 'Daily Brief';
+  if (entry.contentType === 'study') return 'Research';
+  return 'Review';
+}
+
+function getTypeBadgeClass(entry: LensEntry): string {
+  if (entry.contentType === 'brief') return 'type-badge--brief';
+  if (entry.contentType === 'study') return 'type-badge--study';
+  return 'type-badge--review';
+}
+
+function getHeroStyle(entry: LensEntry) {
+  return `--hero-gradient: ${entry.heroGradient};${entry.heroImageUrl ? `--hero-image: url('${entry.heroImageUrl}');` : ''}`;
+}
+
+function formatDate(raw: string | undefined): string {
+  if (!raw) return '';
+  try {
+    return new Date(raw).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  } catch { return ''; }
+}
+---
+
+<div class="hero-carousel" data-carousel data-interval="7000">
+  <div class="hero-carousel__track">
+    {entries.map((entry, i) => {
+      const showDek = entry.dek && entry.dek !== entry.title;
+      return (
+        <section
+          class={`hero-carousel__slide ${i === 0 ? 'is-active' : ''}`}
+          style={getHeroStyle(entry)}
+          data-slide={i}
+        >
+          <div class="hero-carousel__overlay"></div>
+          <div class="shell hero-carousel__grid">
+            <div class="hero-carousel__copy">
+              <span class={`type-badge ${getTypeBadgeClass(entry)}`}>{getTypeBadgeLabel(entry)}</span>
+              <div class="eyebrow">{entry.category}</div>
+              <h2 class="hero-carousel__title">{entry.title}</h2>
+              {showDek && <p class="hero-dek">{entry.dek}</p>}
+              <div class="hero-meta">
+                <span>{formatDate(entry.publishedAt)}</span>
+                {entry.runTime && <span>{entry.runTime}</span>}
+                {entry.platform && <span>{entry.platform}</span>}
+              </div>
+              {getHookText(entry) && (
+                <div class="hero-hook">
+                  <span class="hero-hook__label">The Gist</span>
+                  <p class="hero-hook__text">{getHookText(entry)}</p>
+                </div>
+              )}
+              <div class="hero-actions">
+                <a class="primary-button" href={getEntryHref(entry)} data-smooth-nav>{getPrimaryLabel(entry)}</a>
+                <a class="secondary-button" href={getEntrySectionHref(entry.contentType)}>{getSecondaryLabel(entry)}</a>
+              </div>
+            </div>
+            <div class="hero-carousel__panel">
+              {entry.scoreRings && entry.overallScore && (
+                <div class="signal-card score-signal">
+                  <div class="signal-label">CineCraft Score</div>
+                  <div class="hero-score">{entry.overallScore.toFixed(1)}</div>
+                  <div class="hero-score__meta">
+                    {entry.scoreRings.map((ring) => (
+                      <span>{ring.shortLabel} {ring.score.toFixed(1)}</span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
+      );
+    })}
+  </div>
+
+  <!-- Progress indicators -->
+  <div class="hero-carousel__nav shell">
+    {entries.map((entry, i) => (
+      <button
+        class={`hero-carousel__indicator ${i === 0 ? 'is-active' : ''}`}
+        data-goto={i}
+        aria-label={`Go to slide ${i + 1}: ${entry.title}`}
+      >
+        <span class="hero-carousel__indicator-bar">
+          <span class="hero-carousel__indicator-fill"></span>
+        </span>
+        <span class="hero-carousel__indicator-title">{entry.title}</span>
+      </button>
+    ))}
+  </div>
+</div>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const carousel = document.querySelector('[data-carousel]') as HTMLElement;
+    if (!carousel) return;
+
+    const slides = carousel.querySelectorAll('[data-slide]') as NodeListOf<HTMLElement>;
+    const indicators = carousel.querySelectorAll('[data-goto]') as NodeListOf<HTMLButtonElement>;
+    const interval = parseInt(carousel.dataset.interval || '7000', 10);
+    const total = slides.length;
+    if (total <= 1) return;
+
+    let current = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    let isPaused = false;
+
+    function activate(index: number) {
+      // Deactivate all
+      slides.forEach(s => s.classList.remove('is-active', 'is-exiting'));
+      indicators.forEach(b => b.classList.remove('is-active'));
+
+      // Exit animation on old slide
+      slides[current]?.classList.add('is-exiting');
+
+      // Activate new
+      current = index;
+      slides[current].classList.add('is-active');
+      indicators[current].classList.add('is-active');
+    }
+
+    function next() {
+      activate((current + 1) % total);
+    }
+
+    function startTimer() {
+      clearTimeout(timer);
+      if (!isPaused) {
+        timer = setTimeout(() => {
+          next();
+          startTimer();
+        }, interval);
+      }
+    }
+
+    // Click indicators
+    indicators.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const idx = parseInt(btn.dataset.goto || '0', 10);
+        if (idx !== current) {
+          activate(idx);
+          startTimer();
+        }
+      });
+    });
+
+    // Pause on hover
+    carousel.addEventListener('mouseenter', () => {
+      isPaused = true;
+      clearTimeout(timer);
+    });
+    carousel.addEventListener('mouseleave', () => {
+      isPaused = false;
+      startTimer();
+    });
+
+    // Swipe support
+    let touchStartX = 0;
+    carousel.addEventListener('touchstart', (e: TouchEvent) => {
+      touchStartX = e.touches[0].clientX;
+    }, { passive: true });
+    carousel.addEventListener('touchend', (e: TouchEvent) => {
+      const diff = touchStartX - e.changedTouches[0].clientX;
+      if (Math.abs(diff) > 50) {
+        if (diff > 0) {
+          activate((current + 1) % total);
+        } else {
+          activate((current - 1 + total) % total);
+        }
+        startTimer();
+      }
+    }, { passive: true });
+
+    // Start
+    startTimer();
+  });
+</script>

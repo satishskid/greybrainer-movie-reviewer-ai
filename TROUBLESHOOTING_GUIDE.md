@@ -3,11 +3,15 @@
 ## ✅ Issues Resolved
 
 ### 1. Greybrainer Insights & Research - FIXED
-**Root Cause Found:** The `generateGreybrainerInsightWithGemini` function was missing the `tools: [{ googleSearchRetrieval: {} }]` parameter that other working functions use.
+**Root Cause Found:** The `generateGreybrainerInsightWithGemini` function was missing search grounding, so it was not matching the other Gemini calls that were using web-grounded prompts.
 
 **Fix Applied:**
 - Added the missing `tools` parameter to ensure consistency with other Gemini API calls
 - This should now work exactly like other features that use the Gemini API key
+
+**2026 Note:**
+- Historical references to `googleSearchRetrieval` are obsolete for current models.
+- Active runtime uses the current `googleSearch` tool shape via the migrated Gemini client layer.
 
 ### 2. Monthly Magic Scoreboard - ENHANCED
 **Issues Fixed:**

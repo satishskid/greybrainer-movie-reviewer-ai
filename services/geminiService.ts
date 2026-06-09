@@ -1,9 +1,13 @@
-import { GoogleGenerativeAI, GenerateContentResult } from "@google/generative-ai";
+import { GoogleGenerativeAI, GenerateContentResult } from "../utils/googleGenAICompat";
 import { ReviewLayer, ReviewStage, LayerAnalysisData, GroundingChunkWeb, GroundingMetadata, PersonnelData, SummaryReportData, CreativeSparkResult, VonnegutShapeData, PlotPoint, ScriptIdeaInput, MagicQuotientAnalysis, MorphokineticsAnalysis, FinancialAnalysisData, SocialSnippets, MovieSuggestion, DistributionPack } from '../types';
 import { MAX_SCORE, MAGIC_QUOTIENT_DISCLAIMER } from '../constants';
 import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
+import { getGroqApiKeyString } from '../utils/groqKeyStorage';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
 import { modelConfigService } from './modelConfigService';
+import { getEditorialMovieSuggestions } from './editorialSignalsService';
+import { googleSearchService } from './googleSearchService';
+import { buildGeminiQuotaMessage, isGeminiQuotaError } from '../utils/geminiQuotaMessaging';
 
 // --- IP PROTECTION & COMMERCIAL SERVICE NOTE ---
 // For a commercial application requiring IP protection and robust user management/metering:
@@ -25,6 +29,291 @@ const getGeminiAI = (): GoogleGenerativeAI => {
 };
 
 export type LogTokenUsageFn = (operation: string, inputChars: number, outputChars: number) => void;
+
+const GOOGLE_SEARCH_TOOL = [{ googleSearch: {} }] as any[];
+const GROQ_API_BASE_URL = import.meta.env.VITE_GROQ_API_BASE_URL?.trim() || 'https://api.groq.com/openai/v1/chat/completions';
+
+interface HybridDraftSectionPlan {
+  heading: string;
+  purpose: string;
+  approxWords: number;
+  mustInclude: string[];
+}
+
+interface HybridDraftPlan {
+  workingTitle: string;
+  targetAudience: string;
+  targetLength: string;
+  styleGuardrails: string[];
+  bannedPatterns: string[];
+  evidencePacket: string[];
+  sections: HybridDraftSectionPlan[];
+  qualityChecklist: string[];
+}
+
+interface HybridDraftVerificationResult {
+  approved: boolean;
+  score: number;
+  issues: string[];
+  revisedDraft: string;
+}
+
+const parseJsonFromModel = <T>(responseText: string): T => {
+  const jsonPayload = extractJsonPayloadFromModelText(responseText);
+  return JSON.parse(jsonPayload) as T;
+};
+
+const getGroqModelCandidates = (): string[] => {
+  const configuredModel = import.meta.env.VITE_GROQ_MODEL?.trim();
+  return [configuredModel, 'llama-3.3-70b-versatile', 'llama-3.1-8b-instant'].filter(Boolean) as string[];
+};
+
+const runGroqDraftWithFallback = async (
+  operationName: string,
+  prompt: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string> => {
+  const apiKey = getGroqApiKeyString();
+  if (!apiKey) {
+    throw new Error('Groq API key not found. Please provide your API key to continue.');
+  }
+
+  let lastError: string | null = null;
+
+  for (const model of getGroqModelCandidates()) {
+    try {
+      const response = await fetch(GROQ_API_BASE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model,
+          temperature: 0.35,
+          max_tokens: 4096,
+          messages: [
+            {
+              role: 'system',
+              content: 'You are a precise editorial drafter. Follow the provided contract exactly, preserve structure, and never invent unsupported facts.',
+            },
+            {
+              role: 'user',
+              content: prompt,
+            },
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Groq ${response.status}: ${errorText}`);
+      }
+
+      const payload = await response.json();
+      const content = payload?.choices?.[0]?.message?.content?.trim();
+      if (!content) {
+        throw new Error(`Groq returned an empty draft for ${operationName}.`);
+      }
+
+      logTokenUsage?.(`${operationName} (Groq Draft)`, prompt.length, content.length);
+      return content;
+    } catch (error) {
+      lastError = error instanceof Error ? error.message : 'Unknown Groq error';
+      console.warn(`⚠️ [${operationName}] Groq model failed, trying next candidate:`, error);
+    }
+  }
+
+  throw new Error(lastError || `Groq failed during ${operationName}.`);
+};
+
+const sanitizeHybridPlan = (plan: Partial<HybridDraftPlan>): HybridDraftPlan => {
+  const sections = Array.isArray(plan.sections) && plan.sections.length > 0
+    ? plan.sections.map((section) => ({
+        heading: String(section?.heading || 'Untitled Section').trim(),
+        purpose: String(section?.purpose || 'Deliver the next part of the argument.').trim(),
+        approxWords: Number(section?.approxWords) || 150,
+        mustInclude: Array.isArray(section?.mustInclude)
+          ? section.mustInclude.map((item) => String(item).trim()).filter(Boolean)
+          : [],
+      }))
+    : [
+        {
+          heading: 'Main Argument',
+          purpose: 'Present the strongest grounded version of the argument.',
+          approxWords: 300,
+          mustInclude: [],
+        },
+      ];
+
+  return {
+    workingTitle: String(plan.workingTitle || 'Greybrainer Draft').trim(),
+    targetAudience: String(plan.targetAudience || 'Film professionals and serious readers').trim(),
+    targetLength: String(plan.targetLength || 'Medium-length article').trim(),
+    styleGuardrails: Array.isArray(plan.styleGuardrails) ? plan.styleGuardrails.map((item) => String(item).trim()).filter(Boolean) : [],
+    bannedPatterns: Array.isArray(plan.bannedPatterns) ? plan.bannedPatterns.map((item) => String(item).trim()).filter(Boolean) : [],
+    evidencePacket: Array.isArray(plan.evidencePacket) ? plan.evidencePacket.map((item) => String(item).trim()).filter(Boolean) : [],
+    sections,
+    qualityChecklist: Array.isArray(plan.qualityChecklist) ? plan.qualityChecklist.map((item) => String(item).trim()).filter(Boolean) : [],
+  };
+};
+
+const createHybridDraftPlan = async (
+  operationName: string,
+  sourceMaterial: string,
+  brief: string,
+  logTokenUsage?: LogTokenUsageFn,
+  tools?: any[],
+): Promise<HybridDraftPlan> => {
+  const prompt = `
+You are the Greybrainer planning model. Build a strict drafting contract for a secondary writer model.
+
+SOURCE MATERIAL:
+${sourceMaterial}
+
+TASK BRIEF:
+${brief}
+
+Return valid JSON only with this schema:
+{
+  "workingTitle": "string",
+  "targetAudience": "string",
+  "targetLength": "string",
+  "styleGuardrails": ["string"],
+  "bannedPatterns": ["string"],
+  "evidencePacket": ["string"],
+  "sections": [
+    {
+      "heading": "string",
+      "purpose": "string",
+      "approxWords": 180,
+      "mustInclude": ["string"]
+    }
+  ],
+  "qualityChecklist": ["string"]
+}
+
+Rules:
+- Do NOT draft the article.
+- Include only claims supported by the source material or grounded evidence you can verify.
+- Use evidencePacket to list the facts, examples, and comparative anchors the writer is allowed to mention.
+- bannedPatterns must explicitly forbid invented facts, fake quotes, filler transitions, and repetitive hype.
+- qualityChecklist must be concrete and testable.
+  `.trim();
+
+  return runGeminiWithFallback(
+    `${operationName} Planner`,
+    prompt,
+    { temperature: 0.2, maxOutputTokens: 1800 },
+    (responseText) => sanitizeHybridPlan(parseJsonFromModel<Partial<HybridDraftPlan>>(responseText)),
+    logTokenUsage,
+    tools
+  );
+};
+
+const verifyHybridDraft = async (
+  operationName: string,
+  sourceMaterial: string,
+  plan: HybridDraftPlan,
+  draft: string,
+  logTokenUsage?: LogTokenUsageFn,
+  tools?: any[],
+): Promise<HybridDraftVerificationResult> => {
+  const prompt = `
+You are Greybrainer's final quality gate.
+
+SOURCE MATERIAL:
+${sourceMaterial}
+
+PLAN JSON:
+${JSON.stringify(plan, null, 2)}
+
+DRAFT TO CHECK:
+${draft}
+
+Evaluate whether the draft follows the plan exactly and whether every significant claim is supported by the source material or the evidence packet.
+
+Return valid JSON only in this schema:
+{
+  "approved": true,
+  "score": 92,
+  "issues": ["string"],
+  "revisedDraft": "full corrected draft text"
+}
+
+Rules:
+- If the draft is good, still return the finalized polished draft in revisedDraft.
+- If the draft drifts, revise it fully so it complies.
+- Remove unsupported facts rather than embellishing.
+- Keep the structure clear and scannable.
+  `.trim();
+
+  return runGeminiWithFallback(
+    `${operationName} Quality Verification`,
+    prompt,
+    { temperature: 0.15, maxOutputTokens: 4096 },
+    (responseText) => {
+      const parsed = parseJsonFromModel<Partial<HybridDraftVerificationResult>>(responseText);
+      return {
+        approved: Boolean(parsed.approved),
+        score: Number(parsed.score) || 0,
+        issues: Array.isArray(parsed.issues) ? parsed.issues.map((item) => String(item).trim()).filter(Boolean) : [],
+        revisedDraft: String(parsed.revisedDraft || '').trim(),
+      };
+    },
+    logTokenUsage,
+    tools
+  );
+};
+
+const generateHybridPublicationText = async (
+  operationName: string,
+  sourceMaterial: string,
+  planningBrief: string,
+  fallbackGenerator: () => Promise<string>,
+  logTokenUsage?: LogTokenUsageFn,
+  tools?: any[],
+): Promise<string> => {
+  if (!getGroqApiKeyString()) {
+    return fallbackGenerator();
+  }
+
+  try {
+    const plan = await createHybridDraftPlan(operationName, sourceMaterial, planningBrief, logTokenUsage, tools);
+    const groqPrompt = `
+You are writing a Greybrainer publication draft.
+
+PLAN JSON:
+${JSON.stringify(plan, null, 2)}
+
+SOURCE MATERIAL:
+${sourceMaterial}
+
+Instructions:
+- Follow the section order exactly.
+- Use only the evidencePacket and source material for claims.
+- If support is weak, write cautiously or omit the claim.
+- Do not mention the plan or metadata.
+- Return only the finished draft.
+    `.trim();
+
+    const draft = await runGroqDraftWithFallback(operationName, groqPrompt, logTokenUsage);
+    const verified = await verifyHybridDraft(operationName, sourceMaterial, plan, draft, logTokenUsage, tools);
+
+    if (verified.revisedDraft) {
+      return verified.revisedDraft;
+    }
+
+    if (verified.approved) {
+      return draft;
+    }
+
+    throw new Error(verified.issues.join('; ') || `${operationName} verification failed.`);
+  } catch (error) {
+    console.warn(`⚠️ [${operationName}] Hybrid generation failed, falling back to Gemini-only flow:`, error);
+    return fallbackGenerator();
+  }
+};
 
 export async function runGeminiWithFallback<T>(
   operationName: string,
@@ -80,33 +369,33 @@ export async function runGeminiWithFallback<T>(
       }
     } catch (error: any) {
       const errorMsg = error.message?.toLowerCase() || '';
-      const isModelError = errorMsg.includes('404') || 
-                         error.status === 404 || 
+      const isModelError = errorMsg.includes('404') ||
+                         error.status === 404 ||
                          errorMsg.includes('not found') ||
                          errorMsg.includes('unsupported model');
-                         
+
       const isToolError = errorMsg.includes('tool') || errorMsg.includes('400') || errorMsg.includes('search');
       const isQuotaError = error.status === 429 || errorMsg.includes('429') || errorMsg.includes('quota');
-                   
-      if (isModelError || isQuotaError || (isToolError && tools && tools.length > 0)) {
-        console.warn(`⚠️ [${operationName}] Model ${modelName} error (${isToolError ? 'tool issue' : isQuotaError ? 'quota' : 'not found'}), trying next fallback...`);
+      const isForbiddenError = error.status === 403 || errorMsg.includes('403') || errorMsg.includes('forbidden') || errorMsg.includes('permission_denied');
+
+      if (isModelError || isQuotaError || isForbiddenError || (isToolError && tools && tools.length > 0)) {
+        console.warn(`⚠️ [${operationName}] Model ${modelName} error (${isToolError ? 'tool issue' : isQuotaError ? 'quota' : isForbiddenError ? 'forbidden' : 'not found'}), trying next fallback...`);
         lastError = error;
         continue;
       }
-      
+
       console.error(`❌ [${operationName}] Permanent error with model ${modelName}:`, error);
       throw error;
     }
   }
 
-  // Second pass: If all failed and we had tools, retry WITHOUT tools as a last resort
   if (tools && tools.length > 0) {
     console.warn(`⚠️ [${operationName}] All tool-enabled models failed. Retrying WITHOUT tools.`);
     try {
       const genAI = getGeminiAI();
-      const model = genAI.getGenerativeModel({ 
-        model: modelsToTry[0], 
-        generationConfig 
+      const model = genAI.getGenerativeModel({
+        model: modelsToTry[0],
+        generationConfig
       });
       const response = await model.generateContent(prompt);
       const responseText = response.response.text();
@@ -117,163 +406,28 @@ export async function runGeminiWithFallback<T>(
     }
   }
 
-  throw new Error(`[${operationName}] All Gemini attempts failed. Last error: ${lastError?.message || 'Unknown error'}`);
+  const lastErrorMessage = lastError?.message || 'Unknown error';
+  if (isGeminiQuotaError(lastErrorMessage)) {
+    throw new Error(buildGeminiQuotaMessage(lastErrorMessage, { context: `[${operationName}]` }));
+  }
+
+  throw new Error(`[${operationName}] All Gemini attempts failed. Last error: ${lastErrorMessage}`);
 }
 
-// Simple movie title suggestions using Gemini API
-export const suggestMovieTitles = async (
-  partialTitle: string,
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<string[]> => {
-  if (!partialTitle || partialTitle.trim().length < 2) {
-    return [];
-  }
-
-  const prompt = `
-You are a movie database assistant. The user is typing: "${partialTitle}"
-
-List 8 movie or TV series titles that match or contain this text. Include:
-- Exact matches first
-- Popular titles containing these letters
-- Recent releases when relevant
-- Both movies and series
-
-Format: Just the titles, one per line, no explanations.
-
-Examples:
-Input: "fam"
-Output:
-The Family Man
-The Family Man (Series)
-Famous
-Fame
-Family Plot
-
-Input: "stranger"
-Output:
-Stranger Things
-Stranger Than Fiction
-The Stranger
-
-Now suggest titles for: "${partialTitle}"
-  `.trim();
-
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.3,
-        maxOutputTokens: 200
-      }
-    });
-    
-    // Add timeout for better reliability
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-    
-    const response = await model.generateContent(prompt);
-    clearTimeout(timeoutId);
-    
-    const responseText = response.response.text().trim();
-    logTokenUsage?.('Movie Title Suggestions (Gemini)', prompt.length, responseText.length);
-    
-    // Parse response - one title per line
-    const suggestions = responseText
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0 && line.length < 100)
-      .slice(0, 8); // Limit to 8 suggestions
-    
-    return suggestions;
-  } catch (error) {
-    console.error('Gemini API error getting movie suggestions:', error);
-    handleGeminiError(error as Error, 'Movie Title Suggestions');
-    return []; // Return empty array on error - user can type manually
-  }
-}; 
-
-// Lookup movie title by IMDb ID using Gemini API
-export const lookupMovieByImdbId = async (
-  imdbId: string,
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<string | null> => {
-  if (!imdbId || !imdbId.trim()) {
-    return null;
-  }
-
-  // Validate IMDb ID format (tt1234567 or tt12345678)
-  const imdbIdPattern = /^tt\d{7,8}$/;
-  if (!imdbIdPattern.test(imdbId.trim())) {
-    throw new Error('Invalid IMDb ID format. Must be "tt" followed by 7-8 digits (e.g., tt1234567)');
-  }
-
-  const prompt = `
-You are a movie database assistant. Look up the movie or TV series with IMDb ID: ${imdbId}
-
-Return only the exact title of the movie or series. If it's a series, include "(Series)" at the end.
-
-Examples:
-Input: tt1234567
-Output: The Family Man (Series)
-
-Input: tt7658407
-Output: The Family Man
-
-If the ID is not found or invalid, return "NOT_FOUND".
-
-Look up: ${imdbId}
-  `.trim();
-
-  try {
-    const model = getGeminiAI().getGenerativeModel({ 
-      model: getSelectedGeminiModel(),
-      generationConfig: {
-        temperature: 0.1,
-        maxOutputTokens: 100
-      }
-    });
-    
-    // Add timeout for better reliability
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // 8 second timeout
-    
-    const response = await model.generateContent(prompt);
-    clearTimeout(timeoutId);
-    
-    const responseText = response.response.text().trim();
-    logTokenUsage?.('IMDb ID Lookup (Gemini)', prompt.length, responseText.length);
-    
-    if (responseText.toUpperCase().includes('NOT_FOUND')) {
-      return null;
-    }
-    
-    return responseText;
-  } catch (error) {
-    console.error('Gemini API error looking up IMDb ID:', error);
-    handleGeminiError(error as Error, 'IMDb ID Lookup');
-  }
-  
-  return null; // Fallback return
-};
-
-// Simple error handling without quota monitoring
 const handleGeminiError = (error: Error, operation: string): never => {
-  const errorMessage = error.message.toLowerCase();
-  
-  // Handle quota/rate limit errors with simple informative message
-  if (errorMessage.includes('429') || errorMessage.includes('quota') || errorMessage.includes('rate limit')) {
-    throw new Error('Gemini API has daily usage limits. Please try again later.');
+  const errorMessage = error.message;
+
+  if (isGeminiQuotaError(errorMessage)) {
+    throw new Error(buildGeminiQuotaMessage(errorMessage, { context: `Gemini API error in ${operation}:` }));
   }
-  
-  // Handle other API errors
-  if (error.message.includes('API key not valid') || error.message.includes('API_KEY_INVALID')) {
+
+  if (errorMessage.includes('API key not valid') || errorMessage.includes('API_KEY_INVALID')) {
     throw new Error('Invalid Gemini API Key. Please check your API key configuration.');
   }
-  
-  throw new Error(`Gemini API error in ${operation}: ${error.message}`);
+
+  throw new Error(`Gemini API error in ${operation}: ${errorMessage}`);
 };
 
-// Add missing type definitions
 interface CharacterIdea {
   name: string;
   description: string;
@@ -284,8 +438,15 @@ interface SceneIdea {
   description: string;
 }
 
-// Add missing generateAnalysisPrompt function
-const generateAnalysisPrompt = (movieTitle: string, reviewStage: ReviewStage, layer: ReviewLayer, layerTitle: string, layerDescription: string, year?: string, director?: string): string => {
+const generateAnalysisPrompt = (
+  movieTitle: string,
+  reviewStage: ReviewStage,
+  layer: ReviewLayer,
+  layerTitle: string,
+  layerDescription: string,
+  year?: string,
+  director?: string,
+): string => {
   const contextInfo = [
     year ? `Year: ${year}` : '',
     director ? `Director: ${director}` : ''
@@ -296,7 +457,7 @@ const generateAnalysisPrompt = (movieTitle: string, reviewStage: ReviewStage, la
   return `
     You are an expert film critic analyzing ${titleWithContext} (${reviewStage}).
     Focus on the ${layerTitle}: ${layerDescription}
-    
+
     IMPORTANT: Ensure you are analyzing the correct movie.
     ${year ? `Release Year: ${year}` : ''}
     ${director ? `Director: ${director}` : ''}
@@ -307,34 +468,34 @@ const generateAnalysisPrompt = (movieTitle: string, reviewStage: ReviewStage, la
     2. Strengths and weaknesses
     3. How it contributes to the overall film
     4. Suggested improvements
-    
+
     Include the following structured data:
     Director: [Director Name]
     Main Cast: [Cast Names]
     Suggested Score: [Score]/${MAX_SCORE}
     Potential Enhancements: [List of suggestions]
-    
+
     ${layer === ReviewLayer.STORY ? `
     Also include Vonnegut Story Shape analysis:
     ---VONNEGUT STORY SHAPE START---
     [Analysis of story shape and emotional arc]
     ---VONNEGUT STORY SHAPE END---
     ` : ''}
-    
+
     Provide your analysis:
   `;
 };
 
-
 export interface ParsedLayerAnalysis {
-  analysisText: string;
-  director?: string;
-  mainCast?: string[];
-  groundingSources?: GroundingChunkWeb[];
-  aiSuggestedScore?: number;
-  improvementSuggestions?: string | string[];
-  vonnegutShape?: VonnegutShapeData;
-  isFallbackResult?: boolean; 
+    analysisText: string;
+    aiSuggestedScore?: number;
+    director?: string;
+    mainCast?: string[];
+    groundingSources?: GroundingChunkWeb[];
+    improvementSuggestions?: string | string[];
+    vonnegutShape?: VonnegutShapeData;
+    isFallbackResult?: boolean;
+    error?: string;
 }
 
 export interface ParsedFinancials {
@@ -374,7 +535,253 @@ const getDynamicDateRange = () => {
   };
 };
 
+const normalizeMovieSearchText = (value: string): string =>
+  value
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 
+const getMeaningfulQueryTokens = (value: string): string[] =>
+  normalizeMovieSearchText(value)
+    .split(' ')
+    .filter((token) => token.length >= 2);
+
+const parseSuggestionYear = (year?: string): number | undefined => {
+  if (!year) {
+    return undefined;
+  }
+
+  const match = year.match(/\d{4}/);
+  if (!match) {
+    return undefined;
+  }
+
+  const parsedYear = Number.parseInt(match[0], 10);
+  return Number.isFinite(parsedYear) ? parsedYear : undefined;
+};
+
+const scoreMovieSuggestion = (
+  query: string,
+  suggestion: MovieSuggestion,
+  currentYear: number,
+): number => {
+  const normalizedQuery = normalizeMovieSearchText(query);
+  const normalizedTitle = normalizeMovieSearchText(suggestion.title || '');
+  const queryTokens = normalizedQuery.split(' ').filter(Boolean);
+  const suggestionYear = parseSuggestionYear(suggestion.year);
+
+  let score = 0;
+
+  if (normalizedTitle === normalizedQuery) {
+    score += 300;
+  } else if (normalizedTitle.startsWith(normalizedQuery)) {
+    score += 220;
+  } else if (normalizedTitle.includes(normalizedQuery)) {
+    score += 160;
+  }
+
+  const matchedTokens = queryTokens.filter(token => normalizedTitle.includes(token)).length;
+  score += matchedTokens * 20;
+
+  if (suggestionYear !== undefined) {
+    const age = currentYear - suggestionYear;
+
+    if (age < 0) {
+      score += 80;
+    } else if (age === 0) {
+      score += 140;
+    } else if (age === 1) {
+      score += 120;
+    } else if (age === 2) {
+      score += 95;
+    } else if (age <= 5) {
+      score += 70 - age * 8;
+    } else if (age <= 10) {
+      score += 20;
+    } else {
+      score -= Math.min(35, age - 10);
+    }
+  } else {
+    score -= 15;
+  }
+
+  if (suggestion.type === 'Movie') {
+    score += 5;
+  }
+
+  return score;
+};
+
+const isSuggestionRelevantToQuery = (query: string, suggestion: MovieSuggestion): boolean => {
+  const normalizedQuery = normalizeMovieSearchText(query);
+  const normalizedTitle = normalizeMovieSearchText(suggestion.title || '');
+
+  if (!normalizedQuery) {
+    return true;
+  }
+
+  if (normalizedTitle.includes(normalizedQuery) || normalizedQuery.includes(normalizedTitle)) {
+    return true;
+  }
+
+  const queryTokens = getMeaningfulQueryTokens(query);
+  if (queryTokens.length === 0) {
+    return false;
+  }
+
+  const matchedTokens = queryTokens.filter((token) => normalizedTitle.includes(token));
+
+  if (queryTokens.length === 1) {
+    return matchedTokens.length === 1;
+  }
+
+  return matchedTokens.length >= Math.ceil(queryTokens.length / 2);
+};
+
+const filterSuggestionsForQuery = (query: string, suggestions: MovieSuggestion[]): MovieSuggestion[] => {
+  const normalizedQuery = normalizeMovieSearchText(query);
+  if (!normalizedQuery) {
+    return suggestions;
+  }
+
+  return suggestions.filter((suggestion) => isSuggestionRelevantToQuery(normalizedQuery, suggestion));
+};
+
+const rankMovieSuggestions = (
+  query: string,
+  suggestions: MovieSuggestion[],
+  currentYear: number,
+): MovieSuggestion[] => {
+  return [...suggestions].sort((left, right) => {
+    const scoreDifference = scoreMovieSuggestion(query, right, currentYear) - scoreMovieSuggestion(query, left, currentYear);
+    if (scoreDifference !== 0) {
+      return scoreDifference;
+    }
+
+    const rightYear = parseSuggestionYear(right.year) ?? 0;
+    const leftYear = parseSuggestionYear(left.year) ?? 0;
+    if (rightYear !== leftYear) {
+      return rightYear - leftYear;
+    }
+
+    return left.title.localeCompare(right.title);
+  });
+};
+
+const dedupeMovieSuggestions = (suggestions: MovieSuggestion[]): MovieSuggestion[] => {
+  const seen = new Set<string>();
+
+  return suggestions.filter((suggestion) => {
+    const key = `${suggestion.title}_${suggestion.year || ''}`.trim().toLowerCase();
+    if (!key || seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+};
+
+const mergeMovieSuggestions = (...groups: MovieSuggestion[][]): MovieSuggestion[] => {
+  return dedupeMovieSuggestions(groups.flat().filter((suggestion) => suggestion?.title?.trim()));
+};
+
+const parseMovieSuggestionArray = (responseText: string): MovieSuggestion[] => {
+  const cleanJson = extractJsonPayloadFromModelText(responseText);
+  const parsed = JSON.parse(cleanJson);
+  if (!Array.isArray(parsed)) {
+    return [];
+  }
+
+  return parsed
+    .filter((item) => item && typeof item === 'object' && typeof item.title === 'string')
+    .map((item) => ({
+      title: item.title.trim(),
+      year: typeof item.year === 'string' ? item.year.trim() : undefined,
+      director: typeof item.director === 'string' ? item.director.trim() : undefined,
+      type: (item.type === 'Series' ? 'Series' : 'Movie') as 'Series' | 'Movie',
+      description: typeof item.description === 'string' ? item.description.trim() : undefined,
+      source: typeof item.source === 'string' ? item.source.trim() : 'Grounded search',
+    }))
+    .filter((item) => item.title.length > 0);
+};
+
+const getGroundedMovieSuggestions = async (
+  query: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<MovieSuggestion[]> => {
+  const trimmedQuery = query.trim();
+  const { currentDate, currentYear, previousYear } = getDynamicDateRange();
+
+  const prompt = trimmedQuery
+    ? `
+You are Greybrainer's movie autocomplete engine.
+Current Date: ${currentDate}
+User typed: "${trimmedQuery}"
+
+Use Google Search grounding to find real, existing movie or series titles matching this partial query.
+
+Rules:
+- Only include titles you can verify from search results.
+- Prefer current/recent results from ${previousYear}-${currentYear} when the query is ambiguous.
+- Do not invent titles.
+- If nothing credible matches, return an empty array.
+- Return up to 8 results.
+
+For each result return:
+- title
+- year
+- director
+- type (Movie or Series)
+- description
+- source
+
+Return valid JSON only.
+Example:
+[
+  {
+    "title": "Toaster",
+    "year": "${currentYear}",
+    "director": "Example Director",
+    "type": "Movie",
+    "description": "Recent release matching the typed query.",
+    "source": "Grounded search"
+  }
+]
+    `.trim()
+    : `
+You are Greybrainer's daily review starter picker.
+Current Date: ${currentDate}
+
+Use Google Search grounding to find real, current movie and series titles worth reviewing right now.
+
+Rules:
+- Only include titles you can verify from search results.
+- Prioritize theatrical releases, fresh OTT releases, and strong current conversation from ${previousYear}-${currentYear}.
+- Focus on Indian cinema first, then major global titles.
+- Do not invent titles.
+- Return up to 8 results.
+
+For each result return:
+- title
+- year
+- director
+- type (Movie or Series)
+- description
+- source
+
+Return valid JSON only.
+    `.trim();
+
+  return runGeminiWithFallback(
+    trimmedQuery ? 'Grounded Movie Suggestions' : 'Grounded Recent Suggestions',
+    prompt,
+    { temperature: 0.1, maxOutputTokens: 700 },
+    (responseText) => dedupeMovieSuggestions(parseMovieSuggestionArray(responseText)).slice(0, 8),
+    logTokenUsage,
+    GOOGLE_SEARCH_TOOL
+  );
+};
 
 const parseMainCast = (text: string): string[] | undefined => {
   const match = text.match(/Main Cast:\s*([\w\s,]+)/i);
@@ -822,6 +1229,8 @@ export const getMovieTitleSuggestions = async (
   }
 };
 
+export const suggestMovieTitles = getMovieTitleSuggestions;
+
 export const fetchMovieFinancialsWithGemini = async (
   movieTitle: string,
   logTokenUsage?: LogTokenUsageFn
@@ -862,7 +1271,7 @@ export const fetchMovieFinancialsWithGemini = async (
       }
     },
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] // Enable Google Search for financials
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -984,7 +1393,7 @@ Generate insight:
     },
     (responseText) => responseText.trim(),
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[] // Using as any[] to bypass Tool type definition limitations
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -1099,18 +1508,25 @@ SEO/VIRAL ELEMENTS:
 Generate the full publication-ready article now:
   `.trim();
   
-  return runGeminiWithFallback(
+  return generateHybridPublicationText(
     'Expanded Publication Insight',
-    prompt,
-    {
-      temperature: 0.8,
-      topP: 0.95,
-      topK: 60,
-      maxOutputTokens: 4096,
-    },
-    (responseText) => responseText.trim(),
+    originalInsight,
+    'Write a publication-ready long-form opinion piece. Preserve Greybrainer methodology positioning, keep the argument evidence-based, and make the article readable and publication-ready.',
+    () => runGeminiWithFallback(
+      'Expanded Publication Insight',
+      prompt,
+      {
+        temperature: 0.8,
+        topP: 0.95,
+        topK: 60,
+        maxOutputTokens: 4096,
+      },
+      (responseText) => responseText.trim(),
+      logTokenUsage,
+      GOOGLE_SEARCH_TOOL
+    ),
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[] // Using as any[] to bypass Tool type definition limitations
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -1183,7 +1599,7 @@ Generate insight:
     },
     (responseText) => responseText.trim(),
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[] // Using as any[] to bypass Tool type definition limitations
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -1245,7 +1661,7 @@ export const analyzeLayerWithGemini = async (
       };
     },
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] // Enable Google Search for layer analysis
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -1380,7 +1796,7 @@ export const generateFinalReportWithGemini = async (
     { temperature: 0.7 },
     (responseText) => parseFinalReportAndMore(responseText.trim(), financialData),
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[]
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -1465,8 +1881,272 @@ Polarizing or contrarian angle.​​
 };
 
 /**
+ * Generate generic Greybrainer Publisher Editorial from any research/analysis text
+ */
+export const generateGenericPublisherEditorial = async (
+  topicTitle: string,
+  pureAnalysis: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string> => {
+  const prompt = `You are "Greybrainer Publisher AI" — the publishing and editorial layer of Greybrainer, an advanced cinematic intelligence and authentic review engine.
+
+Your job is to transform Greybrainer research attachments into premium publishable editorial assets.
+
+The uploaded attachments may contain:
+- Greybrainer reports
+- HTML analysis pages
+- social posts
+- blog drafts
+- emotional arc data
+- score visualizations
+- layer analysis
+- pacing analysis
+- key moments
+- conceptual reviews
+- audience insights
+- cinematic observations
+
+Your responsibilities:
+
+====================================================
+CORE OBJECTIVE
+====================================================
+
+Convert the uploaded Greybrainer analysis into:
+
+1. A premium SEO-optimized article
+2. Cinematic editorial writing
+3. Metadata for publishing
+4. Social promotion copy
+5. Optional YouTube/reel script
+6. Structured publish-ready formatting
+
+The output must feel:
+- cinematic
+- intelligent
+- human-written
+- emotionally observant
+- editorial-grade
+- publication-ready
+
+NEVER sound generic or robotic.
+
+====================================================
+IMPORTANT BRAND RULES
+====================================================
+
+Greybrainer is NOT:
+- a generic AI review generator
+- a casual movie blog
+- a fan-summary engine
+
+Greybrainer IS:
+- a cinematic intelligence engine
+- an authentic review framework
+- an emotional architecture analysis system
+- a storytelling research platform
+
+Maintain this positioning throughout the writing.
+
+====================================================
+FACTUAL RULES
+====================================================
+
+STRICTLY use ONLY information present in the uploaded files.
+
+DO NOT:
+- invent facts
+- invent cast
+- invent release dates
+- invent ratings
+- invent reviews
+- invent awards
+- invent box office
+- invent quotes
+- invent production details
+
+If information is uncertain or contradictory inside the uploaded files:
+- acknowledge ambiguity gracefully
+- prioritize consistency
+- never hallucinate
+
+====================================================
+EDITORIAL STYLE
+====================================================
+
+Writing style should combine:
+- premium film journalism
+- cinematic essay writing
+- intelligent emotional analysis
+- modern editorial pacing
+
+Tone reference:
+- HBO documentary narration
+- Letterboxd high-end editorial
+- IndieWire long-form analysis
+- Every Frame a Painting
+- Nerdwriter
+- The Atlantic film essays
+
+The writing should:
+- flow naturally
+- avoid repetitive AI phrasing
+- avoid filler
+- avoid overexplaining
+- avoid keyword stuffing
+
+====================================================
+SEO REQUIREMENTS
+====================================================
+
+Generate:
+- SEO title
+- URL slug
+- meta description
+- excerpt
+- keyword suggestions
+- semantic keywords
+- FAQ section
+- structured headings
+- internal linking suggestions
+- schema-ready review summary
+
+SEO must feel natural and human.
+
+DO NOT keyword spam.
+
+====================================================
+ARTICLE STRUCTURE
+====================================================
+
+Generate the final article in this structure:
+
+# SEO Title
+
+# Meta Description
+
+# URL Slug
+
+# Excerpt
+
+# Suggested Keywords
+
+# Article
+
+The article should include:
+- compelling cinematic opening hook
+- overview of the topic
+- Key Insights
+- Deep Dive Analysis
+- Cinematic observations
+- strengths and weaknesses
+- final verdict
+- conclusion
+
+Use proper H1/H2/H3 formatting.
+
+====================================================
+SOCIAL CONTENT
+====================================================
+
+Generate:
+1. Twitter/X post
+2. LinkedIn post
+3. Instagram caption
+
+Each should:
+- feel platform-native
+- avoid hashtags overload
+- sound cinematic and intelligent
+- promote curiosity
+
+====================================================
+YOUTUBE SCRIPT
+====================================================
+
+Generate a short cinematic YouTube intro script:
+
+Length:
+120–250 words
+
+Style:
+- atmospheric
+- emotionally intelligent
+- cinematic voiceover style
+
+====================================================
+OUTPUT FORMAT
+====================================================
+
+Return the response in clean markdown.
+
+Use this exact section order:
+
+# SEO TITLE
+# META DESCRIPTION
+# URL SLUG
+# EXCERPT
+# KEYWORDS
+# ARTICLE
+# FAQ
+# SOCIAL POSTS
+# YOUTUBE INTRO
+# SCHEMA SUMMARY
+
+====================================================
+QUALITY BAR
+====================================================
+
+Before finalizing:
+- remove repetitive phrasing
+- remove generic AI wording
+- improve rhythm and flow
+- make transitions cinematic
+- ensure readability
+- ensure publication quality
+
+The final result should feel ready for:
+- WordPress
+- Webflow
+- Ghost CMS
+- Medium
+- Substack
+- LinkedIn articles
+- magazine publication
+
+====================================================
+FINAL INSTRUCTION
+====================================================
+
+Treat the uploaded Greybrainer files as the authoritative source material.
+
+Transform analysis into cinematic editorial publishing quality.
+
+Do not summarize mechanically.
+
+Interpret emotionally and editorially while remaining factually grounded in the uploaded material.
+
+**PURE ANALYSIS DATA FOR "${topicTitle}":**
+${pureAnalysis}
+
+**Generate the Editorial Essay now, following the template exactly.**`;
+
+  return generateHybridPublicationText(
+    'Generic Publisher Generation',
+    `${pureAnalysis}`,
+    'Write a sharp public-facing Grey Editor essay with strong hierarchy, short paragraphs, and no invented facts. Follow the Publisher AI prompt rules.',
+    () => runGeminiWithFallback(
+      'Generic Publisher Generation',
+      prompt,
+      { temperature: 0.65, maxOutputTokens: 4500 },
+      (responseText) => responseText,
+      logTokenUsage
+    )
+  );
+};
+
+/**
  * Generate a Grey Editor-style blog post from pure analysis
- * Transforms technical analysis into compelling, opinionated essay
  */
 export const generateGreyEditorBlogPost = async (
   movieTitle: string,
@@ -1476,116 +2156,334 @@ export const generateGreyEditorBlogPost = async (
   morphokineticsInsight?: string,
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<string> => {
-  const prompt = `**ROLE**
-You are the Editor-in-Chief of "GreyBrainer." Your writer has just handed you a deep, data-heavy "Pure Analysis" of the film "${movieTitle}". Your job is to **distill** this dense analysis into a compelling, opinionated, and highly readable essay for a public audience (Medium/LinkedIn).
+  const prompt = `You are "Greybrainer Publisher AI" — the publishing and editorial layer of Greybrainer, an advanced cinematic intelligence and authentic review engine.
 
-**YOUR VOICE (The "Grey" Persona)**
-* **Nuanced:** You reject binary "Good vs. Bad" takes. You look for the *intent* vs. the *execution*.
-* **Authoritative:** You don't guess; you declare. Use strong verbs.
-* **Vulnerable:** You are not a robot. If a scene made you cringe or cry, say so.
-* **Scannable:** You hate walls of text. You love short paragraphs, bold hooks, and clear hierarchy.
+Your job is to transform Greybrainer research attachments into premium publishable editorial assets.
 
-**THE TASK**
-1.  **Read** the provided "Pure Analysis" (Story, Conceptualization, Performance layers).
-2.  **Synthesize** the key insights into a narrative flow. Do not just copy-paste the data.
-3.  **Format** the output into the structure below.
+The uploaded attachments may contain:
+- Greybrainer reports
+- HTML analysis pages
+- social posts
+- blog drafts
+- emotional arc data
+- score visualizations
+- layer analysis
+- pacing analysis
+- key moments
+- conceptual reviews
+- audience insights
+- cinematic observations
 
-**STRICT FORMATTING GUIDELINES**
-* **The "Verdict" Box:** Always start with a summary block so the reader gets value in 5 seconds.
-* **Headlines:** Must be "Click-Worthy" but intellectual. (e.g., instead of "Review of Movie X", use "Why Movie X Failed Despite a ₹500Cr Budget").
-* **Text Density:** Max 3 sentences per paragraph.
-* **The "Grey" Angle:** Every section must answer "Why does this matter?" not just "What happened?"
+Your responsibilities:
 
-**PURE ANALYSIS DATA:**
+====================================================
+CORE OBJECTIVE
+====================================================
+
+Convert the uploaded Greybrainer analysis into:
+
+1. A premium SEO-optimized article
+2. Cinematic editorial writing
+3. Metadata for publishing
+4. Social promotion copy
+5. Optional YouTube/reel script
+6. Structured publish-ready formatting
+
+The output must feel:
+- cinematic
+- intelligent
+- human-written
+- emotionally observant
+- editorial-grade
+- publication-ready
+
+NEVER sound generic or robotic.
+
+====================================================
+IMPORTANT BRAND RULES
+====================================================
+
+Greybrainer is NOT:
+- a generic AI review generator
+- a casual movie blog
+- a fan-summary engine
+
+Greybrainer IS:
+- a cinematic intelligence engine
+- an authentic review framework
+- an emotional architecture analysis system
+- a storytelling research platform
+
+Maintain this positioning throughout the writing.
+
+====================================================
+FACTUAL RULES
+====================================================
+
+STRICTLY use ONLY information present in the uploaded files.
+
+DO NOT:
+- invent facts
+- invent cast
+- invent release dates
+- invent ratings
+- invent reviews
+- invent awards
+- invent box office
+- invent quotes
+- invent production details
+
+If information is uncertain or contradictory inside the uploaded files:
+- acknowledge ambiguity gracefully
+- prioritize consistency
+- never hallucinate
+
+====================================================
+EDITORIAL STYLE
+====================================================
+
+Writing style should combine:
+- premium film journalism
+- cinematic essay writing
+- intelligent emotional analysis
+- modern editorial pacing
+
+Tone reference:
+- HBO documentary narration
+- Letterboxd high-end editorial
+- IndieWire long-form analysis
+- Every Frame a Painting
+- Nerdwriter
+- The Atlantic film essays
+
+The writing should:
+- flow naturally
+- avoid repetitive AI phrasing
+- avoid filler
+- avoid overexplaining
+- avoid keyword stuffing
+
+====================================================
+SEO REQUIREMENTS
+====================================================
+
+Generate:
+- SEO title
+- URL slug
+- meta description
+- excerpt
+- keyword suggestions
+- semantic keywords
+- FAQ section
+- structured headings
+- internal linking suggestions
+- schema-ready review summary
+
+SEO must feel natural and human.
+
+DO NOT keyword spam.
+
+====================================================
+ARTICLE STRUCTURE
+====================================================
+
+Generate the final article in this structure:
+
+# SEO Title
+
+# Meta Description
+
+# URL Slug
+
+# Excerpt
+
+# Suggested Keywords
+
+# Article
+
+The article should include:
+- compelling cinematic opening hook
+- overview of the film/show
+- Greybrainer score summary
+- Story Layer analysis
+- Concept Layer analysis
+- Performance Layer analysis
+- Emotional Arc discussion
+- Key Moments discussion
+- Cinematic observations
+- strengths and weaknesses
+- final verdict
+- conclusion
+
+Use proper H1/H2/H3 formatting.
+
+====================================================
+SCORING RULES
+====================================================
+
+If the report contains layered scores:
+- preserve them accurately
+
+Preferred format:
+
+Overall Greybrainer Score: ${score}/${maxScore}
+
+Layer Breakdown:
+- Story: [Extract from analysis]
+- Concept: [Extract from analysis]
+- Performance: [Extract from analysis]
+
+DO NOT output totals like:
+26/10
+27/10
+
+Instead:
+26/30 (optional internal reference)
+
+====================================================
+SOCIAL CONTENT
+====================================================
+
+Generate:
+1. Twitter/X post
+2. LinkedIn post
+3. Instagram caption
+
+Each should:
+- feel platform-native
+- avoid hashtags overload
+- sound cinematic and intelligent
+- promote curiosity
+
+====================================================
+YOUTUBE SCRIPT
+====================================================
+
+Generate a short cinematic YouTube intro script:
+
+Length:
+120–250 words
+
+Style:
+- atmospheric
+- emotionally intelligent
+- cinematic voiceover style
+
+====================================================
+OUTPUT FORMAT
+====================================================
+
+Return the response in clean markdown.
+
+Use this exact section order:
+
+# SEO TITLE
+# META DESCRIPTION
+# URL SLUG
+# EXCERPT
+# KEYWORDS
+# ARTICLE
+# FAQ
+# SOCIAL POSTS
+# YOUTUBE INTRO
+# SCHEMA SUMMARY
+
+====================================================
+QUALITY BAR
+====================================================
+
+Before finalizing:
+- remove repetitive phrasing
+- remove generic AI wording
+- improve rhythm and flow
+- make transitions cinematic
+- ensure readability
+- ensure publication quality
+
+The final result should feel ready for:
+- WordPress
+- Webflow
+- Ghost CMS
+- Medium
+- Substack
+- LinkedIn articles
+- magazine publication
+
+====================================================
+FINAL INSTRUCTION
+====================================================
+
+Treat the uploaded Greybrainer files as the authoritative source material.
+
+Transform analysis into cinematic editorial publishing quality.
+
+Do not summarize mechanically.
+
+Interpret emotionally and editorially while remaining factually grounded in the uploaded material.
+
+**PURE ANALYSIS DATA FOR "${movieTitle}":**
 ${pureAnalysis}
 
-**SCORE:** ${score} / ${maxScore}
-
-${morphokineticsInsight ? `**MORPHOKINETIC INSIGHT:**
-${morphokineticsInsight}` : ''}
-
-**OUTPUT TEMPLATE**
-
-# [Generate a Provocative Headline Based on the Core Insight]
-## [Subtitle: A 1-sentence hook that summarizes the emotional core of the review]
-
----
-
-### 🏁 The Grey Verdict
-**Score:** ${score} / ${maxScore}
-**The TL;DR:** [Summarize the entire review in 3 punchy sentences. Is it a masterpiece, a mess, or a misunderstood gem?]
-
----
-
-### 1. The Core: Story & Script
-*[Take the 'Magic of Story' data and turn it into a narrative. Discuss the themes and character arcs. Use bolding for key phrases.]*
-> **"Quote Idea":** *[Pull a standout quote or dialogue mentioned in the analysis, or synthesize a 'pull-quote' that captures the script's essence.]*
-
-### 2. The Vision: Conceptualization
-*[Distill the 'Magic of Conceptualization' data. Focus on the Director's intent. Did the editing work? Was the world immersive?]*
-
-### 3. The Execution: Performance & Craft
-*[Distill the 'Magic of Performance' data. Don't list actors; describe their impact. Mention music/cinematography only if it changed the viewing experience.]*
-
----
-
-### 🧠 The Grey Insight (The "So What?")
-*[Look at the 'Morphokinetic Insight' from the input. Explain where this film fits in the history of cinema. Is it a trendsetter or a relic? Connect it to a social topic if relevant.]*
-
-**Engagement Hook:** [Ask a specific, debate-sparking question related to the film's central conflict.]
-
----
-
-### 📊 Digital Biomarker & Publishing Guidelines
-
-**Biomarker ID:** GB-[YYYYMMDD]-[XXX]  
-*(Example: GB-20260112-001)*
-
-**Published:** [Date & Time]  
-**Topic:** [Film Title] - [Key Theme/Angle]  
-**Keywords:** #[MainKeyword] #[GenreTag] #[PlatformTag] #[TrendingTag]  
-**Biomarker Tag:** #GreybrainerPulse[YYYYMMDD]  
-**Medium URL:** [Paste after publishing]  
-
----
-
-**📋 For Publishing Team:**
-
-When publishing this post to Medium (@GreyBrainer), please:
-
-1. **URL Slug Format:** Use greybrainer-pulse-YYYYMMDD-[topic-keyword]  
-   Example: greybrainer-pulse-20260112-akhanda-divine-action
-
-2. **Biomarker Hashtag:** Add the unique daily tag at the end (e.g., #GreybrainerPulse20260112)
-
-3. **Track Performance (24h after publish):**
-   - Views count
-   - Claps received
-   - Comments (note the top reaction/theme)
-   - Traffic sources (organic search vs social shares)
-
-4. **Update Biomarker Section:** After 24h, paste stats back into this section for research tracking
-
-5. **For Next Day's Research:** Use this biomarker + stats in the "Past Content Context" field to help AI identify what resonated and build narrative continuity
-
-**Why This Matters:** This biomarker system allows Greybrainer AI to analyze audience engagement patterns, suggest follow-up topics based on proven interest, and create a continuous narrative thread across all @GreyBrainer posts. Each post becomes a data point in understanding your audience's evolving preferences.
-
----
-
-*Follow @GreyBrainer for continuous cinema narrative analysis.*
-
----
+**MORPHOKINETIC INSIGHT:**
+**MORPHOKINETIC INSIGHT:**
+${morphokineticsInsight || 'N/A'}
 
 **Generate the Grey Editor essay now, following the template exactly.**`;
 
-  return runGeminiWithFallback(
+  return generateHybridPublicationText(
     'Grey Editor Blog Generation',
+    `${pureAnalysis}\n\nScore: ${score}/${maxScore}${morphokineticsInsight ? `\n\nMorphokinetics Insight:\n${morphokineticsInsight}` : ''}`,
+    'Write a sharp public-facing Grey Editor essay with strong hierarchy, short paragraphs, and no invented facts. Keep the score, verdict framing, and argument structure coherent.',
+    () => runGeminiWithFallback(
+      'Grey Editor Blog Generation',
+      prompt,
+      {
+        temperature: 0.9,
+        maxOutputTokens: 2048
+      },
+      (responseText) => responseText.trim(),
+      logTokenUsage
+    ),
+    logTokenUsage
+  );
+};
+
+/**
+ * Extract a core cultural theme or industry trend from a movie review
+ * This bridges the review engine to the newsletter continuous narrative.
+ */
+export const extractNewsletterThemeFromReview = async (
+  movieTitle: string,
+  summaryReportText: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string> => {
+  const prompt = `**ROLE**
+You are the Editor-in-Chief of the Greybrainer Newsletter.
+Your job is to look at a movie review we just completed and extract the CORE CULTURAL THEME, SOCIETAL TREND, or INDUSTRY SHIFT that the movie represents.
+
+**CONTEXT**
+We do not just write standalone movie reviews. We use movies as a lens to explore broader trends.
+We just reviewed: "${movieTitle}"
+Here is the core summary of the review:
+${summaryReportText}
+
+**TASK**
+Based on the review above, what is the ONE overarching theme or trend that this movie signifies?
+Do not summarize the movie. Do not give me a list.
+Give me a SINGLE, powerful, 1-2 sentence statement that defines the trend.
+
+Examples of good outputs:
+- "The rise of corporate exhaustion and the fantasy of extreme anti-work rebellion."
+- "The weaponization of nostalgia to mask creatively bankrupt legacy franchises."
+- "The audience's growing appetite for flawed, morally grey protagonists over sanitized heroes."
+
+Extract the theme now:`;
+
+  return runGeminiWithFallback(
+    'Extract Newsletter Theme',
     prompt,
-    {
-      temperature: 0.9,
-      maxOutputTokens: 2048
-    },
-    (responseText) => responseText.trim(),
+    { temperature: 0.7, maxOutputTokens: 200 },
+    (text) => text.trim(),
     logTokenUsage
   );
 };
@@ -1754,12 +2652,12 @@ Use these past posts to create narrative continuity. Show evolution, not repetit
 /**
  * Generate Grey Verdict Editorial - Cultural editorial that transforms film analysis into trend narratives
  * Based on the GreyBrainer Editorial Engine system
- * Supports multiple movies (comma-separated) and newsletter context parsing
+ * Supports multiple movies (comma-separated) and signal-board / ecosystem context parsing
  */
 export const generateGreyVerdictEditorial = async (
   movieTitles: string, // Now supports comma-separated list: "Angammal, The Raja Saab, Haq"
   trendAngle: string,
-  pastEcosystemContext?: string, // Can be newsletter with trending topics + suggestions
+  pastEcosystemContext?: string, // Can be signal-board context with trending topics + suggestions
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<string> => {
   const today = new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
@@ -1775,7 +2673,7 @@ export const generateGreyVerdictEditorial = async (
 You are the **Editor-in-Chief of GreyBrainer**, the premier "Morphokinetic" film analysis platform. Your goal is to transcend simple movie reviews. You write **Cultural Editorials** that connect specific films to broader industry trends, societal shifts, and business insights.
 
 **YOUR MEDIUM BLOG REFERENCE**
-The GreyBrainer Medium blog (https://medium.com/@GreyBrainer) contains your past cultural analyses, trend narratives, and editorial insights. When the user provides newsletter context or past ecosystem data, look for:
+The GreyBrainer Medium blog (https://medium.com/@GreyBrainer) contains your past cultural analyses, trend narratives, and editorial insights. When the user provides signal-board context or past ecosystem data, look for:
 - Trending topics mentioned
 - Suggestions on how to approach the Grey Verdict
 - References to past films/analyses you should connect to
@@ -1784,11 +2682,11 @@ The GreyBrainer Medium blog (https://medium.com/@GreyBrainer) contains your past
 **INPUT DATA**
 * **Subject Film(s):** ${movieDisplay} ${movieCount > 1 ? `(${movieCount} films analyzed together)` : ''}
 * **The Trend/Angle:** ${trendAngle}
-${pastEcosystemContext ? `* **Newsletter Context / Past Ecosystem:**
+${pastEcosystemContext ? `* **Signal Board / Past Ecosystem Context:**
 ${pastEcosystemContext}
 
 **INSTRUCTION:** Parse the above context carefully. If it contains:
-- A newsletter with trending topics → Extract the key themes
+- A signal board or curated trend list → Extract the key themes
 - Suggestions on Grey Verdict approach → Follow those guidelines
 - References to past GreyBrainer analyses → Create explicit thematic bridges
 - Cultural patterns → Weave them into your trend analysis` : ''}
@@ -1946,7 +2844,7 @@ ${pastEcosystemContext ?
 * Use actual industry examples, box office data, OTT trends where possible
 * The "Grey" voice admits ambiguity - avoid absolute statements
 * End with forward-looking insights, not just analysis of what was
-* If newsletter context provided, extract trending topics and suggestions - use them as guidance
+* If signal-board or ecosystem context is provided, extract trending topics and suggestions - use them as guidance
 * Reference Medium blog https://medium.com/@GreyBrainer for ecosystem continuity
 
 **Generate the Grey Verdict Editorial now, following the template exactly.**`;
@@ -1996,7 +2894,7 @@ Begin your analysis:
       };
     },
     logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] // Enable Google Search for personnel analysis
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -2246,6 +3144,7 @@ User input: "${userInput}"
 Current Date: ${currentYear}
 
 Find and suggest the most likely movie/series matches for this input. **PRIORITIZE ${currentYear} RELEASES AND CURRENT FILMS** but also include relevant classics if they match well.
+Use Google Search to verify that every suggested title actually exists. Do not invent or speculate.
 
 **RELEASE STATUS GUIDANCE:** 
 - Only mark content as "unreleased" or "upcoming" if you have specific knowledge of a future release date
@@ -2279,6 +3178,7 @@ Provide 8-12 most likely matches as a numbered list, ordered by relevance (recen
 ...
 
 Focus on real, existing movies and series. **Strongly prioritize ${previousYear}-${currentYear} releases and current year films** and currently popular titles. Include release years when helpful for disambiguation.
+If you cannot verify a likely match, leave it out. If nothing credible is found, return an empty list.
 
 Begin matching:
   `.trim();
@@ -2303,9 +3203,10 @@ Begin matching:
         }
       });
       
-      return matches.length > 0 ? matches.slice(0, 12) : [userInput];
+      return matches.slice(0, 12);
     },
-    logTokenUsage
+    logTokenUsage,
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -2408,16 +3309,24 @@ export const generateDetailedReportFromInsightWithGemini = async (
     Maintain a professional, analytical, and objective tone. While data can be illustrative, prioritize credible information.
     The output should be the full text of the report. Format with clear paragraph breaks. You can use simple headings for sections if it improves readability (e.g., "## Introduction"), but avoid complex markdown.
   `;
-  return runGeminiWithFallback(
+  return generateHybridPublicationText(
     'Detailed Insight Report Generation',
-    prompt,
-    {
-      temperature: 0.7,
-      topP: 0.85,
-      topK: 60,
-    },
-    (responseText) => responseText.trim(),
-    logTokenUsage
+    insightText,
+    'Expand the insight into a structured research report for industry professionals. Keep it evidence-based, sectioned, and free of unsupported examples.',
+    () => runGeminiWithFallback(
+      'Detailed Insight Report Generation',
+      prompt,
+      {
+        temperature: 0.7,
+        topP: 0.85,
+        topK: 60,
+      },
+      (responseText) => responseText.trim(),
+      logTokenUsage,
+      GOOGLE_SEARCH_TOOL
+    ),
+    logTokenUsage,
+    GOOGLE_SEARCH_TOOL
   );
 };
 
@@ -2426,63 +3335,91 @@ export const searchMovies = async (
   query: string,
   logTokenUsage?: LogTokenUsageFn,
 ): Promise<MovieSuggestion[]> => {
-  if (!query || query.trim().length < 2) {
-    return [];
+  const trimmedQuery = query.trim();
+
+  const { currentYear } = getDynamicDateRange();
+  const editorialFallback = getEditorialMovieSuggestions(trimmedQuery, 8);
+
+  if (!trimmedQuery) {
+    try {
+      const groundedRecentSuggestions = await getGroundedMovieSuggestions('', logTokenUsage);
+      return rankMovieSuggestions('', mergeMovieSuggestions(groundedRecentSuggestions, editorialFallback), currentYear).slice(0, 8);
+    } catch (error) {
+      console.warn('Grounded recent suggestions unavailable, using editorial starters:', error);
+      return editorialFallback;
+    }
   }
 
-  const { currentDate, currentYear, previousYear } = getDynamicDateRange();
+  let verifiedSuggestions: MovieSuggestion[] = [];
 
-  const prompt = `
-You are a movie database assistant. The user is searching for: "${query}"
-Current Date: ${currentDate}
+  try {
+    const googleSuggestions = await googleSearchService.suggestMovies(trimmedQuery, 8);
+    verifiedSuggestions = googleSuggestions.map((suggestion) => ({
+      title: suggestion.title,
+      year: suggestion.year,
+      source: suggestion.source || 'Google Search',
+    }));
+  } catch (error) {
+    console.warn('Verified Google search suggestions unavailable, falling back to curated matches:', error);
+  }
 
-List up to 5 movies or TV series that match this query.
-CONTEXT: The user is primarily interested in Indian cinema (Bollywood, Tollywood, etc.) and recent global releases. If the title is ambiguous, prioritize Indian movies or recent releases from late ${previousYear}/${currentYear}.
+  try {
+    const groundedSuggestions = await getGroundedMovieSuggestions(trimmedQuery, logTokenUsage);
+    verifiedSuggestions = mergeMovieSuggestions(verifiedSuggestions, groundedSuggestions);
+  } catch (error) {
+    console.warn('Structured grounded suggestions unavailable:', error);
+  }
 
-IMPORTANT: Use your Google Search tool to find the most up-to-date information, especially for movies released in the last few months.
+  if (verifiedSuggestions.length === 0) {
+    try {
+      const groundedMatches = await findMovieMatches(trimmedQuery, logTokenUsage);
+      verifiedSuggestions = groundedMatches.map((title) => ({
+        title,
+        source: 'Grounded match',
+      }));
+    } catch (error) {
+      console.warn('Grounded Gemini title matching unavailable:', error);
+    }
+  }
 
-For each match, provide:
-- Title
-- Year of release
-- Director (or Creator for series)
-- Type (Movie or Series)
-- A very brief one-line description (max 10 words) to help identify it.
+  const mergedSuggestions = mergeMovieSuggestions(verifiedSuggestions, editorialFallback);
+  const filteredSuggestions = filterSuggestionsForQuery(trimmedQuery, mergedSuggestions);
 
-Format the output as a JSON array of objects.
-Example JSON format:
-[
-  { "title": "Avatar", "year": "2009", "director": "James Cameron", "type": "Movie", "description": "Paraplegic Marine on alien planet Pandora." },
-  { "title": "Avatar: The Last Airbender", "year": "2005", "director": "Michael Dante DiMartino", "type": "Series", "description": "Aang must master four elements." }
-]
+  return rankMovieSuggestions(trimmedQuery, filteredSuggestions, currentYear).slice(0, 8);
+};
 
-Ensure the JSON is valid. Do not include markdown formatting like \`\`\`json.
-  `.trim();
+export const lookupMovieByImdbId = async (
+  imdbId: string,
+  logTokenUsage?: LogTokenUsageFn,
+): Promise<string | null> => {
+  const cleanedId = imdbId.trim();
+  if (!cleanedId) {
+    return null;
+  }
+
+  const prompt = `You are a movie database assistant.
+
+Resolve this IMDb title id to the canonical movie or series title:
+${cleanedId}
+
+Rules:
+- Return only the title text.
+- No markdown, no quotes, no explanation.
+- If the id cannot be resolved confidently, return exactly: NOT_FOUND`;
 
   return runGeminiWithFallback(
-    'Movie Search',
+    'IMDb ID Lookup',
     prompt,
-    { temperature: 0.3 },
+    { temperature: 0.1, maxOutputTokens: 80 },
     (responseText) => {
-      try {
-        const cleanJson = extractJsonPayloadFromModelText(responseText);
-        const suggestions: MovieSuggestion[] = JSON.parse(cleanJson);
-        return suggestions;
-      } catch (e) {
-        console.error('Failed to parse search JSON:', e);
-        throw e; // Let runGeminiWithFallback handle retry/fallback
+      const result = responseText.trim().replace(/^"|"$/g, '');
+      if (!result || result === 'NOT_FOUND') {
+        return null;
       }
+      return result;
     },
-    logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[]
-  ).catch(async () => {
-    // Custom catch for searchMovies to provide its own fallback to suggestMovieTitles
-    try {
-      const simpleSuggestions = await suggestMovieTitles(query, logTokenUsage);
-      return simpleSuggestions.map(s => ({ title: s }));
-    } catch (e) {
-      return [];
-    }
-  });
+    logTokenUsage
+  ).catch(() => null);
 };
 
 export const extractJsonPayloadFromModelText = (responseText: string): string => {
@@ -2555,337 +3492,6 @@ export const extractJsonPayloadFromModelText = (responseText: string): string =>
   cleaned = cleaned.replace(/,\s*}/g, '}').replace(/,\s*\]/g, ']');
 
   return cleaned;
-};
-
-/**
- * Generate an SEO Optimized Daily Newsletter with Narrative Continuity
- * Uses Google Search Grounding for live trends and RAG context for memory.
- */
-export const generateDailyNewsletter = async (
-  pastContentContext: string,
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<{ title: string, themes: string, content: string, suggestedReviews: MovieSuggestion[], suggestedResearchTopics: string[] }> => {
-  const today = new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
-  
-  const prompt = `**ROLE**
-You are the Editor-in-Chief for the @GreyBrainer Daily Newsletter. Your readers are cinephiles and industry professionals who value "Morphokinetic" analysis, vulnerability, and deep cultural insights into Indian and global cinema.
-
-**OBJECTIVE**
-Write today's edition of the daily newsletter (${today}). It must be SEO-optimized, highly engaging, and form a continuous narrative with our past dispatches. 
-
-**LIVE GOOGLE SEARCH REQUIREMENT**
-Search Google right now to find:
-1. What are the top 3 trending stories in the Indian cinema ecosystem today?
-2. What notable movies or web series are releasing this week or later this month?
-
-**RAG CONTEXT (WHAT WE WROTE RECENTLY)**
-Here is the context of what we've written over the past 7 days:
-${pastContentContext}
-*(Note: If the past context mentions a movie or trend, DO NOT repeat the same analysis. Instead, build upon it extending the narrative.)*
-
-**OUTPUT STRUCTURE**
-Your output MUST be a valid JSON object with this exact structure:
-{
-  "title": "[Catchy, SEO-Friendly Newsletter Title]",
-  "themes": "[Comma-separated SEO keywords/themes covered in this issue]",
-  "content": "[The full newsletter content in clean Markdown string. CRITICAL: Use \\n for newlines and escape all double quotes with \\\" within this string.]",
-  "suggestedReviews": [
-    {
-      "title": "Movie or Series Title",
-      "year": "YYYY (optional)",
-      "type": "Movie|Series (optional)",
-      "description": "1 sentence: why this is worth a deeper Greybrainer review this week"
-    }
-  ],
-  "suggestedResearchTopics": [
-    "Short research angle/topic phrased as a headline"
-  ]
-}
-
-**IMPORTANT JSON RULES:**
-1. The entire response must be a single, valid JSON object.
-2. The "content" field is a single string containing Markdown. 
-   CRITICAL: You MUST escape all internal double quotes within the markdown string as \\\" (e.g., "he said \"hello\"") and all newlines as \\n.
-3. Do not include any text before or after the JSON object.
-4. If you fail to escape internal double quotes, the JSON will be invalid and the system will fail.
-
-**THE NEWSLETTER CONTENT FORMAT (Markdown)**
-# [The H1 Title Again]
-*(Start with a vulnerable, personal, or punchy 2-sentence hook that acknowledges what day/week it is and sets the thematic tone)*
-
-## 📰 The Ecosystem Pulse
-*(Synthesize the top news you found via Google Search. Group it into a single cohesive narrative rather than just listing news. Explain the "Grey Area" or why this news matters to the industry's evolution.)*
-
-## 🔗 The Narrative Thread
-*(This is where you MUST interlink with our past content. Create a thematic bridge between today's news and what we wrote in the RAG Context.)*
-
-## 🍿 On The Horizon
-*(Highlight one upcoming release found via your search. Provide a brief "Grey Anticipation" - not just what it is, but what it represents for the genre or the lead actor's career trajectory.)*
-
-## 🔮 The Grey Verdict & Question
-*(End with a bold take on today's landscape and pose a thought-provoking question to the readers to drive engagement/comments.)*
-
-**CRITICAL CONSTRAINTS:**
-- **FACTUAL ACCURACY:** Do not hallucinate. Only report news, trends, and release dates that you have explicitly verified using the Google Search tool. If the search results are ambiguous, be honest about the uncertainty.
-- **Zero Repetition:** Do not re-explain concepts we covered in the Past Context. 
-- **SEO Optimization:** Naturally weave the keywords into the H2 headers and body text.
-- **Skimmability:** Use bullet points, bold text for emphasis.
-- **Strict JSON:** You must output ONLY valid JSON, parseable by JSON.parse(). Ensure all double quotes in "content" are escaped.`;
-
-  return runGeminiWithFallback(
-    'Daily Newsletter Engine',
-    prompt,
-    {
-      temperature: 0.7,
-      maxOutputTokens: 4000,
-      responseMimeType: 'application/json'
-    },
-    (responseText) => {
-      try {
-        const jsonStr = extractJsonPayloadFromModelText(responseText);
-        const parsed = JSON.parse(jsonStr) as {
-          title?: unknown;
-          themes?: unknown;
-          content?: unknown;
-          suggestedReviews?: unknown;
-          suggestedResearchTopics?: unknown;
-        };
-        if (typeof parsed?.title !== 'string' || typeof parsed?.themes !== 'string' || typeof parsed?.content !== 'string') {
-          throw new Error('Newsletter JSON missing required string fields');
-        }
-        const suggestedReviews: MovieSuggestion[] = Array.isArray(parsed?.suggestedReviews)
-          ? (parsed.suggestedReviews as any[])
-              .filter((m) => m && typeof m === 'object')
-              .map((m) => ({
-                title: typeof (m as any).title === 'string' ? (m as any).title.trim() : '',
-                year: typeof (m as any).year === 'string' ? (m as any).year.trim() : undefined,
-                director: typeof (m as any).director === 'string' ? (m as any).director.trim() : undefined,
-                type: (m as any).type === 'Movie' || (m as any).type === 'Series' ? (m as any).type : undefined,
-                description: typeof (m as any).description === 'string' ? (m as any).description.trim() : undefined,
-              }))
-              .filter((m) => typeof m.title === 'string' && m.title.length > 0)
-          : [];
-
-        const suggestedResearchTopics: string[] = Array.isArray(parsed?.suggestedResearchTopics)
-          ? (parsed.suggestedResearchTopics as any[])
-              .filter((t) => typeof t === 'string' && t.trim().length > 0)
-              .map((t) => (t as string).trim())
-          : [];
-
-        return {
-          title: parsed.title,
-          themes: parsed.themes,
-          content: parsed.content,
-          suggestedReviews,
-          suggestedResearchTopics,
-        };
-      } catch (e) {
-        console.error('Failed to parse Daily Newsletter JSON', e, responseText);
-        throw new Error('Failed to generate proper newsletter format. Please try again.');
-      }
-    },
-    logTokenUsage,
-    [{ googleSearchRetrieval: { dynamicRetrievalConfig: { mode: 'DYNAMIC', dynamicThreshold: 0.3 } } }] as any[]
-  );
-};
-
-export const extractNewsletterSuggestionsFromContent = async (
-  newsletter: { title?: string; themes?: string; content: string },
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<{ suggestedReviews: MovieSuggestion[]; suggestedResearchTopics: string[] }> => {
-  const prompt = `You are an editorial assistant for @GreyBrainer.
-
-Given the newsletter content below, extract:
-1) Suggested movies/series to review next (title + optional year/type + 1 sentence why).
-2) Suggested research topics (headline-style).
-
-OUTPUT MUST be valid JSON only (no markdown fences) with exactly:
-{
-  "suggestedReviews": [
-    { "title": "string", "year": "YYYY (optional)", "type": "Movie|Series (optional)", "description": "string (optional)" }
-  ],
-  "suggestedResearchTopics": ["string"]
-}
-
-NEWSLETTER TITLE: ${newsletter.title || ''}
-THEMES/SEO: ${newsletter.themes || ''}
-CONTENT (markdown):
-${newsletter.content.substring(0, 12000)}
-`;
-
-  return runGeminiWithFallback(
-    'Newsletter Suggestions Extraction',
-    prompt,
-    { 
-      temperature: 0.2, 
-      maxOutputTokens: 2048,
-      responseMimeType: 'application/json'
-    },
-    (responseText) => {
-      const jsonStr = extractJsonPayloadFromModelText(responseText);
-      const parsed = JSON.parse(jsonStr) as {
-        suggestedReviews?: unknown;
-        suggestedResearchTopics?: unknown;
-      };
-
-      const suggestedReviews: MovieSuggestion[] = Array.isArray(parsed?.suggestedReviews)
-        ? (parsed.suggestedReviews as any[])
-            .filter((m) => m && typeof m === 'object')
-            .map((m) => ({
-              title: typeof (m as any).title === 'string' ? (m as any).title.trim() : '',
-              year: typeof (m as any).year === 'string' ? (m as any).year.trim() : undefined,
-              director: typeof (m as any).director === 'string' ? (m as any).director.trim() : undefined,
-              type: (m as any).type === 'Movie' || (m as any).type === 'Series' ? (m as any).type : undefined,
-              description: typeof (m as any).description === 'string' ? (m as any).description.trim() : undefined,
-            }))
-            .filter((m) => typeof m.title === 'string' && m.title.length > 0)
-        : [];
-
-      const suggestedResearchTopics: string[] = Array.isArray(parsed?.suggestedResearchTopics)
-        ? (parsed.suggestedResearchTopics as any[])
-            .filter((t) => typeof t === 'string' && t.trim().length > 0)
-            .map((t) => (t as string).trim())
-        : [];
-
-      return { suggestedReviews, suggestedResearchTopics };
-    },
-    logTokenUsage
-  );
-};
-
-export const generateDistributionPackForNewsletter = async (
-  newsletter: { title: string; themes: string; content: string; suggestedReviews?: MovieSuggestion[]; suggestedResearchTopics?: string[] },
-  logTokenUsage?: LogTokenUsageFn,
-): Promise<DistributionPack> => {
-  const prompt = `**ROLE**
-You are the Head of Growth & Social Strategy for @GreyBrainer. Your brand voice is "Cinematic Academic" — high-brow, data-driven, yet punchy and provocative.
-
-**OBJECTIVE**
-Convert the newsletter content into a high-performance Distribution Pack for our social ecosystem:
-- X (Twitter): @GreyBrainer
-- LinkedIn: GreyBrainer AI
-- Instagram: @greybrainer.ai
-- YouTube: GreyBrainer AI (Community)
-
-**VOICE DNA (INJECT THIS)**
-- Sentences: Mix of short, punchy hooks and deep, insightful follow-ups.
-- Tone: "The Post-Weekend Pulse" style — analytical, objective, but with a "Social Spark."
-- Vocabulary: Use terms like "Morphokinetic," "Legacy Closure," "Franchise Bloat," and "Digital Fences."
-
-**INPUT:**
-- Title: ${newsletter.title}
-- Themes/SEO keywords: ${newsletter.themes}
-- Suggested Reviews: ${(newsletter.suggestedReviews || []).map(m => (m.year ? `${m.title} (${m.year})` : m.title)).join(', ')}
-- Suggested Research Topics: ${(newsletter.suggestedResearchTopics || []).join(' | ')}
-- Content (markdown excerpt): ${newsletter.content.substring(0, 4500)}
-
-**OUTPUT REQUIREMENTS:**
-1. **Carousel Plan (Instagram/LinkedIn)**: 7-10 slides. Each slide needs a headline, body text, and a specific Visual Prompt for an AI image generator (e.g., Midjourney/DALL-E) to ensure visual continuity.
-2. **Platform-Native Copy**:
-   - **X (Thread)**: 5-7 tweets. Strong hook on Tweet 1.
-   - **LinkedIn**: Thought-leadership style, focusing on the "Critical View" and "Industry Impact."
-   - **Instagram**: Hook-first caption, emoji-rich but professional.
-3. **IST Windows**: All times in IST.
-4. **CRITICAL**: You MUST escape all internal double quotes within the JSON values as \\\" (e.g., "he said \"hello\"").
-
-**OUTPUT JSON SHAPE (Strict valid JSON only - DO NOT use markdown code blocks or backticks):**
-{
-  "primaryKeyword": "string",
-  "secondaryKeywords": ["string"],
-  "longTailQueries": ["string"],
-  "slug": "string",
-  "metaTitle": "string",
-  "metaDescription": "string",
-  "headlines": ["string"],
-  "twitterThread": ["string"],
-  "linkedinPost": "string",
-  "instagramCaption": "string",
-  "hashtags": ["#tag"],
-  "quoteCards": ["string"],
-  "internalLinksPlan": ["string"],
-  "voiceDNA": "Cinematic Academic with focus on [today's primary theme]",
-  "carouselPlan": [
-    { "slideNumber": 1, "headline": "string", "bodyText": "string", "visualPrompt": "string", "overlayStyle": "string" }
-  ],
-  "abTesting": {
-    "versionA": { "strategy": "Educational", "copy": "string", "hook": "string" },
-    "versionB": { "strategy": "Contrarian/Provocative", "copy": "string", "hook": "string" }
-  },
-  "postingPlan": [
-    { "platform": "Medium|LinkedIn|X|Instagram|YouTube|Newsletter|Other", "handle": "@GreyBrainer|GreyBrainer AI|@greybrainer.ai", "postType": "string", "copy": "string", "bestTimeLocal": "string (IST)", "goal": "string" }
-  ]
-}`;
-
-  return runGeminiWithFallback(
-    `Distribution Pack (Newsletter): ${newsletter.title}`,
-    prompt,
-    { 
-      temperature: 0.4, 
-      maxOutputTokens: 3500,
-      responseMimeType: 'application/json'
-    },
-    (responseText) => {
-      const jsonStr = extractJsonPayloadFromModelText(responseText);
-      const parsed = JSON.parse(jsonStr) as Partial<DistributionPack>;
-
-      const toStringArray = (v: unknown): string[] =>
-        Array.isArray(v) ? v.filter((x) => typeof x === 'string').map((x) => (x as string).trim()).filter(Boolean) : [];
-
-      const carouselPlan = Array.isArray(parsed.carouselPlan) ? parsed.carouselPlan : [];
-      const normalizedCarouselPlan = carouselPlan
-        .filter((s: any) => s && typeof s === 'object')
-        .map((s: any) => ({
-          slideNumber: Number(s.slideNumber) || 0,
-          headline: typeof s.headline === 'string' ? s.headline.trim() : '',
-          bodyText: typeof s.bodyText === 'string' ? s.bodyText.trim() : '',
-          visualPrompt: typeof s.visualPrompt === 'string' ? s.visualPrompt.trim() : '',
-          overlayStyle: typeof s.overlayStyle === 'string' ? s.overlayStyle.trim() : 'center-bold',
-        }));
-
-      const postingPlan = Array.isArray((parsed as any).postingPlan) ? (parsed as any).postingPlan : [];
-      const normalizedPostingPlan = postingPlan
-        .filter((p: any) => p && typeof p === 'object')
-        .map((p: any) => ({
-          platform: p.platform,
-          handle: typeof p.handle === 'string' ? p.handle.trim() : '',
-          postType: typeof p.postType === 'string' ? p.postType.trim() : '',
-          copy: typeof p.copy === 'string' ? p.copy.trim() : '',
-          bestTimeLocal: typeof p.bestTimeLocal === 'string' ? p.bestTimeLocal.trim() : '',
-          goal: typeof p.goal === 'string' ? p.goal.trim() : '',
-        }))
-        .filter((p: any) => typeof p.platform === 'string' && p.platform && p.postType && p.copy);
-
-      const pack: DistributionPack = {
-        primaryKeyword: typeof parsed.primaryKeyword === 'string' ? parsed.primaryKeyword.trim() : '',
-        secondaryKeywords: toStringArray(parsed.secondaryKeywords),
-        longTailQueries: toStringArray(parsed.longTailQueries),
-        slug: typeof parsed.slug === 'string' ? parsed.slug.trim() : '',
-        metaTitle: typeof parsed.metaTitle === 'string' ? parsed.metaTitle.trim() : '',
-        metaDescription: typeof parsed.metaDescription === 'string' ? parsed.metaDescription.trim() : '',
-        headlines: toStringArray(parsed.headlines),
-        twitterThread: toStringArray(parsed.twitterThread),
-        linkedinPost: typeof parsed.linkedinPost === 'string' ? parsed.linkedinPost.trim() : '',
-        instagramCaption: typeof parsed.instagramCaption === 'string' ? parsed.instagramCaption.trim() : '',
-        hashtags: toStringArray(parsed.hashtags),
-        quoteCards: toStringArray(parsed.quoteCards),
-        internalLinksPlan: toStringArray(parsed.internalLinksPlan),
-        carouselPlan: normalizedCarouselPlan,
-        voiceDNA: typeof parsed.voiceDNA === 'string' ? parsed.voiceDNA.trim() : '',
-        abTesting: parsed.abTesting,
-        postingPlan: normalizedPostingPlan as any,
-      };
-
-      if (!pack.primaryKeyword || !pack.slug || !pack.metaTitle || !pack.metaDescription) {
-        console.warn('Distribution pack missing fields, falling back to defaults:', pack);
-        pack.primaryKeyword = pack.primaryKeyword || 'Greybrainer Analysis';
-        pack.slug = pack.slug || 'greybrainer-analysis-' + Date.now();
-        pack.metaTitle = pack.metaTitle || 'Greybrainer Strategic Insight';
-        pack.metaDescription = pack.metaDescription || 'Strategic insights and analysis from Greybrainer AI.';
-      }
-      return pack;
-    },
-    logTokenUsage
-  );
 };
 
 export const generateDistributionPackForResearch = async (
@@ -2985,6 +3591,116 @@ OUTPUT JSON SHAPE:
       }
       return pack;
     },
+    logTokenUsage
+  );
+};
+
+export const generateCreatorInsights = async (
+  movieTitle: string,
+  layerAnalyses: LayerAnalysisData[],
+  overallSuggestions?: string | string[],
+  logTokenUsage?: LogTokenUsageFn
+): Promise<string> => {
+  const aggregatedImprovements: string[] = [];
+  
+  if (overallSuggestions) {
+    aggregatedImprovements.push("## Overall Suggestions:");
+    if (Array.isArray(overallSuggestions)) {
+      aggregatedImprovements.push(...overallSuggestions.map(s => `- ${s}`));
+    } else {
+      aggregatedImprovements.push(overallSuggestions);
+    }
+  }
+
+  layerAnalyses.forEach(layer => {
+    if (layer.improvementSuggestions) {
+      aggregatedImprovements.push(`\n## ${layer.title} Improvements:`);
+      if (Array.isArray(layer.improvementSuggestions)) {
+        aggregatedImprovements.push(...layer.improvementSuggestions.map(s => `- ${s}`));
+      } else {
+        aggregatedImprovements.push(layer.improvementSuggestions);
+      }
+    }
+  });
+
+  const improvementsText = aggregatedImprovements.join("\n");
+
+  const prompt = `
+You are an elite script doctor, film consultant, and editor-in-chief for a premium B2B filmmaking publication (like a hybrid of Masterclass and The Hollywood Reporter).
+
+We have performed a deep AI analysis on the movie: "${movieTitle}".
+Below are the raw, unfiltered "Improvement Suggestions" aggregated from our Story, Conceptualization, and Performance layer analyses.
+
+YOUR TASK:
+Transform these raw bullets into a highly engaging, SEO-optimized "Creator's Blueprint" (a Case Study / Follow-on Blog) specifically targeted at producers, screenwriters, and cine-makers. 
+This is meant to be their go-to guide for learning what went wrong or how it could have been elevated.
+
+RAW IMPROVEMENTS:
+${improvementsText}
+
+REQUIREMENTS:
+1. **Hook & Title**: Start with a catchy, SEO-optimized title (Markdown #) and a compelling hook paragraph.
+2. **Actionable Takeaways**: Structure the post using clear, professional subheadings (Markdown ##). Do not just list the flaws; frame them as "Lessons for Filmmakers" or "How to Fix X".
+3. **Tone**: Professional, constructive, analytical, and authoritative. 
+4. **Formatting**: Use Markdown formatting natively (bolding, lists, blockquotes if useful).
+5. **Length**: Medium-length blog post (approx 400-600 words).
+6. **No fluff**: Get straight to the strategic insights.
+
+Return ONLY the raw Markdown text for this blog post.
+  `.trim();
+
+  return runGeminiWithFallback(
+    'Creator Insights Generation',
+    prompt,
+    { temperature: 0.7 },
+    (responseText) => responseText.trim(),
+    logTokenUsage
+  );
+};
+
+export const generateYouTubeScriptWithGemini = async (
+  movieTitle: string,
+  layerAnalyses: LayerAnalysisData[],
+  overallSuggestions?: string | string[],
+  logTokenUsage?: LogTokenUsageFn
+): Promise<string> => {
+  const aggregatedAnalysis: string[] = [];
+  
+  if (overallSuggestions) {
+    aggregatedAnalysis.push("## Overall Suggestions:");
+    if (Array.isArray(overallSuggestions)) {
+      aggregatedAnalysis.push(...overallSuggestions.map(s => `- ${s}`));
+    } else {
+      aggregatedAnalysis.push(overallSuggestions);
+    }
+  }
+
+  layerAnalyses.forEach(layer => {
+    aggregatedAnalysis.push(`\n## ${layer.title} Analysis:`);
+    aggregatedAnalysis.push(layer.analysisMarkdown || '');
+  });
+
+  const analysisText = aggregatedAnalysis.join("\n").substring(0, 3000); // Truncate to save tokens
+
+  const prompt = `
+You are a top-tier YouTube film essayist. We have performed a deep AI analysis on the movie: "${movieTitle}".
+Your task is to convert this raw analysis into a compelling, 1-2 minute conversational voiceover script for a faceless YouTube video.
+
+IMPORTANT RULES:
+1. Make it sound natural, authoritative, and engaging.
+2. The tone should be like a premium video essay (think Nerdwriter or Lessons from the Screenplay).
+3. Do NOT include any stage directions, brackets, or visuals notes in the text. ONLY output the words the narrator will say.
+4. Keep the total word count around 200-250 words so it fits nicely in a short video.
+
+Here is the raw analysis to base your script on:
+${analysisText}
+  `.trim();
+
+  return runGeminiWithFallback(
+    'YouTube Script Generation',
+    prompt,
+    { temperature: 0.7 },
+    (responseText) => responseText.trim(),
     logTokenUsage
   );
 };

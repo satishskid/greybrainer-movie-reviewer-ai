@@ -5,7 +5,7 @@ import { analyzeLayerWithGemini, LogTokenUsageFn, extractJsonPayloadFromModelTex
 import { ReviewStage, ReviewLayer } from '../types';
 import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI } from "../utils/googleGenAICompat";
 import { PosterUtils } from '../utils/posterUtils';
 
 export interface MonthlyScoreboardCache {

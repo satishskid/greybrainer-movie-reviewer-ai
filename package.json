@@ -6,17 +6,48 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "lint": "tsc",
-    "preview": "vite preview"
+    "lens:dev": "astro dev --root lens-site --port 4321",
+    "lens:build": "astro build --root lens-site",
+    "lens:preview": "astro preview --root lens-site",
+    "lens:deploy": "npm run lens:build && wrangler pages deploy lens-site/dist --project-name cinema-greybrain --branch main",
+    "lens:deploy:preview": "npm run lens:build && wrangler pages deploy lens-site/dist --project-name cinema-greybrain --branch preview",
+    "lint": "tsc && tsc -p tsconfig.worker.json",
+    "preview": "vite preview",
+    "cf:dev": "wrangler dev",
+    "cf:deploy": "wrangler deploy",
+    "cf:pages:deploy": "wrangler pages deploy dist --project-name greybrainer-dev",
+    "cf:typegen": "wrangler types",
+    "db:migrate:turso": "node scripts/migrate-turso.mjs",
+    "db:migrate:social-channels": "node scripts/migrate-sql.mjs db/social_channels_phase2.sql",
+    "db:migrate:social-auth": "node scripts/migrate-sql.mjs db/social_native_auth_phase3.sql",
+    "db:migrate:knowledge": "node scripts/migrate-sql.mjs db/knowledge_medium_phase4.sql",
+    "db:migrate:knowledge-r2": "node scripts/migrate-sql.mjs db/knowledge_r2_phase5.sql",
+    "db:migrate:knowledge-backfill": "node scripts/migrate-sql.mjs db/knowledge_backfill_phase6.sql",
+    "db:migrate:draft-r2": "node scripts/migrate-sql.mjs db/draft_r2_phase7.sql",
+    "db:migrate:ai-keys": "node scripts/migrate-sql.mjs db/ai_keys_phase8.sql",
+    "db:migrate:ai-key-status": "node scripts/migrate-sql.mjs db/ai_key_status_phase9.sql",
+    "content:backfill-images": "node scripts/backfill_images.mjs",
+    "db:migrate:context": "node scripts/migrate-sql.mjs db/context_mode_phase10.sql"
   },
   "dependencies": {
-    "@google/generative-ai": "^0.24.1",
+    "@astrojs/sitemap": "^3.7.1",
+    "@google/genai": "^1.50.1",
+    "@libsql/client": "^0.15.15",
+    "astro": "^6.0.3",
+    "file-saver": "^2.0.5",
     "firebase": "^12.5.0",
+    "html-to-image": "^1.11.13",
+    "html2canvas": "^1.4.1",
+    "jszip": "^3.10.1",
     "lucide-react": "^0.562.0",
     "react": "^18.3.1",
-    "react-dom": "^18.3.1"
+    "react-dom": "^18.3.1",
+    "react-markdown": "^10.1.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
+    "@cloudflare/workers-types": "^4.20260303.0",
+    "@types/file-saver": "^2.0.7",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react": "^4.3.1",
@@ -24,6 +55,7 @@
     "postcss": "^8.4.38",
     "tailwindcss": "^3.4.4",
     "typescript": "^5.2.2",
-    "vite": "^5.3.1"
+    "vite": "^5.3.1",
+    "wrangler": "^4.6.0"
   }
 }

@@ -1,4 +1,6 @@
 import React, { useState, useMemo, useEffect } from 'react';
+import JSZip from 'jszip';
+import { toPng } from 'html-to-image';
 import { ClipboardIcon } from './icons/ClipboardIcon';
 import { DownloadIcon } from './icons/DownloadIcon'; // New Icon
 import { LayerAnalysisData, GroundingChunkWeb, PersonnelData, SummaryReportData, ActualPerformanceData, FinancialAnalysisData, MorphokineticsAnalysis } from '../types'; 
@@ -17,12 +19,20 @@ import { TwitterIcon } from './icons/TwitterIcon';
 import { LinkedInIcon } from './icons/LinkedInIcon';
 import { PublishableAnalysisReport } from './PublishableAnalysisReport';
 import { ShareIcon } from './icons/ShareIcon';
+import { generateGenericPublisherEditorial } from '../services/geminiService';
 import { SparklesIcon } from './icons/SparklesIcon'; // Added import
+import { saveDraft, saveDraftVersion } from '../services/omnichannelDraftService';
+import { db } from '../services/firebaseConfig';
+import { collection, addDoc } from 'firebase/firestore';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 
 interface ReportDisplayProps {
   summaryReportData: SummaryReportData;
   title: string;
+  reviewStage?: string;
+  currentUserEmail?: string | null;
   layerAnalyses: LayerAnalysisData[];
   personnelData: PersonnelData; 
   maxScore: number;
@@ -35,6 +45,8 @@ interface ReportDisplayProps {
 export const ReportDisplay: React.FC<ReportDisplayProps> = ({ 
   summaryReportData, 
   title, 
+  reviewStage,
+  currentUserEmail,
   layerAnalyses, 
   personnelData, 
   maxScore,
@@ -50,6 +62,10 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
   const [showActualsInput, setShowActualsInput] = useState(false);
   const [showBlogExportModal, setShowBlogExportModal] = useState(false);
   const [showPublishableReport, setShowPublishableReport] = useState(false);
+  const [isSavingDraft, setIsSavingDraft] = useState(false);
+  const [saveDraftError, setSaveDraftError] = useState<string | null>(null);
+  const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
+  const [isExportingZip, setIsExportingZip] = useState(false);
 
   useEffect(() => {
     setLocalActualPerformance(initialActualPerformance || {});
@@ -60,7 +76,79 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
     }
   }, [initialActualPerformance]);
 
-  const { reportText, socialSnippets, overallImprovementSuggestions } = summaryReportData;
+  // Auto-archive to Hub on generation
+  const hasAutoArchivedRef = React.useRef(false);
+  useEffect(() => {
+    if (!hasAutoArchivedRef.current && title && summaryReportData) {
+        hasAutoArchivedRef.current = true;
+        
+        // Use a timeout to ensure all rendering/state is settled before grabbing markdown
+        setTimeout(async () => {
+            const markdownContent = generateMarkdownReport();
+
+            const simplifiedLayerAnalyses = layerAnalyses.map(la => ({
+                id: la.id,
+                title: la.title,
+                shortTitle: la.shortTitle,
+                userScore: la.userScore ?? null,
+                aiSuggestedScore: la.aiSuggestedScore ?? null
+            }));
+
+            const simplifiedMorpho = morphokineticsAnalysis ? {
+                keyMoments: morphokineticsAnalysis.keyMoments || [],
+                overallSummary: morphokineticsAnalysis.overallSummary || ""
+            } : null;
+
+            let ringsBase64 = null;
+            let morphoBase64 = null;
+            try {
+                const ringsElement = document.getElementById('concentric-rings-chart');
+                if (ringsElement) {
+                    ringsBase64 = await toPng(ringsElement, { backgroundColor: '#1e293b' });
+                }
+                const morphoElement = document.getElementById('morphokinetics-chart');
+                if (morphoElement) {
+                    morphoBase64 = await toPng(morphoElement, { backgroundColor: '#1e293b' });
+                }
+            } catch (e) {
+                console.warn("Failed to capture chart images for archive:", e);
+            }
+
+            addDoc(collection(db, 'published_research'), {
+                title: title,
+                type: 'research_export',
+                content: markdownContent,
+                socials: summaryReportData.socialSnippets || null,
+                youtubeScript: summaryReportData.youtubeScript || null,
+                layerData: simplifiedLayerAnalyses,
+                morphoData: simplifiedMorpho,
+                images: {
+                  rings: ringsBase64,
+                  morpho: morphoBase64
+                },
+                createdAt: new Date(),
+                status: 'draft',
+                createdBy: currentUserEmail || 'system',
+                autoArchived: true
+            }).catch(err => console.error("Auto-archive to Hub failed:", err));
+
+            if (summaryReportData.creatorInsights) {
+              addDoc(collection(db, 'published_research'), {
+                  title: `${title} - Creator's Blueprint`,
+                  type: 'creator_insights',
+                  content: summaryReportData.creatorInsights,
+                  socials: null,
+                  createdAt: new Date(),
+                  status: 'draft',
+                  createdBy: currentUserEmail || 'system',
+                  autoArchived: true
+              }).catch(err => console.error("Auto-archive creator insights to Hub failed:", err));
+            }
+        }, 1000);
+    }
+  }, [title, summaryReportData, currentUserEmail]);
+
+  const { reportText, socialSnippets, overallImprovementSuggestions, youtubeScript } = summaryReportData;
 
   const overallScore = useMemo(() => {
     const scoredLayers = layerAnalyses.filter(l => typeof l.userScore === 'number');
@@ -307,6 +395,147 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
     URL.revokeObjectURL(url);
   };
 
+  const handleDownloadZip = async () => {
+    setIsExportingZip(true);
+    try {
+      const zip = new JSZip();
+      const safeTitle = title.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+
+      // 1. Add Markdown Report
+      const markdownContent = generateMarkdownReport();
+      zip.file(`${safeTitle}_report.md`, markdownContent);
+
+      if (summaryReportData.creatorInsights) {
+        zip.file(`${safeTitle}_creator_insights.md`, summaryReportData.creatorInsights);
+      }
+
+      // 1.5. Generate Publisher AI Editorial
+      let editorialContent = "";
+      try {
+        editorialContent = await generateGenericPublisherEditorial(title, markdownContent);
+        zip.file(`${safeTitle}_publisher_editorial.md`, editorialContent);
+      } catch (e) {
+        console.error("Failed to generate publisher editorial:", e);
+        zip.file(`${safeTitle}_publisher_editorial_error.md`, "Failed to generate publisher editorial. Ensure API keys are set.");
+      }
+
+      // 2. Add Social Snippets (if available)
+      if (socialSnippets && (socialSnippets.twitter || socialSnippets.linkedin)) {
+        let socialContent = `# Social Media Posts for ${title}\n\n`;
+        if (socialSnippets.twitter) socialContent += `## Twitter / X:\n${socialSnippets.twitter}\n\n`;
+        if (socialSnippets.linkedin) socialContent += `## LinkedIn:\n${socialSnippets.linkedin}\n\n`;
+        zip.file(`${safeTitle}_social.md`, socialContent);
+      }
+
+      // 2.5 Archive to Firebase (Free Tier Spark Plan)
+      try {
+        const simplifiedLayerAnalyses = layerAnalyses.map(la => ({
+            id: la.id,
+            title: la.title,
+            shortTitle: la.shortTitle,
+            userScore: la.userScore ?? null,
+            aiSuggestedScore: la.aiSuggestedScore ?? null
+        }));
+
+        const simplifiedMorpho = morphokineticsAnalysis ? {
+            keyMoments: morphokineticsAnalysis.keyMoments || [],
+            overallSummary: morphokineticsAnalysis.overallSummary || ""
+        } : null;
+
+        await addDoc(collection(db, 'published_research'), {
+          title: title,
+          type: 'research_export',
+          content: markdownContent,
+          editorial: editorialContent || null,
+          socials: socialSnippets || null,
+          layerData: simplifiedLayerAnalyses,
+          morphoData: simplifiedMorpho,
+          createdAt: new Date(),
+          status: 'archived',
+          createdBy: currentUserEmail || 'system'
+        });
+      } catch (err) {
+        console.error("Failed to archive research to Firebase:", err);
+      }
+
+      // 3. Capture Concentric Rings
+      const ringsElement = document.getElementById('concentric-rings-chart');
+      if (ringsElement) {
+        // Delay slightly to ensure rendering
+        await new Promise(r => setTimeout(r, 100));
+        const ringsDataUrl = await toPng(ringsElement, { backgroundColor: '#1e293b' });
+        const base64Data = ringsDataUrl.replace(/^data:image\/png;base64,/, "");
+        zip.file(`${safeTitle}_concentric_rings.png`, base64Data, { base64: true });
+      }
+
+      // 4. Capture Morphokinetics (if available)
+      const morphoElement = document.getElementById('morphokinetics-chart');
+      if (morphoElement) {
+        const morphoDataUrl = await toPng(morphoElement, { backgroundColor: '#1e293b' });
+        const base64Data = morphoDataUrl.replace(/^data:image\/png;base64,/, "");
+        zip.file(`${safeTitle}_morphokinetics.png`, base64Data, { base64: true });
+      }
+
+      // Generate and download zip
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${safeTitle}_greybrainer_export.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error("Error generating zip export:", error);
+      alert("Failed to generate zip export. See console for details.");
+    } finally {
+      setIsExportingZip(false);
+    }
+  };
+
+  const handleSaveDraft = async () => {
+    setIsSavingDraft(true);
+    setSaveDraftError(null);
+
+    try {
+      const payload = {
+        analysis: {
+          actualPerformance: localActualPerformance,
+          financialAnalysisData,
+          morphokineticsAnalysis,
+          overallImprovementSuggestions,
+          personnelData,
+          pixarStyleScenes: summaryReportData.pixarStyleScenes,
+          reportText,
+        },
+        blogMarkdown: generateMarkdownReport(),
+        createdBy: currentUserEmail ?? null,
+        reviewStage: reviewStage ?? undefined,
+        socials: socialSnippets ?? null,
+        sourcePayload: {
+          actualPerformance: localActualPerformance,
+          financialAnalysisData,
+          layerAnalyses,
+          morphokineticsAnalysis,
+          personnelData,
+          summaryReportData,
+          title,
+        },
+        subjectTitle: title,
+      };
+      const savedDraft = savedDraftId
+        ? await saveDraftVersion(savedDraftId, payload)
+        : await saveDraft(payload);
+      setSavedDraftId(savedDraft.id);
+    } catch (error) {
+      setSaveDraftError(error instanceof Error ? error.message : 'Failed to save draft.');
+    } finally {
+      setIsSavingDraft(false);
+    }
+  };
+
   const renderSuggestions = (suggestions: string | string[] | undefined, baseClasses: string, areaClass: string) => {
     if (!suggestions) return null;
     if (typeof suggestions === 'string') {
@@ -324,11 +553,20 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
 
   return (
     <div className="mt-10 p-6 bg-slate-800/80 rounded-xl shadow-2xl border border-slate-700">
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6">
-        <h2 className="text-2xl md:text-3xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 mb-3 sm:mb-0">
+      <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6">
+        <h2 className="text-2xl md:text-3xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 mb-3 xl:mb-0">
           Greybrainer Report: <span className="italic">{title}</span>
         </h2>
-        <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2 w-full sm:w-auto">
+        <div className="flex flex-row flex-wrap gap-2 w-full xl:w-auto xl:justify-end">
+            <button
+              onClick={handleSaveDraft}
+              disabled={isSavingDraft}
+              className="flex items-center justify-center px-4 py-2 bg-emerald-600 hover:bg-emerald-500 disabled:bg-emerald-800 text-white text-sm font-medium rounded-lg shadow-md transition-colors duration-150 w-full sm:w-auto"
+              title="Save this report as a durable draft in the Cloudflare/Turso backend"
+            >
+              <CheckCircleIcon className="w-4 h-4 mr-2" />
+              {isSavingDraft ? 'Saving Draft...' : 'Save Draft'}
+            </button>
             <button
               onClick={() => setShowBlogExportModal(true)}
               className="flex items-center justify-center px-4 py-2 bg-purple-600 hover:bg-purple-500 text-white text-sm font-medium rounded-lg shadow-md transition-colors duration-150 w-full sm:w-auto"
@@ -361,8 +599,31 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
               <DownloadIcon className="w-4 h-4 mr-2" />
               Download Markdown
             </button>
+            <button
+              onClick={handleDownloadZip}
+              disabled={isExportingZip}
+              className={`flex items-center justify-center px-4 py-2 text-white text-sm font-medium rounded-lg shadow-md transition-colors duration-150 w-full sm:w-auto ${
+                isExportingZip ? 'bg-amber-700 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-500'
+              }`}
+              title="Download single zip with markdown, publisher editorial, social posts, and screenshot images of charts"
+            >
+              <DownloadIcon className="w-4 h-4 mr-2" />
+              {isExportingZip ? 'Publishing & Zipping...' : 'Download All (ZIP)'}
+            </button>
         </div>
       </div>
+
+      {(savedDraftId || saveDraftError) && (
+        <div className={`mb-4 rounded-lg border px-4 py-3 text-sm ${
+          saveDraftError ? 'border-red-500/60 bg-red-500/10 text-red-200' : 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200'
+        }`}>
+          {saveDraftError ? (
+            <span>{saveDraftError}</span>
+          ) : (
+            <span>Draft saved in omnichannel backend with ID `{savedDraftId}`.</span>
+          )}
+        </div>
+      )}
       
       {/* Score and Actuals Comparison Display */}
       <div className="mb-6 p-4 bg-gradient-to-r from-indigo-700 via-purple-700 to-pink-700 rounded-lg shadow-lg">
@@ -436,6 +697,29 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
                       </div>
                   )}
               </div>
+          </div>
+      )}
+
+      {/* YouTube Script Section */}
+      {youtubeScript && (
+          <div className="mb-6 p-4 bg-slate-700/60 rounded-lg border border-red-500/30">
+              <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-red-400">YouTube Voiceover Script</h3>
+                  <button
+                      onClick={() => {
+                          navigator.clipboard.writeText(youtubeScript);
+                          // We could add a copied state here for UI feedback
+                      }}
+                      className="flex items-center px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-medium rounded-md shadow transition-colors duration-150"
+                      title="Copy YouTube Script"
+                  >
+                      <ClipboardIcon className="w-3 h-3 mr-1.5" />
+                      Copy Script
+                  </button>
+              </div>
+              <blockquote className="border-l-4 border-red-500 p-3 bg-slate-800/50 rounded-r-md">
+                  <p className="text-sm text-slate-300 whitespace-pre-wrap gb-content-area font-mono">{youtubeScript}</p>
+              </blockquote>
           </div>
       )}
 
@@ -562,6 +846,18 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
             </div>
             <div className="ml-0 md:ml-9">
                  {renderSuggestions(overallImprovementSuggestions, "text-sky-200 whitespace-pre-wrap text-sm leading-relaxed", "gb-content-area")}
+            </div>
+        </div>
+      )}
+
+      {summaryReportData.creatorInsights && (
+         <div className="my-6 p-4 bg-amber-900/40 border border-amber-700/60 rounded-lg">
+            <div className="flex items-center mb-4 border-b border-amber-800/50 pb-2">
+                <SparklesIcon className="w-6 h-6 text-amber-400 mr-3 flex-shrink-0" />
+                <h3 className="text-xl font-bold text-amber-300">Creator's Blueprint (B2B Insights)</h3>
+            </div>
+            <div className="prose prose-invert prose-amber max-w-none text-sm gb-content-area text-amber-100">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{summaryReportData.creatorInsights}</ReactMarkdown>
             </div>
         </div>
       )}

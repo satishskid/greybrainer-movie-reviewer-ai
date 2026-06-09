@@ -20,7 +20,10 @@ export class AdminService {
       const ADMIN_EMAILS = [
         'satish@skids.health',
         'satish.rath@gmail.com',
-        'social@skids.health'
+        'dr.satish@greybrain.ai',
+        'digi.social@greybrain.ai',
+        'social@skids.health',
+        'support@skids.health'
       ];
       
       if (ADMIN_EMAILS.includes(user.email)) {
@@ -82,7 +85,10 @@ export class AdminService {
     const ADMIN_EMAILS = [
       'satish@skids.health',
       'satish.rath@gmail.com',
-      'social@skids.health'
+      'dr.satish@greybrain.ai',
+      'digi.social@greybrain.ai',
+      'social@skids.health',
+      'support@skids.health'
     ];
     
     return ADMIN_EMAILS.includes(user.email);

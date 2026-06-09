@@ -1,0 +1,255 @@
+---
+import BaseLayout from '../layouts/BaseLayout.astro';
+import Footer from './Footer.astro';
+import SiteHeader from './SiteHeader.astro';
+import ArticleSummaryCard from './ArticleSummaryCard.astro';
+import SectionScanner from './SectionScanner.astro';
+import KeywordPills from './KeywordPills.astro';
+import RelatedArticles from './RelatedArticles.astro';
+import ArchiveTeaser from './ArchiveTeaser.astro';
+import type { LensEntry } from '../data/editorials';
+import { getLensEntries } from '../data/manifest';
+
+interface Props {
+  entry: LensEntry;
+}
+
+const { entry } = Astro.props;
+const maxRingScore = Math.max(...(entry.scoreRings?.map((ring) => ring.score) ?? [10]), 10);
+const posterLabel = entry.contentType === 'review' ? 'CineCraft Review' : entry.contentType === 'brief' ? 'Daily Brief' : 'Research Study';
+const posterStyle = entry.posterImageUrl ? `--poster-image: url('${entry.posterImageUrl}');` : '';
+const heroStyle = `--hero-gradient: ${entry.heroGradient};${entry.heroImageUrl ? `--hero-image: url('${entry.heroImageUrl}');` : ''}`;
+// Don't show dek if it's just the title repeated
+const showDek = entry.dek && entry.dek !== entry.title;
+// Only show verdict if it's meaningful text
+const showVerdict = entry.verdict && entry.verdict.length > 10 && !entry.verdict.includes('sitemap') && !entry.verdict.includes('medium.com');
+// Only show pullQuote if it's not the generic fallback
+const showPullQuote = entry.pullQuote && entry.pullQuote !== 'Analysis in three dimensions.' && entry.pullQuote.length > 15;
+
+// Generate section anchor IDs
+function toAnchorId(heading: string): string {
+  return heading.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60);
+}
+const sectionAnchors = entry.readingMetadata?.sectionAnchors
+  ?? entry.sections.map((s) => ({
+    id: toAnchorId(s.heading),
+    label: s.heading,
+    wordCount: s.body.join(' ').split(/\s+/).filter(Boolean).length,
+  }));
+const readTime = entry.readingMetadata?.estimatedReadTime ?? entry.runTime;
+
+// Load all entries for related articles sidebar
+const allEntries = await getLensEntries();
+const relatedEntries = allEntries
+  .filter((e) => e.contentType === entry.contentType && e.slug !== entry.slug)
+  .slice(0, 4);
+---
+
+<BaseLayout title={`${entry.title} | CineCraft`} description={entry.dek}>
+  <SiteHeader />
+  <article class="article-shell">
+    <section class="article-hero" style={heroStyle}>
+      <div class="shell article-hero__grid article-hero__grid--review">
+        <div>
+          <div class="eyebrow">{entry.category}</div>
+          <h1>{entry.title}</h1>
+          {showDek && <p class="hero-dek">{entry.dek}</p>}
+          <div class="hero-meta">
+            <span>{entry.publishedAt}</span>
+            <span>{entry.runTime}</span>
+            <span>{entry.releaseFocus}</span>
+            {entry.platform && <span>{entry.platform}</span>}
+          </div>
+        </div>
+        <aside class="article-aside poster-panel">
+          <div class="poster-panel__art" style={posterStyle}>
+            <span class="poster-panel__label">{posterLabel}</span>
+            <strong>{entry.posterLabel ?? entry.title}</strong>
+            {entry.year && <span>{entry.year}</span>}
+          </div>
+          {entry.overallScore && (
+            <div class="poster-panel__score">
+              <span>CineCraft Score</span>
+              <strong>{entry.overallScore.toFixed(1)}/10</strong>
+            </div>
+          )}
+          {showVerdict && <p class="poster-panel__verdict">{entry.verdict}</p>}
+        </aside>
+      </div>
+    </section>
+
+    <div class="shell">
+      <ArticleSummaryCard entry={entry} />
+    </div>
+
+    {entry.scoreRings && (
+      <section class="shell methodology-band">
+        <div class="methodology-band__intro">
+          <span class="section-kicker">Three-Ring Analysis</span>
+          <h2>We don't flatten a film into one number.</h2>
+          <p>
+            Each review separates narrative design, conceptual framing, and execution — revealing exactly
+            where the craft lives, and where it falls short.
+          </p>
+        </div>
+        <div class="ring-stack">
+          <div class="ring-stack__visual" aria-label="Three ring score stack">
+            {entry.scoreRings.map((ring, index) => {
+              const ringClass = ring.accent;
+              const radius = 100 - index * 24;
+              const circumference = 2 * Math.PI * radius;
+              const dashOffset = circumference * (1 - ring.score / maxRingScore);
+              return (
+                <svg class={`ring-svg ring-svg--${ringClass}`} viewBox="0 0 240 240">
+                  <circle cx="120" cy="120" r={radius} class="ring-track" />
+                  <circle
+                    cx="120"
+                    cy="120"
+                    r={radius}
+                    class="ring-value"
+                    stroke-dasharray={circumference}
+                    stroke-dashoffset={dashOffset}
+                  />
+                </svg>
+              );
+            })}
+            <div class="ring-stack__center">
+              <span>Method</span>
+              <strong>{entry.overallScore?.toFixed(1) ?? '--'}</strong>
+            </div>
+          </div>
+          <div class="ring-stack__cards">
+            {entry.scoreRings.map((ring) => (
+              <article class={`ring-card ring-card--${ring.accent}`}>
+                <div class="ring-card__topline">
+                  <span>{ring.shortLabel}</span>
+                  <strong>{ring.score.toFixed(1)}/10</strong>
+                </div>
+                <h3>{ring.label}</h3>
+                <p>{ring.description}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+    )}
+
+    <section class="shell article-body article-body--expanded">
+      <div class="article-main">
+        {entry.sections.map((section) => (
+          <section class="article-section" id={toAnchorId(section.heading)}>
+            <h2>{section.heading}</h2>
+            {section.body.map((paragraph) => (
+              <p>{paragraph}</p>
+            ))}
+          </section>
+        ))}
+
+        {entry.morphokinetics && (
+          <section class="article-section morph-section">
+            <div class="morph-section__heading">
+              <div>
+                <span class="section-kicker">Morphokinetics</span>
+                <h2>Intensity, pacing, and emotional valence across the film.</h2>
+              </div>
+              <p>{entry.morphokinetics.summary}</p>
+            </div>
+
+            <div class="morph-chart" aria-label="Morphokinetic motion chart">
+              <div class="morph-chart__grid">
+                {entry.morphokinetics.keyMoments.map((moment) => (
+                  <div class="morph-chart__node">
+                    <div
+                      class={`morph-chart__dot morph-chart__dot--${moment.valence}`}
+                      style={`--intensity:${moment.intensity};`}
+                    ></div>
+                    <span>{moment.timeLabel}</span>
+                  </div>
+                ))}
+              </div>
+              <p class="morph-chart__note">{entry.morphokinetics.timelineNotes}</p>
+            </div>
+
+            <div class="morph-moments">
+              {entry.morphokinetics.keyMoments.map((moment) => (
+                <article class="morph-card">
+                  <div class="morph-card__header">
+                    <strong>{moment.timeLabel}</strong>
+                    <div class="morph-card__meta">
+                      {moment.tag && <span class="morph-badge">{moment.tag}</span>}
+                      <span>Intensity {moment.intensity}/10</span>
+                    </div>
+                  </div>
+                  <p>{moment.event}</p>
+                  <div class="morph-card__footer">
+                    <span>{moment.emotion}</span>
+                    <span class={`morph-valence morph-valence--${moment.valence}`}>{moment.valence}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {entry.contentType === 'review' && (
+          <section class="article-section creator-insights">
+            <span class="section-kicker">For Creators</span>
+            <h2>Lessons & Inspiration</h2>
+            <p>Key techniques and creative decisions that shaped this film's impact — extracted for directors, writers, and producers working on their own craft.</p>
+            <div class="creator-prompts">
+              <h3>Creative Prompts</h3>
+              <ul>
+                <li>How might you adapt this film's {entry.scoreRings?.find(r => r.accent === 'story')?.shortLabel.toLowerCase()} approach in your project?</li>
+                <li>What conceptual elements from this review could enhance your visual storytelling?</li>
+                <li>Consider the morphokinetic moments—how does pacing influence audience engagement in your work?</li>
+              </ul>
+            </div>
+          </section>
+        )}
+      </div>
+      <aside class="article-rail">
+        <SectionScanner anchors={sectionAnchors} estimatedReadTime={readTime} />
+        <div class="rail-card">
+          <span class="section-kicker">Lens Position</span>
+          {showPullQuote && <blockquote>{entry.pullQuote}</blockquote>}
+          <div class="rail-meta">
+            {entry.tags.map((tag) => (
+              <span>{tag}</span>
+            ))}
+          </div>
+        </div>
+        {entry.keywords && entry.keywords.length > 0 && (
+          <div class="rail-card">
+            <KeywordPills keywords={entry.keywords} />
+          </div>
+        )}
+        <RelatedArticles entries={relatedEntries} currentSlug={entry.slug} />
+        <ArchiveTeaser totalCount={allEntries.length} contentType={entry.contentType} />
+        <div class="rail-card">
+          <span class="section-kicker">Community</span>
+          <h3>Join the Conversation</h3>
+          <p>Get daily cinema intelligence and discuss reviews with fellow creators.</p>
+          <div class="social-follow-stack">
+            <a class="social-follow-btn social-follow-btn--telegram" href="https://t.me/greybrainlife" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
+              Follow on Telegram
+            </a>
+            <a class="social-follow-btn social-follow-btn--whatsapp" href="https://whatsapp.com/channel/0029Vb76Sl0ISTkTIjJX330N" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413z"/></svg>
+              WhatsApp Channel
+            </a>
+            <a class="social-follow-btn social-follow-btn--medium" href="https://medium.com/@GreyBrainer" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M13.54 12a6.8 6.8 0 0 1-6.77 6.82A6.8 6.8 0 0 1 0 12a6.8 6.8 0 0 1 6.77-6.82A6.8 6.8 0 0 1 13.54 12zm7.42 0c0 3.54-1.51 6.42-3.38 6.42-1.87 0-3.39-2.88-3.39-6.42s1.52-6.42 3.39-6.42 3.38 2.88 3.38 6.42M24 12c0 3.17-.53 5.75-1.19 5.75-.66 0-1.19-2.58-1.19-5.75s.53-5.75 1.19-5.75C23.47 6.25 24 8.83 24 12z"/></svg>
+              Read on Medium
+            </a>
+            <a class="social-follow-btn social-follow-btn--linkedin" href="https://www.linkedin.com/company/greybrainer/" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433a2.062 2.062 0 0 1-2.063-2.065 2.064 2.064 0 1 1 2.063 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/></svg>
+              Follow on LinkedIn
+            </a>
+          </div>
+        </div>
+      </aside>
+    </section>
+  </article>
+  <Footer />
+</BaseLayout>

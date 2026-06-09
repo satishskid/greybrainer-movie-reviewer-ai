@@ -1,0 +1,41 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Footer from '../../components/Footer.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import EditorialShelf from '../../components/EditorialShelf.astro';
+import { getLensEntries } from '../../data/manifest';
+
+const entries = await getLensEntries();
+const researchEntries = entries.filter((entry) => entry.contentType === 'study');
+---
+
+<BaseLayout
+  title="Greybrainer Lens | Research Studies"
+  description="Browse Greybrainer research studies that connect multiple films into larger trend, audience, and platform narratives."
+>
+  <SiteHeader />
+  <section class="shell archive-hero">
+    <span class="section-kicker">Research Studies</span>
+    <h1>Theme, genre, platform, and audience dossiers.</h1>
+    <p>
+      This is where Greybrainer stops behaving like a review destination and starts behaving like a category-intelligence publication.
+      These studies connect multiple titles into one larger cultural thesis.
+    </p>
+    <div class="archive-signals">
+      <div class="signal-card">
+        <span class="signal-label">Study Count</span>
+        <strong>{researchEntries.length}</strong>
+      </div>
+      <div class="signal-card">
+        <span class="signal-label">Editorial Role</span>
+        <strong>Category Ownership</strong>
+      </div>
+      <div class="signal-card">
+        <span class="signal-label">Explore All</span>
+        <a class="cta-link" href="/archive">Open Archive</a>
+      </div>
+    </div>
+  </section>
+  <EditorialShelf items={researchEntries} title="Research Archive" />
+  <Footer />
+</BaseLayout>

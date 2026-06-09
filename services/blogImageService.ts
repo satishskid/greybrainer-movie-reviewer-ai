@@ -4,7 +4,7 @@
  * using Gemini's multimodal capabilities for viral, publish-ready content
  */
 
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { GoogleGenerativeAI } from '../utils/googleGenAICompat';
 import { getSelectedGeminiModel } from '../utils/geminiModelStorage';
 import { getGeminiApiKeyString } from '../utils/geminiKeyStorage';
 import { extractJsonPayloadFromModelText } from './geminiService';

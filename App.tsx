@@ -1,7 +1,7 @@
 
 
 
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { EnhancedMovieInputForm } from './components/EnhancedMovieInputForm';
@@ -9,9 +9,9 @@ import { LayerAnalysisCard } from './components/LayerAnalysisCard';
 import { ReportDisplay } from './components/ReportDisplay';
 import { LoadingSpinner } from './components/LoadingSpinner';
 import { SparklesIcon } from './components/icons/SparklesIcon';
-import { ReviewStage, LayerAnalysisData, ReviewLayer, PersonnelData, SummaryReportData, MagicFactorAnalysis, CreativeSparkResult, TokenUsageEntry, TokenBudgetConfig, ActualPerformanceData, ScriptIdeaInput, MagicQuotientAnalysis, MovieAnalysisInput, MorphokineticsAnalysis, MonthlyScoreboardItem, FinancialAnalysisData, MovieSuggestion } from './types';
+import { ReviewStage, LayerAnalysisData, ReviewLayer, PersonnelData, SummaryReportData, MagicFactorAnalysis, CreativeSparkResult, TokenUsageEntry, TokenBudgetConfig, ActualPerformanceData, ScriptIdeaInput, MagicQuotientAnalysis, MovieAnalysisInput, MorphokineticsAnalysis, MonthlyScoreboardItem, FinancialAnalysisData } from './types';
 import { initialLayerAnalyses, LAYER_DEFINITIONS, REVIEW_STAGES_OPTIONS, MAX_SCORE, COMMON_GENRES, INITIAL_TOKEN_BUDGET_CONFIG, CHARS_PER_TOKEN_ESTIMATE, MAX_TOKEN_LOG_ENTRIES, MOCK_MONTHLY_SCOREBOARD_DATA } from './constants';
-import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini, searchMovies } from './services/geminiService';
+import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini, generateCreatorInsights, generateYouTubeScriptWithGemini } from './services/geminiService';
 import { AdminService } from './services/adminService';
 import { PersonnelDisplay } from './components/PersonnelDisplay';
 import { CreativeSparkGenerator } from './components/CreativeSparkGenerator';
@@ -23,67 +23,71 @@ import { MorphokineticsDisplay } from './components/MorphokineticsDisplay';
 import { LightBulbIcon } from './components/icons/LightBulbIcon';
 import { GreybrainerInsights } from './components/GreybrainerInsights';
 import { GreybrainerComparison } from './components/GreybrainerComparison';
-import { DailyNewsletter } from './components/DailyNewsletter';
 // Admin components moved to AdminSettings modal
 
 import { GoogleSearchKeyManager } from './components/GoogleSearchKeyManager';
 import { AdminSettings } from './components/AdminSettings';
+import { buildGeminiQuotaMessage, isGeminiQuotaError } from './utils/geminiQuotaMessaging';
 
 import { AuthWrapper } from './components/AuthWrapper';
-import { fetchRecentNewsletterSuggestions, NewsletterPipelineAudit, runNewsletterPipelineAudit } from './services/newsletterService';
-import { GreybrainerUser } from './services/firebaseConfig';
 
+const buildLocalFallbackSummaryReport = (
+  movieTitle: string,
+  layerAnalyses: LayerAnalysisData[],
+  personnelData: PersonnelData,
+  financialAnalysisData: FinancialAnalysisData | null,
+): SummaryReportData => {
+  const scoredLayers = layerAnalyses.filter((layer) => typeof layer.userScore === 'number');
+  const overallScore = scoredLayers.length > 0
+    ? scoredLayers.reduce((sum, layer) => sum + (layer.userScore as number), 0) / scoredLayers.length
+    : null;
 
-const NewsletterSuggestionsLoader: React.FC<{
-  authUser: GreybrainerUser | null;
-  onLoaded: (data: { movies: MovieSuggestion[]; topics: string[] }) => void;
-  onAuditLoaded: (audit: NewsletterPipelineAudit | null) => void;
-}> = ({ authUser, onLoaded, onAuditLoaded }) => {
-  const lastUidRef = useRef<string | null>(null);
+  const strongestLayer = [...scoredLayers].sort((left, right) => (right.userScore as number) - (left.userScore as number))[0];
+  const weakestLayer = [...scoredLayers].sort((left, right) => (left.userScore as number) - (right.userScore as number))[0];
 
-  useEffect(() => {
-    const uid = authUser?.uid || null;
-    if (!uid) return;
+  const keyTakeaways = layerAnalyses
+    .filter((layer) => layer.editedText)
+    .map((layer) => {
+      const firstParagraph = layer.editedText.split('\n').map((line) => line.trim()).find(Boolean) || 'Analysis available in the layer card.';
+      return `- ${layer.title}: ${firstParagraph}`;
+    })
+    .join('\n');
 
-    const run = async () => {
-      try {
-        const s = await fetchRecentNewsletterSuggestions(14);
-        onLoaded(s);
-        if ((s.movies?.length || 0) === 0 && (s.topics?.length || 0) === 0) {
-          try {
-            const audit = await runNewsletterPipelineAudit(30);
-            onAuditLoaded(audit);
-          } catch {
-            onAuditLoaded(null);
-          }
-        } else {
-          onAuditLoaded(null);
-        }
-      } catch (e) {
-        console.error('Failed to load newsletter suggestions:', e);
-        onLoaded({ movies: [], topics: [] });
-        try {
-          const audit = await runNewsletterPipelineAudit(30);
-          onAuditLoaded(audit);
-        } catch {
-          onAuditLoaded(null);
-        }
-      }
-    };
+  const improvementSuggestions = layerAnalyses
+    .flatMap((layer) => Array.isArray(layer.improvementSuggestions)
+      ? layer.improvementSuggestions
+      : layer.improvementSuggestions
+        ? [layer.improvementSuggestions]
+        : [])
+    .map((item) => item.trim())
+    .filter(Boolean)
+    .slice(0, 5);
 
-    if (lastUidRef.current !== uid) {
-      lastUidRef.current = uid;
-      run();
-    }
+  const personnelSummary = [
+    personnelData.director ? `Director: ${personnelData.director}` : null,
+    personnelData.mainCast?.length ? `Main cast: ${personnelData.mainCast.join(', ')}` : null,
+  ].filter(Boolean).join('\n');
 
-    const handler = () => run();
-    window.addEventListener('newsletterSuggestions:refresh', handler as EventListener);
-    return () => {
-      window.removeEventListener('newsletterSuggestions:refresh', handler as EventListener);
-    };
-  }, [authUser?.uid, onLoaded, onAuditLoaded]);
+  const financialSummary = financialAnalysisData?.qualitativeROIAnalysis
+    ? `\n\nFinancial perspective:\n${financialAnalysisData.qualitativeROIAnalysis}`
+    : '';
 
-  return null;
+  const reportText = [
+    `Greybrainer generated this fallback summary for ${movieTitle} because the Gemini final-report quota is temporarily exhausted. The layer analyses below are still available and scored, so this summary synthesizes them locally to keep the report workflow moving.`,
+    overallScore !== null ? `Current overall Greybrainer score: ${overallScore.toFixed(1)}/${MAX_SCORE}.` : 'Layer scores are available in the ring visualization below.',
+    strongestLayer ? `Strongest current signal: ${strongestLayer.title}.` : null,
+    weakestLayer && weakestLayer !== strongestLayer ? `Most fragile layer right now: ${weakestLayer.title}.` : null,
+    personnelSummary || null,
+    keyTakeaways ? `\nKey takeaways:\n${keyTakeaways}` : null,
+    financialSummary || null,
+  ].filter(Boolean).join('\n\n');
+
+  return {
+    reportText,
+    overallImprovementSuggestions: improvementSuggestions.length > 0 ? improvementSuggestions : undefined,
+    financialAnalysis: financialAnalysisData || undefined,
+    isFallbackResult: true,
+  };
 };
 
 const App: React.FC = () => {
@@ -123,8 +127,7 @@ const App: React.FC = () => {
   const [tokenBudgetConfig, setTokenBudgetConfig] = useState<TokenBudgetConfig>(INITIAL_TOKEN_BUDGET_CONFIG);
   const [showTokenDashboard, setShowTokenDashboard] = useState<boolean>(false);
   const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [newsletterSuggestions, setNewsletterSuggestions] = useState<{ movies: MovieSuggestion[]; topics: string[] }>({ movies: [], topics: [] });
-  const [newsletterAudit, setNewsletterAudit] = useState<NewsletterPipelineAudit | null>(null);
+  const [settingsInitialTab] = useState<'keys' | 'help' | 'admin' | 'omnichannel' | 'health' | 'diagnostics' | 'scoreboard'>('keys');
 
   const lastBudgetFetchTitleRef = useRef<string>('');
   const budgetFetchDebounceRef = useRef<number | null>(null);
@@ -313,60 +316,6 @@ const App: React.FC = () => {
     await analyzeMovieFlowInternal(movieInput.movieTitle.trim());
   }, [movieInput.movieTitle, analyzeMovieFlowInternal]);
 
-  const handleGetSuggestions = useCallback(async (title: string): Promise<MovieSuggestion[]> => {
-    const query = title.trim().toLowerCase();
-    const normalizeKey = (t: string) => t.toLowerCase().replace(/\s*\(\d{4}\)\s*$/, '').trim();
-
-    const newsletterMatches = query.length
-      ? newsletterSuggestions.movies
-          .filter((m) => normalizeKey(m.title).includes(query) || m.title.toLowerCase().includes(query))
-          .slice(0, 6)
-      : [];
-
-    try {
-      const aiSuggestions = await searchMovies(title, logTokenUsage);
-      const merged: MovieSuggestion[] = [];
-      const seen = new Set<string>();
-
-      [...newsletterMatches, ...aiSuggestions].forEach((m) => {
-        if (!m || typeof m.title !== 'string') return;
-        const key = normalizeKey(m.title);
-        if (!key || seen.has(key)) return;
-        seen.add(key);
-        merged.push(m);
-      });
-
-      return merged.slice(0, 10);
-    } catch (error) {
-      console.error('Error getting movie title suggestions:', error);
-      return newsletterMatches;
-    }
-  }, [logTokenUsage, newsletterSuggestions.movies]);
-
-  const handleNewsletterSuggestionsUpdated = useCallback((data: { movies: MovieSuggestion[]; topics: string[] }) => {
-    setNewsletterSuggestions((prev) => {
-      const movieMap = new Map<string, MovieSuggestion>();
-      prev.movies.forEach((m) => {
-        if (!m?.title) return;
-        movieMap.set(m.title.trim().toLowerCase(), { ...m, title: m.title.trim() });
-      });
-      data.movies.forEach((m) => {
-        if (!m?.title) return;
-        movieMap.set(m.title.trim().toLowerCase(), { ...m, title: m.title.trim() });
-      });
-
-      const topicSet = new Set<string>(prev.topics.map((t) => t.trim()).filter(Boolean));
-      data.topics.forEach((t) => {
-        const cleaned = t.trim();
-        if (cleaned) topicSet.add(cleaned);
-      });
-
-      return { movies: Array.from(movieMap.values()), topics: Array.from(topicSet.values()) };
-    });
-  }, []);
-
-
-
   const handleEditLayerText = (layerId: ReviewLayer, newText: string) => setLayerAnalyses(prev => prev.map(l => l.id === layerId ? { ...l, editedText: newText } : l));
   const handleLayerScoreChange = (layerId: ReviewLayer, score?: number) => setLayerAnalyses(prev => prev.map(l => l.id === layerId ? { ...l, userScore: score } : l));
 
@@ -428,11 +377,48 @@ const App: React.FC = () => {
         movieInput.year,
         movieInput.director
       );
+
+      try {
+        const creatorInsights = await generateCreatorInsights(
+          movieInput.movieTitle,
+          layerAnalyses,
+          reportData.overallImprovementSuggestions,
+          logTokenUsage
+        );
+        reportData.creatorInsights = creatorInsights;
+      } catch (error) {
+        console.error('Error generating creator insights:', error);
+      }
+
+      try {
+        const youtubeScript = await generateYouTubeScriptWithGemini(
+          movieInput.movieTitle,
+          layerAnalyses,
+          reportData.overallImprovementSuggestions,
+          logTokenUsage
+        );
+        reportData.youtubeScript = youtubeScript;
+      } catch (error) {
+        console.error('Error generating youtube script:', error);
+      }
+
       setSummaryReport(reportData);
+      setOverallError(null);
     } catch (error) {
       console.error('Error generating final report:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error generating report.';
-      setOverallError(errorMessage);
+
+      if (isGeminiQuotaError(errorMessage)) {
+        setSummaryReport(buildLocalFallbackSummaryReport(
+          movieInput.movieTitle,
+          layerAnalyses,
+          personnelData,
+          currentFinancialData,
+        ));
+        setOverallError(`${errorMessage} Greybrainer created a local fallback report from the completed layer analyses in the meantime.`);
+      } else {
+        setOverallError(errorMessage);
+      }
     }
     setIsGeneratingReport(false);
   }, [movieInput, layerAnalyses, personnelData, financialAnalysisData, logTokenUsage]);
@@ -521,7 +507,6 @@ const App: React.FC = () => {
     <AuthWrapper>
       {(authUser) => (
         <div className="min-h-screen flex flex-col bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-slate-100">
-          <NewsletterSuggestionsLoader authUser={authUser} onLoaded={setNewsletterSuggestions} onAuditLoaded={setNewsletterAudit} />
           <Header
             onToggleTokenDashboard={() => setShowTokenDashboard(prev => !prev)}
           />
@@ -543,22 +528,15 @@ const App: React.FC = () => {
                 </button>
               </div>
 
-              <DailyNewsletter logTokenUsage={logTokenUsage} onNewsletterSuggestionsUpdated={handleNewsletterSuggestionsUpdated} />
-
               <EnhancedMovieInputForm
                 movieInput={movieInput}
                 setMovieInput={setMovieInput}
                 reviewStages={REVIEW_STAGES_OPTIONS}
                 onAnalyze={handleAnalyzeMovie}
                 isAnalyzing={isAnalyzingLayers}
-                onGetSuggestions={handleGetSuggestions}
                 financialAnalysisData={financialAnalysisData}
                 onFetchBudgetEstimate={() => fetchBudgetEstimate()}
                 onApplyBudgetEstimate={applyBudgetEstimate}
-                newsletterSuggestedMovies={newsletterSuggestions.movies}
-                newsletterSuggestedTopics={newsletterSuggestions.topics}
-                newsletterAudit={newsletterAudit}
-                onOpenSettings={() => setShowSettings(true)}
               />
 
               {overallError && (<div className={`my-4 p-3 bg-red-500/20 text-red-300 border-red-500 rounded-md`}>{overallError}</div>)}
@@ -589,11 +567,29 @@ const App: React.FC = () => {
                 </div>
               )}
 
-              {summaryReport && !isGeneratingReport && (<ReportDisplay summaryReportData={summaryReport} title={movieInput.movieTitle} layerAnalyses={layerAnalyses} personnelData={personnelData} maxScore={MAX_SCORE} initialActualPerformance={actualPerformance} onActualPerformanceChange={handleUpdateActualPerformance} financialAnalysisData={financialAnalysisData} morphokineticsAnalysis={morphokineticsAnalysis} />)}
+              {summaryReport && !isGeneratingReport && (
+                <ReportDisplay
+                  summaryReportData={summaryReport}
+                  title={movieInput.movieTitle}
+                  reviewStage={movieInput.reviewStage}
+                  currentUserEmail={authUser?.email}
+                  layerAnalyses={layerAnalyses}
+                  personnelData={personnelData}
+                  maxScore={MAX_SCORE}
+                  initialActualPerformance={actualPerformance}
+                  onActualPerformanceChange={handleUpdateActualPerformance}
+                  financialAnalysisData={financialAnalysisData}
+                  morphokineticsAnalysis={morphokineticsAnalysis}
+                />
+              )}
 
               {morphokineticsAnalysis && !isAnalyzingMorphokinetics && (<MorphokineticsDisplay analysis={morphokineticsAnalysis} />)}
 
-              <GreybrainerInsights logTokenUsage={logTokenUsage} newsletterSuggestions={newsletterSuggestions} />
+              <GreybrainerInsights
+                logTokenUsage={logTokenUsage}
+                analyzedMovieTitle={movieInput.movieTitle}
+                analyzedMovieSummary={summaryReport?.reportText}
+              />
               <GreybrainerComparison logTokenUsage={logTokenUsage} />
               {/* Monthly Scoreboard temporarily disabled due to network issues */}
               {/* <MonthlyMagicScoreboard 
@@ -619,6 +615,7 @@ const App: React.FC = () => {
           {/* Admin Settings Modal */}
           <AdminSettings
             isOpen={showSettings}
+            initialTab={settingsInitialTab}
             onClose={() => setShowSettings(false)}
             currentUser={authUser}
           />

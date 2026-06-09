@@ -9,7 +9,7 @@ Our platform is built upon the **"Greybrainer Movie Magic Theory,"** a systemati
 ## Table of Contents
 - [Core Philosophy](#core-philosophy-the-greybrainer-movie-magic-theory)
 - [Key Features](#key-features--capabilities)
-- [Daily Newsletter Workflow](#daily-newsletter-workflow)
+- [Manual Analysis Workflow](#manual-analysis-workflow)
 - [Settings (What It Is)](#settings-what-it-is)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
@@ -61,47 +61,45 @@ The Greybrainer methodology posits that cinematic impact is primarily derived fr
 *   👤 **Personnel "Magic Factor" Insights:**
     *   Provides an AI-generated analysis of the signature style and unique impact of identified directors or key actors.
 
-## Daily Newsletter Workflow
+## Manual Analysis Workflow
 
-This is the fastest, non-technical workflow for a content writer: open the app, pick a movie from the chips, run analysis, use the output.
+This is the fastest, non-technical workflow for a content writer: open the app, type a title, run analysis, use the output.
 
 ### Writer Flow (2 things: search + output)
 1.  **Pick what to review**
-    *   Use **Newsletter Picks** (movie chips) to fill the title quickly, or type a title in the search box.
+    - Type a title in the search box and choose a suggestion if needed.
 2.  **Generate output**
-    *   Click **Analyze Movie Magic** to generate the multi-layer analysis.
-    *   When available, click **Generate Complete Report** for the final consolidated output.
-
-### If Newsletter Picks show “0”
-1.  Click **Refresh** next to Newsletter Picks.
-2.  If still 0, open **Settings → Newsletter** and run **Enrich Chips** (admin), then come back and **Refresh** again.
+    - Click **Analyze Movie Magic** to generate the multi-layer analysis.
+    - When available, click **Generate Complete Report** for the final consolidated output.
 
 ## Settings (What It Is)
 
 Settings is intentionally a small “control panel” for two things:
 
-### 1) Newsletter Chips Maintenance
-These controls exist because newsletter content and “chip suggestions” are stored in Firestore, and sometimes older newsletters need backfilling.
+### 1) Core Workflow + Worker Status
 
-*   **Refresh (Audit):** Checks whether newsletters exist and whether they contain chip fields.
-*   **Import (Admin):** Pulls newsletters from the BaaS source into Firestore.
-*   **Enrich Chips (Admin):** Extracts movie picks + research topics from newsletter content and saves them back to Firestore.
-*   **Refresh chips on homepage:** Forces the homepage chips UI to reload.
+Settings now focuses on the active editor workflow and worker health.
+
+- **Core workflow:** The main app stays title-first and manual, so the analysis engine is not coupled to scheduled signal feeds.
+- **Cloudflare worker flow:** The settings panel shows worker key-vault status, AI Gateway routing, and the active worker Gemini BYOK configuration.
+- **Refresh / status checks:** Use Settings to inspect current worker health and key status rather than running newsletter backfill tools.
+- **Operational separation:** Keep cron-driven or signal-driven experiments outside the core analysis path.
 
 ### 2) API Keys (BYOK)
+
 Keys are stored in the browser (localStorage) for a “Bring Your Own Key” setup.
 
-*   **Gemini Key:** Enables deeper analysis and certain AI features.
-*   **Google Search Key:** Optional; improves search/suggestions.
+- **Gemini Key:** Enables deeper analysis and certain AI features.
+- **Google Search Key:** Optional; improves search/suggestions.
 
 There is also an always-available **Help** tab inside Settings with the quick start and troubleshooting steps for new users.
 
 ## Tech Stack
 
-*   **Framework:** React, TypeScript
-*   **Build Tool:** Vite
-*   **Styling:** Tailwind CSS
-*   **AI Engine:** Groq API (`llama3-8b-8192`)
+- **Framework:** React, TypeScript
+- **Build Tool:** Vite
+- **Styling:** Tailwind CSS
+- **AI Engine:** Groq API (`llama3-8b-8192`)
 
 ## Project Structure
 The project is structured as a standard Vite + React application.

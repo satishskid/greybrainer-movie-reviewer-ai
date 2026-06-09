@@ -1,0 +1,102 @@
+---
+import type { LensEntry } from '../data/editorials';
+import { getEntryHref } from '../data/editorials';
+
+interface Props {
+  entries: LensEntry[];
+  currentSlug: string;
+}
+
+const { entries, currentSlug } = Astro.props;
+
+// Show up to 4 related entries, excluding the current one
+const related = entries
+  .filter((e) => e.slug !== currentSlug)
+  .slice(0, 4);
+
+if (!related.length) return;
+---
+
+<div class="related-articles">
+  <span class="related-articles__label">Related</span>
+  <div class="related-articles__list">
+    {related.map((entry) => {
+      const badgeClass = entry.contentType === 'brief'
+        ? 'type-badge--brief'
+        : entry.contentType === 'study'
+          ? 'type-badge--study'
+          : 'type-badge--review';
+      return (
+        <a class="related-article" href={getEntryHref(entry)} data-smooth-nav>
+          <span class={`type-badge type-badge--sm ${badgeClass}`}>
+            {entry.contentType === 'brief' ? 'Brief' : entry.contentType === 'study' ? 'Research' : 'Review'}
+          </span>
+          <strong class="related-article__title">{entry.title}</strong>
+          {entry.publishedAt && <span class="related-article__date">{entry.publishedAt}</span>}
+        </a>
+      );
+    })}
+  </div>
+</div>
+
+<style>
+  .related-articles {
+    margin-top: 1.5rem;
+  }
+
+  .related-articles__label {
+    display: block;
+    font-family: var(--sans);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    margin-bottom: 0.75rem;
+  }
+
+  .related-articles__list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+  }
+
+  .related-article {
+    display: block;
+    padding: 0.75rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    text-decoration: none;
+    transition: all 160ms ease;
+  }
+
+  .related-article:hover {
+    border-color: rgba(255, 255, 255, 0.15);
+    background: var(--surface-raised);
+  }
+
+  .type-badge--sm {
+    font-size: 0.55rem;
+    padding: 0.15em 0.5em;
+    margin-bottom: 0.35rem;
+  }
+
+  .related-article__title {
+    display: block;
+    font-family: var(--serif);
+    font-size: 0.88rem;
+    font-weight: 600;
+    line-height: 1.3;
+    color: var(--text);
+    margin-top: 0.25rem;
+  }
+
+  .related-article__date {
+    display: block;
+    font-family: var(--sans);
+    font-size: 0.65rem;
+    color: var(--text-secondary);
+    margin-top: 0.25rem;
+  }
+</style>

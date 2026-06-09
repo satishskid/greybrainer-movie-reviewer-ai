@@ -1,0 +1,50 @@
+---
+interface Props {
+  totalCount: number;
+  contentType?: string;
+}
+
+const { totalCount, contentType } = Astro.props;
+const label = contentType === 'brief'
+  ? 'Browse all briefs'
+  : contentType === 'study'
+    ? 'Browse all research'
+    : contentType === 'review'
+      ? 'Browse all reviews'
+      : 'Browse the full archive';
+---
+
+<div class="archive-teaser">
+  <span class="archive-teaser__label">Archive</span>
+  <p class="archive-teaser__count">{totalCount} articles published</p>
+  <a class="cta-link" href="/archive">{label}</a>
+</div>
+
+<style>
+  .archive-teaser {
+    margin-top: 2rem;
+    padding: 1rem;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    text-align: center;
+  }
+
+  .archive-teaser__label {
+    display: block;
+    font-family: var(--sans);
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 0.4rem;
+  }
+
+  .archive-teaser__count {
+    font-family: var(--sans);
+    font-size: 0.78rem;
+    color: var(--text-secondary);
+    margin: 0 0 0.75rem;
+  }
+</style>

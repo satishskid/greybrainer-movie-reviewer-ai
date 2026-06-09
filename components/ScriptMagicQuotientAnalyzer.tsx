@@ -7,6 +7,9 @@ import { SparklesIcon } from './icons/SparklesIcon';
 import { SimpleBeakerIcon } from './icons/BeakerIcon'; // Using the simpler version
 import { InformationCircleIcon } from './icons/InformationCircleIcon';
 import { StarIcon } from './icons/StarIcon'; // For displaying scores
+import { DownloadIcon } from './icons/DownloadIcon';
+import JSZip from 'jszip';
+import { generateGenericPublisherEditorial } from '../services/geminiService';
 
 interface ScriptMagicQuotientAnalyzerProps {
   genres: string[];
@@ -28,6 +31,7 @@ export const ScriptMagicQuotientAnalyzer: React.FC<ScriptMagicQuotientAnalyzerPr
   const [synopsis, setSynopsis] = useState<string>('');
   const [selectedGenre, setSelectedGenre] = useState<string>(genres[0] || '');
   const [formError, setFormError] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState<boolean>(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +66,38 @@ export const ScriptMagicQuotientAnalyzer: React.FC<ScriptMagicQuotientAnalyzerPr
         </div>
       </div>
     );
+  };
+
+  const handlePublisherAndZipExport = async () => {
+    if (!analysisResult) return;
+    setIsExporting(true);
+    try {
+      const ideaName = title.trim() || 'Script Idea';
+      const rawAnalysis = JSON.stringify(analysisResult, null, 2);
+      
+      const editorialText = await generateGenericPublisherEditorial(ideaName, rawAnalysis);
+      
+      const zip = new JSZip();
+      const safeTitle = ideaName.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      
+      zip.file(`${safeTitle}_magic_quotient_raw.json`, rawAnalysis);
+      zip.file(`${safeTitle}_publisher_editorial.md`, editorialText);
+      
+      const content = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(content);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${safeTitle}_magic_quotient_export.zip`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Export failed:", err);
+      alert("Failed to export ZIP. See console.");
+    } finally {
+      setIsExporting(false);
+    }
   };
 
 
@@ -168,7 +204,18 @@ export const ScriptMagicQuotientAnalyzer: React.FC<ScriptMagicQuotientAnalyzerPr
 
       {analysisResult && !isLoading && (
         <div className="mt-8 pt-6 border-t border-slate-700/70 space-y-6">
-          <h3 className="text-xl font-semibold text-cyan-200 mb-3">Magic Quotient Analysis Results:</h3>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-xl font-semibold text-cyan-200">Magic Quotient Analysis Results:</h3>
+            <button
+              onClick={handlePublisherAndZipExport}
+              disabled={isExporting}
+              className="flex items-center px-3 py-1.5 bg-amber-600 hover:bg-amber-500 text-white text-xs font-medium rounded-md shadow transition-colors disabled:opacity-50"
+              title="Generate Editorial with Publisher AI & Download ZIP"
+            >
+              <DownloadIcon className="w-3 h-3 mr-1.5" />
+              {isExporting ? 'Zipping...' : 'Publisher AI & ZIP'}
+            </button>
+          </div>
           
           <div className="p-4 bg-slate-700/50 rounded-lg border border-slate-600/70">
             <h4 className="text-md font-semibold text-cyan-300 mb-2">Overall Assessment:</h4>

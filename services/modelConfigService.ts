@@ -10,6 +10,7 @@
  */
 
 import modelConfig from '../config/gemini-models.json';
+import { GoogleGenerativeAI } from '../utils/googleGenAICompat';
 
 // Enhanced model interface with metadata
 export interface GeminiModelConfig {
@@ -95,7 +96,7 @@ class ModelConfigurationService {
     let source = 'localStorage';
     
     // PROACTIVE FIX: Clear the specifically known incorrect model IDs that were previously used
-    const invalidModels = ['gemini-3.1-flash', 'gemini-3-flash', 'gemini-3.1-pro'];
+    const invalidModels = ['gemini-3.1-flash', 'gemini-3-flash', 'gemini-3.1-pro', 'gemini-pro-latest', 'gemini-flash-latest'];
     if (stored && invalidModels.includes(stored)) {
       console.warn(`⚠️ ModelConfigService: Detected invalid model ${stored} in localStorage. Clearing it.`);
       localStorage.removeItem('greybrainer_gemini_model');
@@ -105,7 +106,8 @@ class ModelConfigurationService {
     let modelId: string;
     
     // Check if stored model is still available in current configuration
-    if (stored && this.isModelAvailable(stored)) {
+    const storedModelInfo = stored ? this.getModelInfo(stored) : null;
+    if (stored && this.isModelAvailable(stored) && !storedModelInfo?.isDeprecated) {
       modelId = stored;
     } else {
       // If stored model is invalid or not in current list, clear it and use preferred model
@@ -229,7 +231,6 @@ class ModelConfigurationService {
     const timestamp = new Date().toISOString();
 
     try {
-      const { GoogleGenerativeAI } = await import('@google/generative-ai');
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: modelId });
 

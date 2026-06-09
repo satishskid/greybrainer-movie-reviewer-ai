@@ -1,0 +1,126 @@
+---
+import type { LensEntry } from '../data/editorials';
+import KeywordPills from './KeywordPills.astro';
+import { getEntryHref } from '../data/editorials';
+
+interface Props {
+  entry: LensEntry;
+}
+
+const { entry } = Astro.props;
+const typeBadgeClass = entry.contentType === 'brief'
+  ? 'type-badge--brief'
+  : entry.contentType === 'study'
+    ? 'type-badge--study'
+    : 'type-badge--review';
+
+const typeBadgeLabel = entry.contentType === 'brief'
+  ? 'Daily Brief'
+  : entry.contentType === 'study'
+    ? 'Research'
+    : 'Review';
+
+const readTime = entry.readingMetadata?.estimatedReadTime ?? entry.runTime;
+const sectionCount = entry.readingMetadata?.sectionAnchors?.length ?? entry.sections?.length ?? 0;
+---
+
+<div class="article-summary-card">
+  <div class="article-summary-card__header">
+    <span class={`type-badge ${typeBadgeClass}`}>{typeBadgeLabel}</span>
+    <div class="article-summary-card__meta">
+      <span>{readTime}</span>
+      {sectionCount > 0 && <span>{sectionCount} sections</span>}
+      {entry.publishedAt && <span>{entry.publishedAt}</span>}
+    </div>
+  </div>
+
+  {entry.summaryHook && (
+    <p class="article-summary-card__hook">{entry.summaryHook}</p>
+  )}
+
+  {entry.keywords && entry.keywords.length > 0 && (
+    <KeywordPills keywords={entry.keywords} />
+  )}
+
+  {entry.overallScore && (
+    <div class="article-summary-card__score">
+      <span class="article-summary-card__score-label">CineCraft Score</span>
+      <strong>{entry.overallScore.toFixed(1)}</strong>
+      <span>/10</span>
+    </div>
+  )}
+</div>
+
+<style>
+  .article-summary-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 1.5rem 1.75rem;
+    margin-bottom: 2rem;
+  }
+
+  .article-summary-card__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+  }
+
+  .article-summary-card__meta {
+    display: flex;
+    gap: 1rem;
+    font-family: var(--sans);
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.03em;
+  }
+
+  .article-summary-card__meta span::before {
+    content: '·';
+    margin-right: 0.5rem;
+    opacity: 0.4;
+  }
+
+  .article-summary-card__meta span:first-child::before {
+    display: none;
+  }
+
+  .article-summary-card__hook {
+    font-family: var(--serif);
+    font-size: 1.1rem;
+    line-height: 1.55;
+    color: var(--text);
+    margin: 0 0 0.75rem;
+    max-width: var(--measure);
+  }
+
+  .article-summary-card__score {
+    display: inline-flex;
+    align-items: baseline;
+    gap: 0.25rem;
+    font-family: var(--sans);
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    padding-top: 0.75rem;
+    border-top: 1px solid var(--border);
+    margin-top: 0.75rem;
+  }
+
+  .article-summary-card__score-label {
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-right: 0.5rem;
+  }
+
+  .article-summary-card__score strong {
+    font-size: 1.3rem;
+    color: var(--text);
+  }
+</style>

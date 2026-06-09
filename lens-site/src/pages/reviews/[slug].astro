@@ -1,0 +1,16 @@
+---
+import EntryArticle from '../../components/EntryArticle.astro';
+import { getLensEntries } from '../../data/manifest';
+
+export async function getStaticPaths() {
+  const entries = await getLensEntries();
+  return entries.filter((entry) => entry.contentType === 'review').map((entry) => ({
+    params: { slug: entry.slug },
+    props: { entry },
+  }));
+}
+
+const { entry } = Astro.props;
+---
+
+<EntryArticle entry={entry} />

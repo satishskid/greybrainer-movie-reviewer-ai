@@ -22,16 +22,8 @@
     
     <div id="result"></div>
 
-    <script type="importmap">
-    {
-        "imports": {
-            "@google/generative-ai": "https://esm.run/@google/generative-ai"
-        }
-    }
-    </script>
-
     <script type="module">
-        import { GoogleGenerativeAI } from "@google/generative-ai";
+        import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
 
         window.testModel = async function() {
             const apiKey = document.getElementById('apiKey').value.trim();

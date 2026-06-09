@@ -1,0 +1,41 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import Footer from '../../components/Footer.astro';
+import SiteHeader from '../../components/SiteHeader.astro';
+import EditorialShelf from '../../components/EditorialShelf.astro';
+import { getLensEntries } from '../../data/manifest';
+
+const entries = await getLensEntries();
+const briefEntries = entries.filter((entry) => entry.contentType === 'brief');
+---
+
+<BaseLayout
+  title="Greybrainer Lens | Daily Briefs"
+  description="Browse CineCraft-style daily intelligence briefs covering OTT shifts, audience mood, and screen-cycle narratives."
+>
+  <SiteHeader />
+  <section class="shell archive-hero">
+    <span class="section-kicker">Daily Briefs</span>
+    <h1>The morning intelligence file for the Indian screen cycle.</h1>
+    <p>
+      These pieces convert daily signals into editorial momentum: what is trending, what is being critiqued, and what social pattern is
+      really underneath the noise.
+    </p>
+    <div class="archive-signals">
+      <div class="signal-card">
+        <span class="signal-label">Brief Count</span>
+        <strong>{briefEntries.length}</strong>
+      </div>
+      <div class="signal-card">
+        <span class="signal-label">Cadence</span>
+        <strong>Daily Adaptive Format</strong>
+      </div>
+      <div class="signal-card">
+        <span class="signal-label">Explore All</span>
+        <a class="cta-link" href="/archive">Open Archive</a>
+      </div>
+    </div>
+  </section>
+  <EditorialShelf items={briefEntries} title="Brief Archive" />
+  <Footer />
+</BaseLayout>
