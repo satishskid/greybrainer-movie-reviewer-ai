@@ -56,16 +56,11 @@ const ADMIN_EMAILS = [
   'satish@skids.health',
   'satish.rath@gmail.com',
   'rath.satish@gmail.com',
-<<<<<<< HEAD
   'satishskid@gmail.com',
   'dr.satish@greybrain.ai',
   'digi.social@greybrain.ai',
   'support@skids.health',
   'mousamkumarp@gmail.com'
-=======
-  'mousamkumarp@gmail.com',
-  'dr.satish@greybrain.ai'
->>>>>>> origin/main
 ];
 
 // Editor emails
