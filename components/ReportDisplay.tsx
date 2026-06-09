@@ -17,7 +17,7 @@ import { LoadingSpinner } from './LoadingSpinner';
 import { ChartPieIcon } from './icons/ChartPieIcon'; // For Financial/ROI section
 import { TwitterIcon } from './icons/TwitterIcon';
 import { LinkedInIcon } from './icons/LinkedInIcon';
-import { PublishableAnalysisReport } from './PublishableAnalysisReport';
+import { PublishableAnalysisReport, generateHTMLReportString } from './PublishableAnalysisReport';
 import { ShareIcon } from './icons/ShareIcon';
 import { generateGenericPublisherEditorial } from '../services/geminiService';
 import { SparklesIcon } from './icons/SparklesIcon'; // Added import
@@ -65,6 +65,7 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [saveDraftError, setSaveDraftError] = useState<string | null>(null);
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
+  const [archivedId, setArchivedId] = useState<string | null>(null);
   const [isExportingZip, setIsExportingZip] = useState(false);
 
   useEffect(() => {
@@ -104,11 +105,11 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
             try {
                 const ringsElement = document.getElementById('concentric-rings-chart');
                 if (ringsElement) {
-                    ringsBase64 = await toPng(ringsElement, { backgroundColor: '#1e293b' });
+                    ringsBase64 = await toPng(ringsElement, { backgroundColor: '#1e293b', pixelRatio: 2 });
                 }
                 const morphoElement = document.getElementById('morphokinetics-chart');
                 if (morphoElement) {
-                    morphoBase64 = await toPng(morphoElement, { backgroundColor: '#1e293b' });
+                    morphoBase64 = await toPng(morphoElement, { backgroundColor: '#1e293b', pixelRatio: 2 });
                 }
             } catch (e) {
                 console.warn("Failed to capture chart images for archive:", e);
@@ -130,7 +131,7 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
                 status: 'draft',
                 createdBy: currentUserEmail || 'system',
                 autoArchived: true
-            }).catch(err => console.error("Auto-archive to Hub failed:", err));
+            }).then(docRef => setArchivedId(docRef.id)).catch(err => console.error("Auto-archive to Hub failed:", err));
 
             if (summaryReportData.creatorInsights) {
               addDoc(collection(db, 'published_research'), {
@@ -378,6 +379,9 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
         mdReport += `**Layer Sources:**\n${layer.groundingSources.map(s => `- [${s.title || s.uri}](${s.uri})`).join('\n')}\n\n`;
       }
     });
+    if (summaryReportData.youtubeScript) {
+      mdReport += `## YouTube Video Script\n${summaryReportData.youtubeScript}\n\n`;
+    }
     return mdReport.trim();
   };
 
@@ -404,6 +408,10 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
       // 1. Add Markdown Report
       const markdownContent = generateMarkdownReport();
       zip.file(`${safeTitle}_report.md`, markdownContent);
+      
+      // 1.2 Add HTML Report
+      const htmlContent = generateHTMLReportString(title, layerAnalyses, summaryReportData, overallScore, morphokineticsAnalysis, personnelData, financialAnalysisData);
+      zip.file(`${safeTitle}_report.html`, htmlContent);
 
       if (summaryReportData.creatorInsights) {
         zip.file(`${safeTitle}_creator_insights.md`, summaryReportData.creatorInsights);
@@ -461,9 +469,9 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
       // 3. Capture Concentric Rings
       const ringsElement = document.getElementById('concentric-rings-chart');
       if (ringsElement) {
-        // Delay slightly to ensure rendering
-        await new Promise(r => setTimeout(r, 100));
-        const ringsDataUrl = await toPng(ringsElement, { backgroundColor: '#1e293b' });
+        // Delay slightly to ensure rendering and fonts loaded
+        await new Promise(r => setTimeout(r, 500));
+        const ringsDataUrl = await toPng(ringsElement, { backgroundColor: '#1e293b', pixelRatio: 2, skipFonts: true });
         const base64Data = ringsDataUrl.replace(/^data:image\/png;base64,/, "");
         zip.file(`${safeTitle}_concentric_rings.png`, base64Data, { base64: true });
       }
@@ -471,7 +479,7 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
       // 4. Capture Morphokinetics (if available)
       const morphoElement = document.getElementById('morphokinetics-chart');
       if (morphoElement) {
-        const morphoDataUrl = await toPng(morphoElement, { backgroundColor: '#1e293b' });
+        const morphoDataUrl = await toPng(morphoElement, { backgroundColor: '#1e293b', pixelRatio: 2, skipFonts: true });
         const base64Data = morphoDataUrl.replace(/^data:image\/png;base64,/, "");
         zip.file(`${safeTitle}_morphokinetics.png`, base64Data, { base64: true });
       }
@@ -554,9 +562,26 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
   return (
     <div className="mt-10 p-6 bg-slate-800/80 rounded-xl shadow-2xl border border-slate-700">
       <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center mb-6">
-        <h2 className="text-2xl md:text-3xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 mb-3 xl:mb-0">
-          Greybrainer Report: <span className="italic">{title}</span>
-        </h2>
+        <div>
+          <h2 className="text-2xl md:text-3xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-indigo-400 to-purple-400 mb-3 xl:mb-0">
+            Greybrainer Report: <span className="italic">{title}</span>
+          </h2>
+          {archivedId && (
+            <div className="flex items-center mt-2 p-2 bg-slate-900 rounded-lg border border-slate-700 inline-flex">
+              <span className="text-sm text-slate-400 mr-2">Content ID:</span>
+              <code className="text-indigo-400 font-mono text-sm mr-3">{archivedId}</code>
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(archivedId);
+                }}
+                className="text-xs bg-slate-700 hover:bg-slate-600 px-2 py-1 rounded text-white transition-colors"
+                title="Copy Content ID for the video generation script"
+              >
+                Copy
+              </button>
+            </div>
+          )}
+        </div>
         <div className="flex flex-row flex-wrap gap-2 w-full xl:w-auto xl:justify-end">
             <button
               onClick={handleSaveDraft}

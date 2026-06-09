@@ -15,45 +15,16 @@ interface PublishableAnalysisReportProps {
   onClose: () => void;
 }
 
-export const PublishableAnalysisReport: React.FC<PublishableAnalysisReportProps> = ({
-  movieTitle,
-  layerAnalyses,
-  summaryReport,
-  morphokineticsAnalysis,
-  personnelData,
-  financialData,
-  onClose
-}) => {
-  const [copied, setCopied] = React.useState(false);
 
-  // Calculate overall score
-  const scoredLayers = layerAnalyses.filter(layer => typeof layer.userScore === 'number');
-  const overallScore = scoredLayers.length > 0 
-    ? (scoredLayers.reduce((sum, layer) => sum + (layer.userScore as number), 0) / scoredLayers.length)
-    : null;
-
-  const handleCopyHTML = () => {
-    const htmlContent = generateBlogHTML();
-    navigator.clipboard.writeText(htmlContent).then(() => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 3000);
-    });
-  };
-
-  const handleDownloadHTML = () => {
-    const htmlContent = generateBlogHTML();
-    const blob = new Blob([htmlContent], { type: 'text/html' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `greybrainer-analysis-${movieTitle.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.html`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  };
-
-  const generateBlogHTML = () => {
+export const generateHTMLReportString = (
+  movieTitle: string,
+  layerAnalyses: LayerAnalysisData[],
+  summaryReport: SummaryReportData,
+  overallScore: number | null,
+  morphokineticsAnalysis?: MorphokineticsAnalysis,
+  personnelData?: PersonnelData,
+  financialData?: FinancialAnalysisData
+) => {
     const currentDate = new Date().toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'long', 
@@ -442,6 +413,16 @@ export const PublishableAnalysisReport: React.FC<PublishableAnalysisReportProps>
         </section>
         ` : ''}
 
+
+        ${summaryReport.youtubeScript ? `
+        <section style="margin: 30px 0; padding: 30px; background: linear-gradient(135deg, #fff1f2, #ffe4e6); border-radius: 10px; border: 2px solid #e11d48;">
+            <h2 style="color: #be123c; font-size: 1.6em; margin-bottom: 20px; text-align: center;">▶️ YouTube Video Script</h2>
+            <div style="font-family: monospace; white-space: pre-wrap; color: #881337; line-height: 1.8; background: white; padding: 20px; border-radius: 8px; border: 1px solid #fda4af;">
+                ${summaryReport.youtubeScript}
+            </div>
+        </section>
+        ` : ''}
+
         <footer class="footer">
             <p><strong>Greybrainer AI Film Analysis Platform</strong></p>
             <p>This analysis was generated using advanced AI technology and the proprietary Greybrainer methodology.</p>
@@ -454,9 +435,47 @@ export const PublishableAnalysisReport: React.FC<PublishableAnalysisReportProps>
     </article>
 </body>
 </html>`;
+};
+
+export const PublishableAnalysisReport: React.FC<PublishableAnalysisReportProps> = ({
+  movieTitle,
+  layerAnalyses,
+  summaryReport,
+  morphokineticsAnalysis,
+  personnelData,
+  financialData,
+  onClose
+}) => {
+  const [copied, setCopied] = React.useState(false);
+
+  // Calculate overall score
+  const scoredLayers = layerAnalyses.filter(layer => typeof layer.userScore === 'number');
+  const overallScore = scoredLayers.length > 0 
+    ? (scoredLayers.reduce((sum, layer) => sum + (layer.userScore as number), 0) / scoredLayers.length)
+    : null;
+
+  const handleCopyHTML = () => {
+    const htmlContent = generateHTMLReportString(movieTitle, layerAnalyses, summaryReport, overallScore, morphokineticsAnalysis, personnelData, financialData);
+    navigator.clipboard.writeText(htmlContent).then(() => {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 3000);
+    });
   };
 
-  return (
+  const handleDownloadHTML = () => {
+    const htmlContent = generateHTMLReportString(movieTitle, layerAnalyses, summaryReport, overallScore, morphokineticsAnalysis, personnelData, financialData);
+    const blob = new Blob([htmlContent], { type: 'text/html' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `greybrainer-analysis-${movieTitle.replace(/[^a-zA-Z0-9]/g, '-').toLowerCase()}.html`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+    return (
     <div className="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-4xl max-h-[90vh] overflow-hidden shadow-2xl">
         {/* Header */}
