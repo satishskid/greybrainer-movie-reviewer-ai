@@ -4,6 +4,7 @@ import { copyFileSync } from 'fs'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: '/engine/',
   plugins: [
     react(),
     {
