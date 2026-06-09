@@ -1,6 +1,6 @@
 // Firebase Configuration and Services
 import { initializeApp } from 'firebase/app';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signInWithEmailAndPassword, signOut, onAuthStateChanged, User } from 'firebase/auth';
 import { getFirestore, doc, setDoc, getDoc, collection, query, where, getDocs, updateDoc, deleteDoc, addDoc, orderBy, limit } from 'firebase/firestore';
 import { getFunctions, httpsCallable } from 'firebase/functions';
 import { getAnalytics } from 'firebase/analytics';
@@ -56,11 +56,16 @@ const ADMIN_EMAILS = [
   'satish@skids.health',
   'satish.rath@gmail.com',
   'rath.satish@gmail.com',
+<<<<<<< HEAD
   'satishskid@gmail.com',
   'dr.satish@greybrain.ai',
   'digi.social@greybrain.ai',
   'support@skids.health',
   'mousamkumarp@gmail.com'
+=======
+  'mousamkumarp@gmail.com',
+  'dr.satish@greybrain.ai'
+>>>>>>> origin/main
 ];
 
 // Editor emails
@@ -78,6 +83,16 @@ export class FirebaseAuthService {
   // Sign in with Google
   async signInWithGoogle(): Promise<GreybrainerUser | null> {
     try {
+      // Check if mobile device
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        // Use redirect for mobile to avoid popup blockers
+        await signInWithRedirect(auth, googleProvider);
+        return null; // Page will redirect
+      }
+      
+      // Use popup for desktop
       const result = await signInWithPopup(auth, googleProvider);
       const user = result.user;
       
@@ -94,6 +109,30 @@ export class FirebaseAuthService {
       
     } catch (error) {
       console.error('Google sign-in error:', error);
+      throw error;
+    }
+  }
+
+  // Handle redirect result (call this on app load)
+  async handleRedirectResult(): Promise<GreybrainerUser | null> {
+    try {
+      const result = await getRedirectResult(auth);
+      if (result) {
+        const user = result.user;
+        
+        // Check if user is whitelisted
+        const isWhitelisted = await this.isUserWhitelisted(user.email!);
+        if (!isWhitelisted) {
+          await signOut(auth);
+          throw new Error('Access denied. Please contact administrator for access.');
+        }
+        
+        // Create or update user profile
+        return await this.createOrUpdateUserProfile(user);
+      }
+      return null;
+    } catch (error) {
+      console.error('Redirect result error:', error);
       throw error;
     }
   }
@@ -338,7 +377,16 @@ This technology enables filmmakers, critics, and audiences to gain deeper insigh
   onAuthStateChanged(callback: (user: GreybrainerUser | null) => void) {
     return onAuthStateChanged(auth, async (user) => {
       if (user) {
-        const profile = await this.getCurrentUserProfile();
+        let profile = await this.getCurrentUserProfile();
+        
+        // If profile is not found immediately, retry once after a short delay
+        // This handles the race condition during the very first login
+        if (!profile) {
+          console.log('Profile not found, retrying in 1.5s...');
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          profile = await this.getCurrentUserProfile();
+        }
+        
         callback(profile);
       } else {
         callback(null);
