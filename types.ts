@@ -154,6 +154,7 @@ export interface SummaryReportData {
   financialAnalysis?: FinancialAnalysisData; // Added
   pixarStyleScenes?: string[]; // Added for visual descriptions
   creatorInsights?: string; // B2B Creator's Blueprint
+  youtubeScript?: string; // Voiceover script for Faceless YouTube video
   isFallbackResult?: boolean; 
 }
 

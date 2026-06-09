@@ -11,7 +11,7 @@ import { LoadingSpinner } from './components/LoadingSpinner';
 import { SparklesIcon } from './components/icons/SparklesIcon';
 import { ReviewStage, LayerAnalysisData, ReviewLayer, PersonnelData, SummaryReportData, MagicFactorAnalysis, CreativeSparkResult, TokenUsageEntry, TokenBudgetConfig, ActualPerformanceData, ScriptIdeaInput, MagicQuotientAnalysis, MovieAnalysisInput, MorphokineticsAnalysis, MonthlyScoreboardItem, FinancialAnalysisData } from './types';
 import { initialLayerAnalyses, LAYER_DEFINITIONS, REVIEW_STAGES_OPTIONS, MAX_SCORE, COMMON_GENRES, INITIAL_TOKEN_BUDGET_CONFIG, CHARS_PER_TOKEN_ESTIMATE, MAX_TOKEN_LOG_ENTRIES, MOCK_MONTHLY_SCOREBOARD_DATA } from './constants';
-import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini, generateCreatorInsights } from './services/geminiService';
+import { analyzeLayerWithGemini, generateFinalReportWithGemini, ParsedLayerAnalysis, analyzeStakeholderMagicFactor, generateCreativeSpark, enhanceCreativeSpark, LogTokenUsageFn, analyzeIdeaMagicQuotient, analyzeMovieMorphokinetics, fetchMovieFinancialsWithGemini, generateQualitativeROIAnalysisWithGemini, generateCreatorInsights, generateYouTubeScriptWithGemini } from './services/geminiService';
 import { AdminService } from './services/adminService';
 import { PersonnelDisplay } from './components/PersonnelDisplay';
 import { CreativeSparkGenerator } from './components/CreativeSparkGenerator';
@@ -388,6 +388,18 @@ const App: React.FC = () => {
         reportData.creatorInsights = creatorInsights;
       } catch (error) {
         console.error('Error generating creator insights:', error);
+      }
+
+      try {
+        const youtubeScript = await generateYouTubeScriptWithGemini(
+          movieInput.movieTitle,
+          layerAnalyses,
+          reportData.overallImprovementSuggestions,
+          logTokenUsage
+        );
+        reportData.youtubeScript = youtubeScript;
+      } catch (error) {
+        console.error('Error generating youtube script:', error);
       }
 
       setSummaryReport(reportData);

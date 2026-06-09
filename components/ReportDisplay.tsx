@@ -119,6 +119,7 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
                 type: 'research_export',
                 content: markdownContent,
                 socials: summaryReportData.socialSnippets || null,
+                youtubeScript: summaryReportData.youtubeScript || null,
                 layerData: simplifiedLayerAnalyses,
                 morphoData: simplifiedMorpho,
                 images: {
@@ -147,7 +148,7 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
     }
   }, [title, summaryReportData, currentUserEmail]);
 
-  const { reportText, socialSnippets, overallImprovementSuggestions } = summaryReportData;
+  const { reportText, socialSnippets, overallImprovementSuggestions, youtubeScript } = summaryReportData;
 
   const overallScore = useMemo(() => {
     const scoredLayers = layerAnalyses.filter(l => typeof l.userScore === 'number');
@@ -696,6 +697,29 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
                       </div>
                   )}
               </div>
+          </div>
+      )}
+
+      {/* YouTube Script Section */}
+      {youtubeScript && (
+          <div className="mb-6 p-4 bg-slate-700/60 rounded-lg border border-red-500/30">
+              <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-lg font-semibold text-red-400">YouTube Voiceover Script</h3>
+                  <button
+                      onClick={() => {
+                          navigator.clipboard.writeText(youtubeScript);
+                          // We could add a copied state here for UI feedback
+                      }}
+                      className="flex items-center px-3 py-1.5 bg-red-600 hover:bg-red-500 text-white text-xs font-medium rounded-md shadow transition-colors duration-150"
+                      title="Copy YouTube Script"
+                  >
+                      <ClipboardIcon className="w-3 h-3 mr-1.5" />
+                      Copy Script
+                  </button>
+              </div>
+              <blockquote className="border-l-4 border-red-500 p-3 bg-slate-800/50 rounded-r-md">
+                  <p className="text-sm text-slate-300 whitespace-pre-wrap gb-content-area font-mono">{youtubeScript}</p>
+              </blockquote>
           </div>
       )}
 

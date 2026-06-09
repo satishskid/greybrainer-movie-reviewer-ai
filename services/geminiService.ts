@@ -3657,3 +3657,50 @@ Return ONLY the raw Markdown text for this blog post.
     logTokenUsage
   );
 };
+
+export const generateYouTubeScriptWithGemini = async (
+  movieTitle: string,
+  layerAnalyses: LayerAnalysisData[],
+  overallSuggestions?: string | string[],
+  logTokenUsage?: LogTokenUsageFn
+): Promise<string> => {
+  const aggregatedAnalysis: string[] = [];
+  
+  if (overallSuggestions) {
+    aggregatedAnalysis.push("## Overall Suggestions:");
+    if (Array.isArray(overallSuggestions)) {
+      aggregatedAnalysis.push(...overallSuggestions.map(s => `- ${s}`));
+    } else {
+      aggregatedAnalysis.push(overallSuggestions);
+    }
+  }
+
+  layerAnalyses.forEach(layer => {
+    aggregatedAnalysis.push(`\n## ${layer.title} Analysis:`);
+    aggregatedAnalysis.push(layer.analysisMarkdown || '');
+  });
+
+  const analysisText = aggregatedAnalysis.join("\n").substring(0, 3000); // Truncate to save tokens
+
+  const prompt = `
+You are a top-tier YouTube film essayist. We have performed a deep AI analysis on the movie: "${movieTitle}".
+Your task is to convert this raw analysis into a compelling, 1-2 minute conversational voiceover script for a faceless YouTube video.
+
+IMPORTANT RULES:
+1. Make it sound natural, authoritative, and engaging.
+2. The tone should be like a premium video essay (think Nerdwriter or Lessons from the Screenplay).
+3. Do NOT include any stage directions, brackets, or visuals notes in the text. ONLY output the words the narrator will say.
+4. Keep the total word count around 200-250 words so it fits nicely in a short video.
+
+Here is the raw analysis to base your script on:
+${analysisText}
+  `.trim();
+
+  return runGeminiWithFallback(
+    'YouTube Script Generation',
+    prompt,
+    { temperature: 0.7 },
+    (responseText) => responseText.trim(),
+    logTokenUsage
+  );
+};
