@@ -23,7 +23,7 @@ import { generateGenericPublisherEditorial } from '../services/geminiService';
 import { SparklesIcon } from './icons/SparklesIcon'; // Added import
 import { saveDraft, saveDraftVersion } from '../services/omnichannelDraftService';
 import { db } from '../services/firebaseConfig';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -410,7 +410,7 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
       zip.file(`${safeTitle}_report.md`, markdownContent);
       
       // 1.2 Add HTML Report
-      const htmlContent = generateHTMLReportString(title, layerAnalyses, summaryReportData, overallScore, morphokineticsAnalysis, personnelData, financialAnalysisData);
+      const htmlContent = generateHTMLReportString(title, layerAnalyses, summaryReportData, overallScore, morphokineticsAnalysis ?? undefined, personnelData, financialAnalysisData ?? undefined);
       zip.file(`${safeTitle}_report.html`, htmlContent);
 
       if (summaryReportData.creatorInsights) {
@@ -435,35 +435,15 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
         zip.file(`${safeTitle}_social.md`, socialContent);
       }
 
-      // 2.5 Archive to Firebase (Free Tier Spark Plan)
+      // 2.5 Update existing auto-archived Firebase document with Publisher Editorial
       try {
-        const simplifiedLayerAnalyses = layerAnalyses.map(la => ({
-            id: la.id,
-            title: la.title,
-            shortTitle: la.shortTitle,
-            userScore: la.userScore ?? null,
-            aiSuggestedScore: la.aiSuggestedScore ?? null
-        }));
-
-        const simplifiedMorpho = morphokineticsAnalysis ? {
-            keyMoments: morphokineticsAnalysis.keyMoments || [],
-            overallSummary: morphokineticsAnalysis.overallSummary || ""
-        } : null;
-
-        await addDoc(collection(db, 'published_research'), {
-          title: title,
-          type: 'research_export',
-          content: markdownContent,
-          editorial: editorialContent || null,
-          socials: socialSnippets || null,
-          layerData: simplifiedLayerAnalyses,
-          morphoData: simplifiedMorpho,
-          createdAt: new Date(),
-          status: 'archived',
-          createdBy: currentUserEmail || 'system'
-        });
+        if (archivedId) {
+          await updateDoc(doc(db, 'published_research', archivedId), {
+            editorial: editorialContent || null,
+          });
+        }
       } catch (err) {
-        console.error("Failed to archive research to Firebase:", err);
+        console.error("Failed to update archived research in Firebase:", err);
       }
 
       // 3. Capture Concentric Rings

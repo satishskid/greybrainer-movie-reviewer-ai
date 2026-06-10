@@ -3677,7 +3677,7 @@ export const generateYouTubeScriptWithGemini = async (
 
   layerAnalyses.forEach(layer => {
     aggregatedAnalysis.push(`\n## ${layer.title} Analysis:`);
-    aggregatedAnalysis.push(layer.analysisMarkdown || '');
+    aggregatedAnalysis.push(layer.editedText || '');
   });
 
   const analysisText = aggregatedAnalysis.join("\n").substring(0, 3000); // Truncate to save tokens
