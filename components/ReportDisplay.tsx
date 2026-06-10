@@ -105,11 +105,11 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
             try {
                 const ringsElement = document.getElementById('concentric-rings-chart');
                 if (ringsElement) {
-                    ringsBase64 = await toPng(ringsElement, { backgroundColor: '#1e293b', pixelRatio: 2 });
+                    ringsBase64 = await toPng(ringsElement, { backgroundColor: '#1e293b', pixelRatio: 2, skipFonts: true });
                 }
                 const morphoElement = document.getElementById('morphokinetics-chart');
                 if (morphoElement) {
-                    morphoBase64 = await toPng(morphoElement, { backgroundColor: '#1e293b', pixelRatio: 2 });
+                    morphoBase64 = await toPng(morphoElement, { backgroundColor: '#1e293b', pixelRatio: 2, skipFonts: true });
                 }
             } catch (e) {
                 console.warn("Failed to capture chart images for archive:", e);
