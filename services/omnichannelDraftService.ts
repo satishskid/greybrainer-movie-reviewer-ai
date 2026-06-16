@@ -61,6 +61,88 @@ export interface DraftPublishResult {
   }>;
 }
 
+export type PublishLaneAuthType = "bearer" | "x-api-key" | "custom-header" | "none";
+export type PublishLaneChannelMode = "native" | "postiz" | "webhook";
+
+export interface PublishLaneChannelConfig {
+  apiKey?: string | null;
+  authHeaderName?: string | null;
+  authType?: PublishLaneAuthType;
+  channel: string;
+  copy?: string | string[] | null;
+  enabled?: boolean;
+  endpointUrl?: string | null;
+  mode: PublishLaneChannelMode;
+  postizIntegrationId?: string | null;
+  postizType?: string | null;
+  postizUploadMedia?: boolean;
+  socialAccountId?: string | null;
+  tags?: string[];
+}
+
+export interface PublishLanePayload {
+  channels: PublishLaneChannelConfig[];
+  dryRun?: boolean;
+  pack?: {
+    articleMarkdown?: string | null;
+    canonicalUrl?: string | null;
+    excerpt?: string | null;
+    hashtags?: string[];
+    media?: {
+      heroImageUrl?: string | null;
+      posterImageUrl?: string | null;
+      thumbnailImageUrl?: string | null;
+    };
+    seoDescription?: string | null;
+    seoTitle?: string | null;
+    slug?: string | null;
+    tags?: string[];
+    title?: string | null;
+  };
+  publishWebsite?: boolean;
+  requestedBy?: string | null;
+  versionId?: string | null;
+  websiteUrl?: string | null;
+}
+
+export interface PublishLaneResult {
+  canonicalUrl: string | null;
+  draftId: string;
+  dryRun: boolean;
+  results: Array<{
+    channel: string;
+    endpointHost?: string | null;
+    error?: string | null;
+    externalId?: string | null;
+    externalUrl?: string | null;
+    mode: PublishLaneChannelMode | "website";
+    payloadPreview?: unknown;
+    responseStatus?: number | null;
+    socialAccountId?: string | null;
+    status: "ready" | "published" | "failed" | "skipped";
+  }>;
+  website:
+    | WebsitePublishResult
+    | {
+        mode: "website";
+        status: "ready" | "skipped";
+      }
+    | null;
+}
+
+export interface PostizIntegrationRecord {
+  customer: {
+    id: string | null;
+    name: string | null;
+  } | null;
+  disabled: boolean;
+  id: string;
+  identifier: string;
+  name: string | null;
+  picture: string | null;
+  profile: string | null;
+}
+
 export interface WebsitePublishResult {
   canonicalUrl: string;
   deployTriggered?: boolean;
@@ -549,6 +631,35 @@ export async function publishDraftToSocialAccounts(draftId: string, socialAccoun
     },
     body: JSON.stringify({ socialAccountIds }),
   });
+}
+
+export async function publishDraftThroughLane(draftId: string, payload: PublishLanePayload): Promise<PublishLaneResult> {
+  return requestJson<PublishLaneResult>(`/drafts/${draftId}/publish-lane`, {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function listPostizIntegrations(input: {
+  apiKey: string;
+  baseUrl?: string | null;
+  group?: string | null;
+}): Promise<PostizIntegrationRecord[]> {
+  const data = await requestJson<{ integrations: PostizIntegrationRecord[] }>("/postiz/integrations", {
+    method: "POST",
+    headers: {
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      apiKey: input.apiKey,
+      baseUrl: input.baseUrl ?? null,
+      group: input.group ?? null,
+    }),
+  });
+  return data.integrations;
 }
 
 export async function publishDraftToWebsite(

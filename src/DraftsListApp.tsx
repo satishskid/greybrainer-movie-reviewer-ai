@@ -5,6 +5,11 @@ import { AuthWrapper } from '../components/AuthWrapper';
 
 type StatusFilter = 'all' | 'generated' | 'approved' | 'published';
 
+function appPath(path: string) {
+  const base = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/, '');
+  return `${base}${path}`;
+}
+
 /* ── Editor guide banner (collapsible) ── */
 function EditorGuide() {
   const [open, setOpen] = useState(() => {
@@ -203,9 +208,26 @@ const DraftsListInner: React.FC<{ currentUserEmail: string | null }> = ({ curren
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto', padding: '2rem 1.5rem', fontFamily: 'Manrope, system-ui, sans-serif' }}>
       <header style={{ marginBottom: '2rem' }}>
-        <h1 style={{ fontSize: '1.6rem', fontWeight: 700, margin: 0, color: '#f5f5f5' }}>
-          GreyBrainer Studio
-        </h1>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+          <h1 style={{ fontSize: '1.6rem', fontWeight: 700, margin: 0, color: '#f5f5f5' }}>
+            GreyBrainer Studio
+          </h1>
+          <a
+            href={appPath('/studio/publish-lane')}
+            style={{
+              padding: '8px 14px',
+              borderRadius: 8,
+              border: '1px solid #38bdf866',
+              background: '#0284c722',
+              color: '#bae6fd',
+              fontSize: '0.78rem',
+              fontWeight: 700,
+              textDecoration: 'none',
+            }}
+          >
+            Publishing Lane
+          </a>
+        </div>
         <p style={{ color: '#a0a0a0', fontSize: '0.85rem', margin: '0.4rem 0 0' }}>
           Content pipeline — review AI output, add images, and publish to Lens.
           {currentUserEmail && <span style={{ float: 'right', fontSize: '0.75rem', color: '#64748b' }}>Signed in as {currentUserEmail}</span>}
@@ -274,7 +296,7 @@ const DraftsListInner: React.FC<{ currentUserEmail: string | null }> = ({ curren
                   {contentTypeBadge(draft.subjectType)}
                 </div>
                 <a
-                  href={`/studio/drafts/${draft.id}`}
+                  href={appPath(`/studio/drafts/${draft.id}`)}
                   style={{ color: '#f5f5f5', textDecoration: 'none', fontSize: '0.95rem', fontWeight: 600, lineHeight: 1.3 }}
                 >
                   {draft.subjectTitle}
@@ -290,7 +312,7 @@ const DraftsListInner: React.FC<{ currentUserEmail: string | null }> = ({ curren
               {/* Actions */}
               <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
                 <a
-                  href={`/studio/drafts/${draft.id}`}
+                  href={appPath(`/studio/drafts/${draft.id}`)}
                   style={{
                     padding: '6px 14px',
                     borderRadius: 6,
@@ -303,6 +325,21 @@ const DraftsListInner: React.FC<{ currentUserEmail: string | null }> = ({ curren
                   }}
                 >
                   Edit
+                </a>
+                <a
+                  href={appPath(`/studio/publish-lane/${draft.id}`)}
+                  style={{
+                    padding: '6px 14px',
+                    borderRadius: 6,
+                    border: '1px solid #0ea5e9',
+                    background: '#0ea5e922',
+                    color: '#7dd3fc',
+                    fontSize: '0.75rem',
+                    fontWeight: 700,
+                    textDecoration: 'none',
+                  }}
+                >
+                  Lane
                 </a>
                 {draft.status !== 'published' && (
                   <button

@@ -600,7 +600,7 @@ function normalizeImageUrl(url: string | null | undefined) {
 export async function listPublicLensManifest(client: Client, env: Env, limit = 100): Promise<PublicLensManifestEntry[]> {
   const publications = await listPublishedWebsiteRows(client, limit);
   const entries = await Promise.all(
-    publications.map(async (publication) => {
+    publications.map(async (publication): Promise<PublicLensManifestEntry | null> => {
       if (!publication.blogMarkdown) {
         return null;
       }

@@ -7,7 +7,9 @@ import { backfillMediumUrls } from "./lib/knowledgeBackfill";
 import { listKnowledgeDocuments, listKnowledgeImportJobs } from "./lib/knowledgeRepository";
 import { syncMediumKnowledgeFeed } from "./lib/mediumKnowledge";
 import { handleNativeCallback, publishDraftToSocialAccounts, startNativeConnection } from "./lib/nativeConnectorRuntime";
+import { listPostizIntegrations } from "./lib/postizApi";
 import { listPublicLensManifest } from "./lib/publicLensManifest";
+import { publishDraftThroughLane, type PublishLaneInput } from "./lib/publishingLane";
 import { publishDraftToWebsite } from "./lib/websitePublishing";
 import { handleWebsitePreviewRoute } from "./lib/websitePreview";
 import { createContextEvent, listContextEvents, searchContextEvents } from "./lib/contextRepository";
@@ -246,6 +248,20 @@ export default {
           facets: { keywords: keywordCounts, types: typeCounts },
           total: filtered.length,
         });
+      }
+
+      if (segments[1] === "postiz" && segments[2] === "integrations" && request.method === "POST") {
+        const body = await parseBody<{ apiKey?: string; baseUrl?: string | null; group?: string | null }>(request);
+        if (!body?.apiKey?.trim()) {
+          return badRequest("apiKey is required.");
+        }
+
+        const integrations = await listPostizIntegrations({
+          apiKey: body.apiKey,
+          baseUrl: body.baseUrl ?? null,
+          group: body.group ?? null,
+        });
+        return json({ integrations });
       }
 
       if (segments[1] === "context") {
@@ -647,6 +663,16 @@ export default {
           skipKnowledge: body?.skipKnowledge ?? false,
         });
         return json(result, 201);
+      }
+
+      if (segments.length === 4 && segments[3] === "publish-lane" && request.method === "POST") {
+        const body = await parseBody<PublishLaneInput>(request);
+        if (!body) {
+          return badRequest("JSON body is required.");
+        }
+
+        const result = await publishDraftThroughLane(client, env, segments[2], body);
+        return json(result, body.dryRun === false ? 201 : 200);
       }
 
       return json({ error: "Not found" }, 404);

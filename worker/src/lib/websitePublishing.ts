@@ -211,6 +211,7 @@ async function persistPublishedWebsiteArtifacts(
       thumbnailImageUrl?: string | null;
       platform?: string | null;
       releaseFocus?: string | null;
+      tags?: string[] | null;
       thumbnailEyebrow?: string | null;
       verdict?: string | null;
       year?: string | null;

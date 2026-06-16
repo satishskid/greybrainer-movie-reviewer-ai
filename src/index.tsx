@@ -6,6 +6,7 @@ import App from '../App';
 import { LensPreviewApp } from './LensPreviewApp';
 import { DraftReviewApp } from './DraftReviewApp';
 import { DraftsListApp } from './DraftsListApp';
+import { PublishLaneApp } from './PublishLaneApp';
 import './index.css'; // Import Tailwind CSS
 
 const rootElement = document.getElementById('root');
@@ -16,8 +17,9 @@ if (!rootElement) {
 const root = ReactDOM.createRoot(rootElement);
 
 function resolveApp() {
-  const path = window.location.pathname;
+  const path = window.location.pathname.replace(/^\/engine(?=\/|$)/, '') || '/';
   if (path === '/lens' || path.startsWith('/lens/')) return <LensPreviewApp />;
+  if (path === '/studio/publish-lane' || path.startsWith('/studio/publish-lane/')) return <PublishLaneApp />;
   if (path === '/studio/drafts' || path === '/studio/drafts/') return <DraftsListApp />;
   if (path.startsWith('/studio/drafts/')) return <DraftReviewApp />;
   return <App />;
