@@ -1,4 +1,5 @@
 import type { ReviewStage, SocialSnippets } from "../types";
+import { auth } from "./firebaseConfig";
 
 const DEFAULT_API_BASE_URL = "/api";
 
@@ -399,6 +400,23 @@ function getApiBaseUrl() {
   return configured && configured.trim().length > 0 ? configured : DEFAULT_API_BASE_URL;
 }
 
+function getAssetUploadUrl() {
+  const configured = import.meta.env.VITE_OMNICHANNEL_ASSET_UPLOAD_URL;
+  if (configured && configured.trim().length > 0) {
+    return configured;
+  }
+
+  if (
+    typeof window !== "undefined" &&
+    window.location.hostname !== "localhost" &&
+    window.location.hostname !== "127.0.0.1"
+  ) {
+    return "/api/assets/upload";
+  }
+
+  return `${getApiBaseUrl()}/assets/upload`;
+}
+
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
@@ -733,12 +751,19 @@ export async function uploadDraftAsset(payload: {
 
   let response: Response;
   try {
-    response = await fetch(`${getApiBaseUrl()}/assets/upload`, {
+    const token = await auth.currentUser?.getIdToken();
+    const headers = new Headers();
+    if (token) {
+      headers.set("authorization", `Bearer ${token}`);
+    }
+
+    response = await fetch(getAssetUploadUrl(), {
       method: "POST",
+      headers,
       body: formData,
     });
   } catch (error) {
-    throw new Error(`Unable to reach the Cloudflare backend at ${getApiBaseUrl()}.`);
+    throw new Error(`Unable to reach the asset upload endpoint at ${getAssetUploadUrl()}.`);
   }
 
   if (!response.ok) {

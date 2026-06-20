@@ -8,6 +8,7 @@ export interface Env {
   CF_PAGES_DEPLOY_HOOK?: string;
   CONTENT_R2?: R2Bucket;
   KNOWLEDGE_R2?: R2Bucket;
+  ASSET_UPLOAD_TOKEN?: string;
   DRAFT_STORAGE_MODE?: string;
   DAILY_BRIEF_ENABLED?: string;
   DAILY_BRIEF_TIMEZONE?: string;

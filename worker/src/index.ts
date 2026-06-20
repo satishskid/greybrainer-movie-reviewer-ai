@@ -37,7 +37,7 @@ import { discoverSocialAccount } from "./lib/socialAccounts";
 
 function corsHeaders() {
   return {
-    "access-control-allow-headers": "content-type, authorization",
+    "access-control-allow-headers": "content-type, authorization, x-api-key",
     "access-control-allow-methods": "GET, POST, PATCH, OPTIONS",
     "access-control-allow-origin": "*",
     "access-control-max-age": "86400",
@@ -56,6 +56,21 @@ function json(data: unknown, status = 200) {
 
 function badRequest(message: string) {
   return json({ error: message }, 400);
+}
+
+function unauthorized(message: string) {
+  return json({ error: message }, 401);
+}
+
+function hasAssetUploadAccess(request: Request, env: Env) {
+  const requiredToken = env.ASSET_UPLOAD_TOKEN?.trim();
+  if (!requiredToken) return true;
+
+  const authorization = request.headers.get("authorization") || "";
+  const bearerToken = authorization.match(/^Bearer\s+(.+)$/i)?.[1]?.trim();
+  const apiKey = request.headers.get("x-api-key")?.trim();
+
+  return bearerToken === requiredToken || apiKey === requiredToken;
 }
 
 function generateEntityId(prefix: string) {
@@ -313,6 +328,9 @@ export default {
         if (segments[2] === "upload" && request.method === "POST") {
           if (!env.CONTENT_R2) {
             return badRequest("CONTENT_R2 is not configured.");
+          }
+          if (!hasAssetUploadAccess(request, env)) {
+            return unauthorized("Asset upload token is invalid.");
           }
           const formData = await request.formData();
           const draftId = String(formData.get("draftId") ?? "").trim();

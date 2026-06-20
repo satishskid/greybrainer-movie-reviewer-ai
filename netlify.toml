@@ -14,6 +14,12 @@
 
 # Redirect rules for SPA (Single Page Application)
 [[redirects]]
+  from = "/api/assets/upload"
+  to = "/.netlify/functions/r2-upload"
+  status = 200
+  force = true
+
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
