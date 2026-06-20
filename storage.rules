@@ -1,0 +1,53 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null && request.auth.token.email != null;
+    }
+
+    function isAdmin() {
+      return signedIn() && request.auth.token.email in [
+        'satish@skids.health',
+        'satish.rath@gmail.com',
+        'satishskid@gmail.com',
+        'rath.satish@gmail.com',
+        'mousamkumarp@gmail.com',
+        'dr.satish@greybrain.ai',
+        'digi.social@greybrain.ai',
+        'social@skids.health',
+        'support@skids.health'
+      ];
+    }
+
+    function isEditor() {
+      return signedIn() && (
+        request.auth.token.email in [
+          'drpratichi@skids.health',
+          'skids.social01@gmail.com',
+          'saminamishra@gmail.com',
+          'saminamisra@gmail.com',
+          'support@skids.health',
+          'mousampatel816@gmail.com',
+          'pranitskid@gmail.com'
+        ] || isAdmin()
+      );
+    }
+
+    function isImageUpload() {
+      return request.resource != null
+        && request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
+    match /article-assets/{articleId}/{fileName=**} {
+      allow read: if isEditor();
+      allow create, update: if isEditor() && isImageUpload();
+      allow delete: if isAdmin();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
