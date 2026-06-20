@@ -27,6 +27,36 @@ import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
+function toPlainText(value: string, maxLength?: number): string {
+  const text = value
+    .replace(/!\[[^\]]*]\([^)]*\)/g, '')
+    .replace(/\[([^\]]+)]\([^)]*\)/g, '$1')
+    .replace(/[#*_`>~|-]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  if (!maxLength || text.length <= maxLength) return text;
+  return `${text.slice(0, maxLength).replace(/\s+\S*$/, '').trim()}...`;
+}
+
+function firstWords(value: string, maxWords: number): string {
+  return toPlainText(value).split(/\s+/).filter(Boolean).slice(0, maxWords).join(' ');
+}
+
+function scoreForLayer(layerAnalyses: LayerAnalysisData[], layerId: string, maxScore: number): string {
+  const layer = layerAnalyses.find((item) => item.id === layerId);
+  return typeof layer?.userScore === 'number' ? `${layer.userScore.toFixed(1)}/${maxScore}` : '';
+}
+
+function buildTags(title: string): string[] {
+  return [
+    'greybrainer review',
+    'movie review',
+    'film analysis',
+    ...title.split(/\s+/).filter((word) => word.length > 3).slice(0, 4),
+  ];
+}
+
 
 interface ReportDisplayProps {
   summaryReportData: SummaryReportData;
@@ -121,6 +151,28 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
                 content: markdownContent,
                 socials: summaryReportData.socialSnippets || null,
                 youtubeScript: summaryReportData.youtubeScript || null,
+                searchHeadline: `${title} Review: Story, Execution and Morphokinetics Analysis`,
+                seoTitle: `${title} Review: Greybrainer Three-Layer Analysis`,
+                seoDescription: toPlainText(summaryReportData.reportText || markdownContent, 155),
+                verdict: firstWords(summaryReportData.reportText || markdownContent, 50),
+                whoShouldWatch: "For viewers who want more than a thumbs-up verdict: story signal, craft reading, audience movement, and a clear sense of whether the film will stay with them.",
+                storyScore: scoreForLayer(layerAnalyses, 'STORY', maxScore),
+                conceptScore: scoreForLayer(layerAnalyses, 'CONCEPTUALIZATION', maxScore),
+                executionScore: scoreForLayer(layerAnalyses, 'PERFORMANCE', maxScore),
+                overallScore: layerAnalyses.some((layer) => typeof layer.userScore === 'number')
+                  ? `${(layerAnalyses.filter((layer) => typeof layer.userScore === 'number').reduce((sum, layer) => sum + (layer.userScore as number), 0) / layerAnalyses.filter((layer) => typeof layer.userScore === 'number').length).toFixed(1)}/${maxScore}`
+                  : '',
+                morphokineticsTeaser: morphokineticsAnalysis?.overallSummary
+                  ? toPlainText(morphokineticsAnalysis.overallSummary, 220)
+                  : "The Morphokinetics pass reads attention, pacing, release, and emotional momentum without exposing the full internal scoring model.",
+                producerInsight: "For producers and directors, this review highlights where the film's intent lands, where craft choices amplify it, and where audience energy may shift.",
+                faqs: [
+                  { question: `Is ${title} worth watching?`, answer: "Yes, if the film's core promise matches the genre, viewing mood, and audience signal described in this Greybrainer review." },
+                  { question: "What does Greybrainer analyze?", answer: "Greybrainer reads story/script, conceptualization, performance/execution, audience pulse, and Morphokinetics as connected signals." },
+                ],
+                tags: buildTags(title),
+                inlineImageUrls: [],
+                relatedSlugs: [],
                 layerData: simplifiedLayerAnalyses,
                 morphoData: simplifiedMorpho,
                 images: {
