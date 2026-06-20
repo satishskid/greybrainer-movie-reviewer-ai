@@ -9,6 +9,7 @@ Our platform is built upon the **"Greybrainer Movie Magic Theory,"** a systemati
 ## Table of Contents
 - [Core Philosophy](#core-philosophy-the-greybrainer-movie-magic-theory)
 - [Key Features](#key-features--capabilities)
+- [Current Publishing Workflow](#current-publishing-workflow)
 - [Manual Analysis Workflow](#manual-analysis-workflow)
 - [Settings (What It Is)](#settings-what-it-is)
 - [Tech Stack](#tech-stack)
@@ -60,6 +61,18 @@ The Greybrainer methodology posits that cinematic impact is primarily derived fr
     *   Uncover the dynamic "motion" of a film: its emotional arc, pacing strategy, tension-building, and timeline structure, complete with visualizations.
 *   👤 **Personnel "Magic Factor" Insights:**
     *   Provides an AI-generated analysis of the signature style and unique impact of identified directors or key actors.
+
+## Current Publishing Workflow
+
+The Engine is the deep-review analysis source. It should not replace the writer's daily newsletter process.
+
+- Production Engine: https://greybrainer-movie.netlify.app
+- Public website: https://movies.greybrain.in
+- Writer Hub: https://movies.greybrain.in/hub
+
+When a Jr dev exports an Engine report, the Engine archives a draft into Firebase `published_research` for the Writer Hub. The draft includes SEO scaffolding, three-layer scores, Morphokinetics teaser, producer/director insight, and diagnostic images when available.
+
+See the full Engine handoff SOP in [docs/CONTENT_WORKFLOW_SOP.md](./docs/CONTENT_WORKFLOW_SOP.md).
 
 ## Manual Analysis Workflow
 
