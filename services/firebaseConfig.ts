@@ -66,6 +66,8 @@ const ADMIN_EMAILS = [
 // Editor emails
 const EDITOR_EMAILS = [
   'drpratichi@skids.health',
+  'skids.social01@gmail.com',
+  'saminamishra@gmail.com',
   'saminamisra@gmail.com',
   'support@skids.health',
   'mousampatel816@gmail.com',

@@ -22,7 +22,7 @@ import { ShareIcon } from './icons/ShareIcon';
 import { generateGenericPublisherEditorial } from '../services/geminiService';
 import { SparklesIcon } from './icons/SparklesIcon'; // Added import
 import { saveDraft, saveDraftVersion } from '../services/omnichannelDraftService';
-import { db } from '../services/firebaseConfig';
+import { auth, db } from '../services/firebaseConfig';
 import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -55,6 +55,70 @@ function buildTags(title: string): string[] {
     'film analysis',
     ...title.split(/\s+/).filter((word) => word.length > 3).slice(0, 4),
   ];
+}
+
+const MAX_INLINE_CHART_DATA_URL_LENGTH = 350_000;
+
+interface AssetUploadResponse {
+  url?: string;
+  error?: string;
+}
+
+function slugifyAssetId(input: string): string {
+  return input
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)+/g, '')
+    .slice(0, 80) || 'greybrainer-review';
+}
+
+async function dataUrlToFile(dataUrl: string, filename: string): Promise<File> {
+  const response = await fetch(dataUrl);
+  const blob = await response.blob();
+  return new File([blob], filename, { type: blob.type || 'image/png' });
+}
+
+async function uploadChartImage(
+  dataUrl: string | null,
+  draftId: string,
+  kind: string,
+  filename: string,
+): Promise<string | null> {
+  if (!dataUrl) return null;
+
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) {
+    console.warn(`Skipping ${kind} chart upload: user is not authenticated.`);
+    return null;
+  }
+
+  const formData = new FormData();
+  formData.append('draftId', draftId);
+  formData.append('kind', kind);
+  formData.append('file', await dataUrlToFile(dataUrl, filename));
+
+  const response = await fetch('/api/assets/upload', {
+    method: 'POST',
+    headers: { authorization: `Bearer ${token}` },
+    body: formData,
+  });
+  const payload = (await response.json().catch(() => ({}))) as AssetUploadResponse;
+
+  if (!response.ok || !payload.url) {
+    throw new Error(payload.error || `${kind} chart upload failed.`);
+  }
+
+  return payload.url;
+}
+
+function chartArchiveReference(uploadedUrl: string | null, dataUrl: string | null, kind: string): string | null {
+  if (uploadedUrl) return uploadedUrl;
+  if (dataUrl && dataUrl.length <= MAX_INLINE_CHART_DATA_URL_LENGTH) return dataUrl;
+  if (dataUrl) {
+    console.warn(`Skipping inline ${kind} chart because it is too large for a Firestore draft.`);
+  }
+  return null;
 }
 
 
@@ -145,6 +209,18 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
                 console.warn("Failed to capture chart images for archive:", e);
             }
 
+            const assetDraftId = slugifyAssetId(title);
+            let ringsUrl: string | null = null;
+            let morphoUrl: string | null = null;
+            try {
+                [ringsUrl, morphoUrl] = await Promise.all([
+                    uploadChartImage(ringsBase64, assetDraftId, 'concentric-rings', `${assetDraftId}-concentric-rings.png`),
+                    uploadChartImage(morphoBase64, assetDraftId, 'morphokinetics', `${assetDraftId}-morphokinetics.png`),
+                ]);
+            } catch (e) {
+                console.warn("Failed to upload chart images to R2 for archive:", e);
+            }
+
             addDoc(collection(db, 'published_research'), {
                 title: title,
                 type: 'research_export',
@@ -176,8 +252,8 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
                 layerData: simplifiedLayerAnalyses,
                 morphoData: simplifiedMorpho,
                 images: {
-                  rings: ringsBase64,
-                  morpho: morphoBase64
+                  rings: chartArchiveReference(ringsUrl, ringsBase64, 'concentric rings'),
+                  morpho: chartArchiveReference(morphoUrl, morphoBase64, 'morphokinetics')
                 },
                 createdAt: new Date(),
                 status: 'draft',

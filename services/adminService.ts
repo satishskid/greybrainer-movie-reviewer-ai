@@ -20,6 +20,9 @@ export class AdminService {
       const ADMIN_EMAILS = [
         'satish@skids.health',
         'satish.rath@gmail.com',
+        'satishskid@gmail.com',
+        'rath.satish@gmail.com',
+        'mousamkumarp@gmail.com',
         'dr.satish@greybrain.ai',
         'digi.social@greybrain.ai',
         'social@skids.health',
@@ -85,6 +88,9 @@ export class AdminService {
     const ADMIN_EMAILS = [
       'satish@skids.health',
       'satish.rath@gmail.com',
+      'satishskid@gmail.com',
+      'rath.satish@gmail.com',
+      'mousamkumarp@gmail.com',
       'dr.satish@greybrain.ai',
       'digi.social@greybrain.ai',
       'social@skids.health',
@@ -102,7 +108,11 @@ export class AdminService {
     
     const EDITOR_EMAILS = [
       'drpratichi@skids.health',
-      'saminamisra@gmail.com'
+      'skids.social01@gmail.com',
+      'saminamishra@gmail.com',
+      'saminamisra@gmail.com',
+      'mousampatel816@gmail.com',
+      'pranitskid@gmail.com'
     ];
     
     return EDITOR_EMAILS.includes(user.email) || this.isAdminSync(user);
