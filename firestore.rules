@@ -120,9 +120,5 @@ service cloud.firestore {
       ] || isAdmin();
     }
     
-    function isWhitelisted() {
-      return exists(/databases/$(database)/documents/whitelist/$(request.auth.token.email)) &&
-             get(/databases/$(database)/documents/whitelist/$(request.auth.token.email)).data.isActive == true;
-    }
   }
 }
