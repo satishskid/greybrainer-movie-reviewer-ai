@@ -23,7 +23,7 @@ import { generateGenericPublisherEditorial } from '../services/geminiService';
 import { SparklesIcon } from './icons/SparklesIcon'; // Added import
 import { saveDraft, saveDraftVersion } from '../services/omnichannelDraftService';
 import { auth, db } from '../services/firebaseConfig';
-import { collection, addDoc, updateDoc, doc } from 'firebase/firestore';
+import { collection, addDoc, updateDoc, doc, setDoc } from 'firebase/firestore';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
@@ -58,6 +58,11 @@ function buildTags(title: string): string[] {
 }
 
 const MAX_INLINE_CHART_DATA_URL_LENGTH = 350_000;
+
+type HubArchiveState = {
+  status: 'idle' | 'sending' | 'sent' | 'error';
+  message: string;
+};
 
 interface AssetUploadResponse {
   url?: string;
@@ -121,6 +126,25 @@ function chartArchiveReference(uploadedUrl: string | null, dataUrl: string | nul
   return null;
 }
 
+async function waitForElementById(id: string, timeoutMs = 4000): Promise<HTMLElement | null> {
+  if (typeof document === 'undefined') return null;
+
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const element = document.getElementById(id);
+    if (element) return element;
+    await new Promise((resolve) => setTimeout(resolve, 150));
+  }
+
+  return document.getElementById(id);
+}
+
+async function captureChartImage(id: string): Promise<string | null> {
+  const element = await waitForElementById(id);
+  if (!element) return null;
+  return toPng(element, { backgroundColor: '#1e293b', pixelRatio: 2, skipFonts: true });
+}
+
 
 interface ReportDisplayProps {
   summaryReportData: SummaryReportData;
@@ -161,6 +185,8 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
   const [savedDraftId, setSavedDraftId] = useState<string | null>(null);
   const [archivedId, setArchivedId] = useState<string | null>(null);
   const [isExportingZip, setIsExportingZip] = useState(false);
+  const [hubArchiveState, setHubArchiveState] = useState<HubArchiveState>({ status: 'idle', message: '' });
+  const hasAutoArchivedRef = React.useRef(false);
 
   useEffect(() => {
     setLocalActualPerformance(initialActualPerformance || {});
@@ -170,112 +196,6 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
         setShowActualsInput(false);
     }
   }, [initialActualPerformance]);
-
-  // Auto-archive to Hub on generation
-  const hasAutoArchivedRef = React.useRef(false);
-  useEffect(() => {
-    if (!hasAutoArchivedRef.current && title && summaryReportData) {
-        hasAutoArchivedRef.current = true;
-        
-        // Use a timeout to ensure all rendering/state is settled before grabbing markdown
-        setTimeout(async () => {
-            const markdownContent = generateMarkdownReport();
-
-            const simplifiedLayerAnalyses = layerAnalyses.map(la => ({
-                id: la.id,
-                title: la.title,
-                shortTitle: la.shortTitle,
-                userScore: la.userScore ?? null,
-                aiSuggestedScore: la.aiSuggestedScore ?? null
-            }));
-
-            const simplifiedMorpho = morphokineticsAnalysis ? {
-                keyMoments: morphokineticsAnalysis.keyMoments || [],
-                overallSummary: morphokineticsAnalysis.overallSummary || ""
-            } : null;
-
-            let ringsBase64 = null;
-            let morphoBase64 = null;
-            try {
-                const ringsElement = document.getElementById('concentric-rings-chart');
-                if (ringsElement) {
-                    ringsBase64 = await toPng(ringsElement, { backgroundColor: '#1e293b', pixelRatio: 2, skipFonts: true });
-                }
-                const morphoElement = document.getElementById('morphokinetics-chart');
-                if (morphoElement) {
-                    morphoBase64 = await toPng(morphoElement, { backgroundColor: '#1e293b', pixelRatio: 2, skipFonts: true });
-                }
-            } catch (e) {
-                console.warn("Failed to capture chart images for archive:", e);
-            }
-
-            const assetDraftId = slugifyAssetId(title);
-            let ringsUrl: string | null = null;
-            let morphoUrl: string | null = null;
-            try {
-                [ringsUrl, morphoUrl] = await Promise.all([
-                    uploadChartImage(ringsBase64, assetDraftId, 'concentric-rings', `${assetDraftId}-concentric-rings.png`),
-                    uploadChartImage(morphoBase64, assetDraftId, 'morphokinetics', `${assetDraftId}-morphokinetics.png`),
-                ]);
-            } catch (e) {
-                console.warn("Failed to upload chart images to R2 for archive:", e);
-            }
-
-            addDoc(collection(db, 'published_research'), {
-                title: title,
-                type: 'research_export',
-                content: markdownContent,
-                socials: summaryReportData.socialSnippets || null,
-                youtubeScript: summaryReportData.youtubeScript || null,
-                searchHeadline: `${title} Review: Story, Execution and Morphokinetics Analysis`,
-                seoTitle: `${title} Review: Greybrainer Three-Layer Analysis`,
-                seoDescription: toPlainText(summaryReportData.reportText || markdownContent, 155),
-                verdict: firstWords(summaryReportData.reportText || markdownContent, 50),
-                whoShouldWatch: "For viewers who want more than a thumbs-up verdict: story signal, craft reading, audience movement, and a clear sense of whether the film will stay with them.",
-                storyScore: scoreForLayer(layerAnalyses, 'STORY', maxScore),
-                conceptScore: scoreForLayer(layerAnalyses, 'CONCEPTUALIZATION', maxScore),
-                executionScore: scoreForLayer(layerAnalyses, 'PERFORMANCE', maxScore),
-                overallScore: layerAnalyses.some((layer) => typeof layer.userScore === 'number')
-                  ? `${(layerAnalyses.filter((layer) => typeof layer.userScore === 'number').reduce((sum, layer) => sum + (layer.userScore as number), 0) / layerAnalyses.filter((layer) => typeof layer.userScore === 'number').length).toFixed(1)}/${maxScore}`
-                  : '',
-                morphokineticsTeaser: morphokineticsAnalysis?.overallSummary
-                  ? toPlainText(morphokineticsAnalysis.overallSummary, 220)
-                  : "The Morphokinetics pass reads attention, pacing, release, and emotional momentum without exposing the full internal scoring model.",
-                producerInsight: "For producers and directors, this review highlights where the film's intent lands, where craft choices amplify it, and where audience energy may shift.",
-                faqs: [
-                  { question: `Is ${title} worth watching?`, answer: "Yes, if the film's core promise matches the genre, viewing mood, and audience signal described in this Greybrainer review." },
-                  { question: "What does Greybrainer analyze?", answer: "Greybrainer reads story/script, conceptualization, performance/execution, audience pulse, and Morphokinetics as connected signals." },
-                ],
-                tags: buildTags(title),
-                inlineImageUrls: [],
-                relatedSlugs: [],
-                layerData: simplifiedLayerAnalyses,
-                morphoData: simplifiedMorpho,
-                images: {
-                  rings: chartArchiveReference(ringsUrl, ringsBase64, 'concentric rings'),
-                  morpho: chartArchiveReference(morphoUrl, morphoBase64, 'morphokinetics')
-                },
-                createdAt: new Date(),
-                status: 'draft',
-                createdBy: currentUserEmail || 'system',
-                autoArchived: true
-            }).then(docRef => setArchivedId(docRef.id)).catch(err => console.error("Auto-archive to Hub failed:", err));
-
-            if (summaryReportData.creatorInsights) {
-              addDoc(collection(db, 'published_research'), {
-                  title: `${title} - Creator's Blueprint`,
-                  type: 'creator_insights',
-                  content: summaryReportData.creatorInsights,
-                  socials: null,
-                  createdAt: new Date(),
-                  status: 'draft',
-                  createdBy: currentUserEmail || 'system',
-                  autoArchived: true
-              }).catch(err => console.error("Auto-archive creator insights to Hub failed:", err));
-            }
-        }, 1000);
-    }
-  }, [title, summaryReportData, currentUserEmail]);
 
   const { reportText, socialSnippets, overallImprovementSuggestions, youtubeScript } = summaryReportData;
 
@@ -513,6 +433,152 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
     return mdReport.trim();
   };
 
+  const archiveReportToHub = async () => {
+    if (archivedId) {
+      setHubArchiveState({ status: 'sent', message: `Already sent to Writer Hub as ${archivedId}.` });
+      return;
+    }
+
+    const user = auth.currentUser;
+    const email = currentUserEmail || user?.email;
+    if (!user || !email) {
+      setHubArchiveState({
+        status: 'error',
+        message: 'Not sent to Writer Hub. Sign in to the Engine, then click Send to Writer Hub.',
+      });
+      return;
+    }
+
+    setHubArchiveState({ status: 'sending', message: 'Sending report and diagnostic visuals to Writer Hub...' });
+
+    try {
+      const markdownContent = generateMarkdownReport();
+      const researchRef = doc(collection(db, 'published_research'));
+      const assetDraftId = researchRef.id || slugifyAssetId(title);
+
+      const simplifiedLayerAnalyses = layerAnalyses.map(la => ({
+        id: la.id,
+        title: la.title,
+        shortTitle: la.shortTitle,
+        userScore: la.userScore ?? null,
+        aiSuggestedScore: la.aiSuggestedScore ?? null
+      }));
+
+      const simplifiedMorpho = morphokineticsAnalysis ? {
+        keyMoments: morphokineticsAnalysis.keyMoments || [],
+        overallSummary: morphokineticsAnalysis.overallSummary || ""
+      } : null;
+
+      let ringsBase64: string | null = null;
+      let morphoBase64: string | null = null;
+      try {
+        [ringsBase64, morphoBase64] = await Promise.all([
+          captureChartImage('concentric-rings-chart'),
+          captureChartImage('morphokinetics-chart'),
+        ]);
+      } catch (e) {
+        console.warn("Failed to capture chart images for archive:", e);
+      }
+
+      const [ringsUrl, morphoUrl] = await Promise.all([
+        uploadChartImage(ringsBase64, assetDraftId, 'concentric-rings', `${slugifyAssetId(title)}-concentric-rings.png`)
+          .catch((e) => {
+            console.warn("Failed to upload concentric rings image to R2:", e);
+            return null;
+          }),
+        uploadChartImage(morphoBase64, assetDraftId, 'morphokinetics', `${slugifyAssetId(title)}-morphokinetics.png`)
+          .catch((e) => {
+            console.warn("Failed to upload morphokinetics image to R2:", e);
+            return null;
+          }),
+      ]);
+
+      const ringsReference = chartArchiveReference(ringsUrl, ringsBase64, 'concentric rings');
+      const morphoReference = chartArchiveReference(morphoUrl, morphoBase64, 'morphokinetics');
+      const diagnosticImageUrls = [ringsReference, morphoReference].filter(Boolean) as string[];
+      const articleSourceText = summaryReportData.reportText || markdownContent;
+
+      await setDoc(researchRef, {
+        title: title,
+        type: 'research_export',
+        content: markdownContent,
+        editorial: summaryReportData.reportText || markdownContent,
+        socials: summaryReportData.socialSnippets || null,
+        youtubeScript: summaryReportData.youtubeScript || null,
+        searchHeadline: `${title} Review: Story, Execution and Morphokinetics Analysis`,
+        seoTitle: `${title} Review: Greybrainer Three-Layer Analysis`,
+        seoDescription: toPlainText(articleSourceText, 155),
+        verdict: firstWords(articleSourceText, 50),
+        whoShouldWatch: "For viewers who want more than a thumbs-up verdict: story signal, craft reading, audience movement, and a clear sense of whether the film will stay with them.",
+        storyScore: scoreForLayer(layerAnalyses, 'STORY', maxScore),
+        conceptScore: scoreForLayer(layerAnalyses, 'CONCEPTUALIZATION', maxScore),
+        executionScore: scoreForLayer(layerAnalyses, 'PERFORMANCE', maxScore),
+        overallScore: layerAnalyses.some((layer) => typeof layer.userScore === 'number')
+          ? `${(layerAnalyses.filter((layer) => typeof layer.userScore === 'number').reduce((sum, layer) => sum + (layer.userScore as number), 0) / layerAnalyses.filter((layer) => typeof layer.userScore === 'number').length).toFixed(1)}/${maxScore}`
+          : '',
+        morphokineticsTeaser: morphokineticsAnalysis?.overallSummary
+          ? toPlainText(morphokineticsAnalysis.overallSummary, 220)
+          : "The Morphokinetics pass reads attention, pacing, release, and emotional momentum without exposing the full internal scoring model.",
+        producerInsight: "For producers and directors, this review highlights where the film's intent lands, where craft choices amplify it, and where audience energy may shift.",
+        faqs: [
+          { question: `Is ${title} worth watching?`, answer: "Yes, if the film's core promise matches the genre, viewing mood, and audience signal described in this Greybrainer review." },
+          { question: "What does Greybrainer analyze?", answer: "Greybrainer reads story/script, conceptualization, performance/execution, audience pulse, and Morphokinetics as connected signals." },
+        ],
+        tags: buildTags(title),
+        inlineImageUrls: diagnosticImageUrls,
+        relatedSlugs: [],
+        layerData: simplifiedLayerAnalyses,
+        morphoData: simplifiedMorpho,
+        images: {
+          rings: ringsReference,
+          morpho: morphoReference
+        },
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        status: 'draft',
+        createdBy: email,
+        source: 'greybrainer_engine',
+        autoArchived: true
+      });
+
+      setArchivedId(researchRef.id);
+      setHubArchiveState({
+        status: 'sent',
+        message: `Sent to Writer Hub with ${diagnosticImageUrls.length} diagnostic visual${diagnosticImageUrls.length === 1 ? '' : 's'}. Content ID: ${researchRef.id}`,
+      });
+
+      if (summaryReportData.creatorInsights) {
+        addDoc(collection(db, 'published_research'), {
+          title: `${title} - Creator's Blueprint`,
+          type: 'creator_insights',
+          content: summaryReportData.creatorInsights,
+          socials: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          status: 'draft',
+          createdBy: email,
+          source: 'greybrainer_engine',
+          autoArchived: true
+        }).catch(err => console.error("Auto-archive creator insights to Hub failed:", err));
+      }
+    } catch (error) {
+      console.error("Auto-archive to Hub failed:", error);
+      setHubArchiveState({
+        status: 'error',
+        message: error instanceof Error ? `Writer Hub send failed: ${error.message}` : 'Writer Hub send failed. Check console.',
+      });
+    }
+  };
+
+  useEffect(() => {
+    if (hasAutoArchivedRef.current || !title || !summaryReportData || !currentUserEmail) return;
+    hasAutoArchivedRef.current = true;
+    const timer = window.setTimeout(() => {
+      void archiveReportToHub();
+    }, 1200);
+    return () => window.clearTimeout(timer);
+  }, [title, summaryReportData, currentUserEmail]);
+
   const handleDownloadMarkdown = () => {
     const markdownContent = generateMarkdownReport();
     const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
@@ -689,8 +755,40 @@ export const ReportDisplay: React.FC<ReportDisplayProps> = ({
               </button>
             </div>
           )}
+          {hubArchiveState.message && (
+            <div className={`mt-3 rounded-lg border px-3 py-2 text-sm ${
+              hubArchiveState.status === 'sent'
+                ? 'border-emerald-500/50 bg-emerald-500/10 text-emerald-200'
+                : hubArchiveState.status === 'error'
+                  ? 'border-red-500/50 bg-red-500/10 text-red-200'
+                  : 'border-amber-500/50 bg-amber-500/10 text-amber-100'
+            }`}>
+              <span>{hubArchiveState.message}</span>
+              {hubArchiveState.status === 'error' && (
+                <button
+                  onClick={() => void archiveReportToHub()}
+                  className="ml-3 rounded bg-slate-700 px-2 py-1 text-xs text-white hover:bg-slate-600"
+                >
+                  Retry
+                </button>
+              )}
+            </div>
+          )}
         </div>
         <div className="flex flex-row flex-wrap gap-2 w-full xl:w-auto xl:justify-end">
+            <button
+              onClick={() => void archiveReportToHub()}
+              disabled={hubArchiveState.status === 'sending' || Boolean(archivedId)}
+              className={`flex items-center justify-center px-4 py-2 text-white text-sm font-medium rounded-lg shadow-md transition-colors duration-150 w-full sm:w-auto ${
+                hubArchiveState.status === 'sending' || archivedId
+                  ? 'bg-slate-700 cursor-not-allowed'
+                  : 'bg-red-600 hover:bg-red-500'
+              }`}
+              title="Send this generated report, SEO fields, and diagnostic visuals to the Writer Hub"
+            >
+              <CheckCircleIcon className="w-4 h-4 mr-2" />
+              {hubArchiveState.status === 'sending' ? 'Sending to Hub...' : archivedId ? 'Sent to Hub' : 'Send to Writer Hub'}
+            </button>
             <button
               onClick={handleSaveDraft}
               disabled={isSavingDraft}
