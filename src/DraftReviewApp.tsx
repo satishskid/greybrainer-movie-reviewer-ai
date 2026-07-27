@@ -2,6 +2,10 @@ import React, { useEffect, useMemo, useState, useCallback } from 'react';
 import { AuthWrapper } from '../components/AuthWrapper';
 import { LoadingSpinner } from '../components/LoadingSpinner';
 import {
+  SignalMediaStudio,
+  type SignalMediaUploadKey,
+} from './components/SignalMediaStudio';
+import {
   getDraft,
   listSocialAccounts,
   publishDraftToSocialAccounts,
@@ -12,10 +16,15 @@ import {
   uploadDraftAsset,
   updateDraftRecord,
 } from '../services/omnichannelDraftService';
+import {
+  createSignalMediaDraft,
+  type SignalMediaDraft,
+} from './services/signalMediaService';
 import { createContextEvent, listContextEvents, type ContextEventRecord } from './services/contextService';
 
-type ViewMode = 'edit' | 'preview';
+type ViewMode = 'edit' | 'preview' | 'media';
 type ImageKind = 'hero' | 'poster' | 'thumbnail';
+type UploadKind = ImageKind | SignalMediaUploadKey;
 
 /* ── Collapsible sidebar section ── */
 const SidebarSection: React.FC<{
@@ -174,6 +183,71 @@ function cleanUrlInput(value: string) {
   return value.trim();
 }
 
+function sourcePayloadWithoutSignalMedia(sourcePayload: unknown) {
+  if (!sourcePayload || typeof sourcePayload !== 'object' || Array.isArray(sourcePayload)) {
+    return sourcePayload;
+  }
+  const next = { ...(sourcePayload as Record<string, unknown>) };
+  delete next.signalMedia;
+  return next;
+}
+
+function signalMediaFromDraft(draft: DraftRecord, fresh = false): SignalMediaDraft {
+  const currentVersion = draft.currentVersion;
+  const sourcePayload = fresh
+    ? sourcePayloadWithoutSignalMedia(currentVersion?.sourcePayload)
+    : currentVersion?.sourcePayload;
+  const signalMedia = createSignalMediaDraft({
+    analysis: currentVersion?.analysis,
+    markdown: currentVersion?.blogMarkdown ?? '',
+    sourcePayload,
+    title: draft.subjectTitle,
+  });
+  const heroUrl = resolveImageUrl(currentVersion?.sourcePayload ?? {}, 'hero');
+  const posterUrl = resolveImageUrl(currentVersion?.sourcePayload ?? {}, 'poster');
+  return {
+    ...signalMedia,
+    assets: {
+      ...signalMedia.assets,
+      posterUrl: posterUrl || heroUrl || signalMedia.assets.posterUrl,
+      stillUrl: signalMedia.assets.stillUrl || heroUrl,
+    },
+  };
+}
+
+function withSignalAsset(
+  signalMedia: SignalMediaDraft,
+  kind: SignalMediaUploadKey,
+  url: string,
+): SignalMediaDraft {
+  if (kind.startsWith('signal-actor-')) {
+    const index = Number.parseInt(kind.replace('signal-actor-', ''), 10) - 1;
+    const actorUrls = [...signalMedia.assets.actorUrls];
+    actorUrls[index] = url;
+    return {
+      ...signalMedia,
+      assets: {
+        ...signalMedia.assets,
+        actorUrls,
+      },
+    };
+  }
+
+  const key =
+    kind === 'signal-director'
+      ? 'directorUrl'
+      : kind === 'signal-still'
+        ? 'stillUrl'
+        : 'platformLogoUrl';
+  return {
+    ...signalMedia,
+    assets: {
+      ...signalMedia.assets,
+      [key]: url,
+    },
+  };
+}
+
 export const DraftReviewApp: React.FC = () => {
   const draftId = getDraftIdFromPath();
 
@@ -196,13 +270,14 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
   const [heroImageUrl, setHeroImageUrl] = useState('');
   const [posterImageUrl, setPosterImageUrl] = useState('');
   const [thumbnailImageUrl, setThumbnailImageUrl] = useState('');
+  const [signalMediaDraft, setSignalMediaDraft] = useState<SignalMediaDraft | null>(null);
   const [viewMode, setViewMode] = useState<ViewMode>('edit');
   const [socialAccounts, setSocialAccounts] = useState<SocialAccountRecord[]>([]);
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingAsset, setIsUploadingAsset] = useState(false);
-  const [uploadKind, setUploadKind] = useState<ImageKind | null>(null);
+  const [uploadKind, setUploadKind] = useState<UploadKind | null>(null);
   const [isPublishingWebsite, setIsPublishingWebsite] = useState(false);
   const [isPublishingSocial, setIsPublishingSocial] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -245,6 +320,7 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
         setHeroImageUrl(resolveImageUrl(loadedDraft.currentVersion?.sourcePayload ?? {}, 'hero'));
         setPosterImageUrl(resolveImageUrl(loadedDraft.currentVersion?.sourcePayload ?? {}, 'poster'));
         setThumbnailImageUrl(resolveImageUrl(loadedDraft.currentVersion?.sourcePayload ?? {}, 'thumbnail'));
+        setSignalMediaDraft(signalMediaFromDraft(loadedDraft));
         setSocialAccounts(accounts);
         setSelectedAccountIds(accounts.filter((account) => account.connectionStatus === 'connected').map((account) => account.id));
       } catch (loadError) {
@@ -266,6 +342,21 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
     () => socialAccounts.filter((account) => account.connectionStatus === 'connected'),
     [socialAccounts],
   );
+  const activeSignalMedia = useMemo(() => {
+    if (!signalMediaDraft) return null;
+    return {
+      ...signalMediaDraft,
+      assets: {
+        ...signalMediaDraft.assets,
+        posterUrl: posterImageUrl || heroImageUrl || signalMediaDraft.assets.posterUrl,
+        stillUrl: signalMediaDraft.assets.stillUrl || heroImageUrl,
+      },
+      copy: {
+        ...signalMediaDraft.copy,
+        title: subjectTitle || signalMediaDraft.copy.title,
+      },
+    };
+  }, [heroImageUrl, posterImageUrl, signalMediaDraft, subjectTitle]);
 
   useEffect(() => {
     if (!draftId) return;
@@ -305,6 +396,7 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
     setHeroImageUrl(resolveImageUrl(loadedDraft.currentVersion?.sourcePayload ?? {}, 'hero'));
     setPosterImageUrl(resolveImageUrl(loadedDraft.currentVersion?.sourcePayload ?? {}, 'poster'));
     setThumbnailImageUrl(resolveImageUrl(loadedDraft.currentVersion?.sourcePayload ?? {}, 'thumbnail'));
+    setSignalMediaDraft(signalMediaFromDraft(loadedDraft));
   };
 
   const handleSaveMetadata = async (nextStatus = status) => {
@@ -345,58 +437,88 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
     }
   };
 
+  const persistVersion = async (overrides?: {
+    heroImageUrl?: string;
+    posterImageUrl?: string;
+    signalMedia?: SignalMediaDraft;
+    thumbnailImageUrl?: string;
+  }) => {
+    if (!draft || !currentVersion) return null;
+    const basePayload =
+      currentVersion.sourcePayload && typeof currentVersion.sourcePayload === 'object'
+        ? { ...(currentVersion.sourcePayload as Record<string, unknown>) }
+        : {};
+    const imagePayload =
+      basePayload.image && typeof basePayload.image === 'object'
+        ? { ...(basePayload.image as Record<string, unknown>) }
+        : {};
+    const nextHero = cleanUrlInput(overrides?.heroImageUrl ?? heroImageUrl);
+    const nextPoster = cleanUrlInput(overrides?.posterImageUrl ?? posterImageUrl);
+    const nextThumb = cleanUrlInput(overrides?.thumbnailImageUrl ?? thumbnailImageUrl);
+    const nextSignalMedia =
+      overrides?.signalMedia ??
+      signalMediaDraft ??
+      signalMediaFromDraft(draft);
+    const mediaWithCurrentImages: SignalMediaDraft = {
+      ...nextSignalMedia,
+      assets: {
+        ...nextSignalMedia.assets,
+        posterUrl: nextPoster || nextHero || nextSignalMedia.assets.posterUrl,
+        stillUrl: nextSignalMedia.assets.stillUrl || nextHero,
+      },
+      copy: {
+        ...nextSignalMedia.copy,
+        title: subjectTitle || draft.subjectTitle,
+      },
+    };
+
+    basePayload.heroImageUrl = nextHero || null;
+    basePayload.posterImageUrl = nextPoster || null;
+    basePayload.thumbnailImageUrl = nextThumb || null;
+    basePayload.signalMedia = mediaWithCurrentImages;
+    if (nextHero) imagePayload.heroUrl = nextHero;
+    if (nextPoster) imagePayload.posterUrl = nextPoster;
+    if (nextThumb) imagePayload.thumbnailUrl = nextThumb;
+    if (Object.keys(imagePayload).length) {
+      basePayload.image = imagePayload;
+    }
+
+    const updated = await saveDraftVersion(draft.id, {
+      analysis: currentVersion.analysis,
+      blogMarkdown: markdown,
+      createdBy: currentUserEmail ?? null,
+      editorNotes: currentVersion.editorNotes ?? null,
+      reviewStage: draft.reviewStage ?? undefined,
+      seoDescription: seoDescription || null,
+      seoTitle: seoTitle || null,
+      socials: currentVersion.socials ?? null,
+      sourcePayload: basePayload,
+      subjectTitle: subjectTitle || draft.subjectTitle,
+    });
+    setDraft(updated);
+    setSignalMediaDraft(signalMediaFromDraft(updated));
+    if (draftId) {
+      await createContextEvent({
+        sessionId: draftId,
+        eventType: 'draft.version',
+        actor: currentUserEmail ?? null,
+        content: `New version saved (v${updated.latestVersionNo}).`,
+        payload: { versionNo: updated.latestVersionNo },
+      });
+      const events = await listContextEvents(draftId, 12);
+      setContextEvents(events);
+    }
+    return updated;
+  };
+
   const handleSaveVersion = async () => {
     if (!draft || !currentVersion) return;
     setIsSaving(true);
     setError(null);
     setMessage(null);
     try {
-      const basePayload =
-        currentVersion.sourcePayload && typeof currentVersion.sourcePayload === 'object'
-          ? { ...(currentVersion.sourcePayload as Record<string, unknown>) }
-          : {};
-      const imagePayload =
-        basePayload.image && typeof basePayload.image === 'object'
-          ? { ...(basePayload.image as Record<string, unknown>) }
-          : {};
-      const nextHero = cleanUrlInput(heroImageUrl);
-      const nextPoster = cleanUrlInput(posterImageUrl);
-      const nextThumb = cleanUrlInput(thumbnailImageUrl);
-      basePayload.heroImageUrl = nextHero || null;
-      basePayload.posterImageUrl = nextPoster || null;
-      basePayload.thumbnailImageUrl = nextThumb || null;
-      if (nextHero) imagePayload.heroUrl = nextHero;
-      if (nextPoster) imagePayload.posterUrl = nextPoster;
-      if (nextThumb) imagePayload.thumbnailUrl = nextThumb;
-      if (Object.keys(imagePayload).length) {
-        basePayload.image = imagePayload;
-      }
-
-      const updated = await saveDraftVersion(draft.id, {
-        analysis: currentVersion.analysis,
-        blogMarkdown: markdown,
-        createdBy: currentUserEmail ?? null,
-        editorNotes: currentVersion.editorNotes ?? null,
-        reviewStage: draft.reviewStage ?? undefined,
-        seoDescription: seoDescription || null,
-        seoTitle: seoTitle || null,
-        socials: currentVersion.socials ?? null,
-        sourcePayload: basePayload,
-        subjectTitle: subjectTitle || draft.subjectTitle,
-      });
-      setDraft(updated);
-      if (draftId) {
-        await createContextEvent({
-          sessionId: draftId,
-          eventType: 'draft.version',
-          actor: currentUserEmail ?? null,
-          content: `New version saved (v${updated.latestVersionNo}).`,
-          payload: { versionNo: updated.latestVersionNo },
-        });
-        const events = await listContextEvents(draftId, 12);
-        setContextEvents(events);
-      }
-      setMessage('Saved a new review version.');
+      await persistVersion();
+      setMessage(viewMode === 'media' ? 'Saved the Greybrainer media pack.' : 'Saved a new review version.');
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : 'Failed to save draft version.');
     } finally {
@@ -464,7 +586,7 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
     }
   };
 
-  const handleAssetUpload = async (kind: ImageKind, file: File) => {
+  const handleAssetUpload = async (kind: UploadKind, file: File) => {
     if (!draft) return;
     setIsUploadingAsset(true);
     setUploadKind(kind);
@@ -472,20 +594,68 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
     setMessage(null);
     try {
       const result = await uploadDraftAsset({ draftId: draft.id, file, kind });
+      let nextSignalMedia =
+        signalMediaDraft ??
+        signalMediaFromDraft(draft);
+      const versionOverrides: {
+        heroImageUrl?: string;
+        posterImageUrl?: string;
+        signalMedia?: SignalMediaDraft;
+        thumbnailImageUrl?: string;
+      } = {};
+
       if (kind === 'hero') {
         setHeroImageUrl(result.url);
+        versionOverrides.heroImageUrl = result.url;
+        if (!nextSignalMedia.assets.stillUrl) {
+          nextSignalMedia = {
+            ...nextSignalMedia,
+            assets: { ...nextSignalMedia.assets, stillUrl: result.url },
+          };
+        }
       } else if (kind === 'poster') {
         setPosterImageUrl(result.url);
-      } else {
+        versionOverrides.posterImageUrl = result.url;
+        nextSignalMedia = {
+          ...nextSignalMedia,
+          assets: { ...nextSignalMedia.assets, posterUrl: result.url },
+        };
+      } else if (kind === 'thumbnail') {
         setThumbnailImageUrl(result.url);
+        versionOverrides.thumbnailImageUrl = result.url;
+      } else {
+        nextSignalMedia = withSignalAsset(nextSignalMedia, kind, result.url);
       }
-      setMessage(`Uploaded ${kind} image to Cloudflare.`);
+
+      versionOverrides.signalMedia = nextSignalMedia;
+      setSignalMediaDraft(nextSignalMedia);
+      await persistVersion(versionOverrides);
+      setMessage(`Uploaded ${kind.replace(/^signal-/, '').replace(/-/g, ' ')} and saved it to this draft.`);
     } catch (uploadError) {
       setError(uploadError instanceof Error ? uploadError.message : 'Failed to upload asset.');
     } finally {
       setIsUploadingAsset(false);
       setUploadKind(null);
     }
+  };
+
+  const handleResetSignalMedia = () => {
+    if (!draft || !currentVersion) return;
+    const fresh = createSignalMediaDraft({
+      analysis: currentVersion.analysis,
+      markdown,
+      sourcePayload: sourcePayloadWithoutSignalMedia(currentVersion.sourcePayload),
+      title: subjectTitle || draft.subjectTitle,
+    });
+    setSignalMediaDraft({
+      ...fresh,
+      assets: {
+        ...fresh.assets,
+        posterUrl: posterImageUrl || heroImageUrl || fresh.assets.posterUrl,
+        stillUrl: heroImageUrl || fresh.assets.stillUrl,
+      },
+    });
+    setMessage('Media copy reset from the saved review evidence. Save the media pack to keep it.');
   };
 
   const handleAddContextNote = async () => {
@@ -563,24 +733,46 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
       <main className="mx-auto grid max-w-[1600px] gap-6 px-6 py-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section className="rounded-[28px] border border-slate-800 bg-slate-950/60 shadow-2xl shadow-black/20">
           <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
-            <div className="text-sm font-medium text-slate-200">Draft Body</div>
-            <div className="flex gap-2 rounded-full border border-slate-800 bg-slate-900 p-1">
+            <div className="text-sm font-medium text-slate-200">
+              {viewMode === 'media' ? 'Signal Media' : 'Draft Body'}
+            </div>
+            <div className="flex gap-1 rounded-lg border border-slate-800 bg-slate-900 p-1">
               <button
                 onClick={() => setViewMode('edit')}
-                className={`rounded-full px-3 py-1.5 text-xs ${viewMode === 'edit' ? 'bg-slate-100 text-slate-950' : 'text-slate-400'}`}
+                className={`rounded-md px-3 py-1.5 text-xs ${viewMode === 'edit' ? 'bg-slate-100 text-slate-950' : 'text-slate-400'}`}
               >
                 Edit
               </button>
               <button
                 onClick={() => setViewMode('preview')}
-                className={`rounded-full px-3 py-1.5 text-xs ${viewMode === 'preview' ? 'bg-slate-100 text-slate-950' : 'text-slate-400'}`}
+                className={`rounded-md px-3 py-1.5 text-xs ${viewMode === 'preview' ? 'bg-slate-100 text-slate-950' : 'text-slate-400'}`}
               >
                 Preview
+              </button>
+              <button
+                onClick={() => setViewMode('media')}
+                className={`rounded-md px-3 py-1.5 text-xs ${viewMode === 'media' ? 'bg-red-600 text-white' : 'text-slate-400'}`}
+              >
+                Media Pack
               </button>
             </div>
           </div>
 
-          {viewMode === 'edit' ? (
+          {viewMode === 'media' && activeSignalMedia ? (
+            <SignalMediaStudio
+              draft={activeSignalMedia}
+              isSaving={isSaving}
+              isUploadingKey={
+                uploadKind?.startsWith('signal-')
+                  ? (uploadKind as SignalMediaUploadKey)
+                  : null
+              }
+              onAssetUpload={(kind, file) => handleAssetUpload(kind, file)}
+              onChange={setSignalMediaDraft}
+              onReset={handleResetSignalMedia}
+              onSave={handleSaveVersion}
+            />
+          ) : viewMode === 'edit' ? (
             <textarea
               value={markdown}
               onChange={(event) => setMarkdown(event.target.value)}
@@ -737,7 +929,7 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
                   )}
                 </div>
               ))}
-              <p className="text-[10px] text-slate-500">Click <strong className="text-slate-400">Save Version</strong> after uploading images to persist them. Poster & Thumbnail fall back to Hero if not set.</p>
+              <p className="text-[10px] text-slate-500">Uploads save automatically. Poster and Thumbnail fall back to Hero if not set.</p>
               <div className="mt-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2.5">
                 <div className="text-[10px] font-semibold uppercase tracking-widest text-slate-500 mb-1.5">Publish Checklist</div>
                 <div className="space-y-1">

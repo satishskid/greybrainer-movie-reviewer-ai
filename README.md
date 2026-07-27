@@ -10,6 +10,7 @@ Our platform is built upon the **"Greybrainer Movie Magic Theory,"** a systemati
 - [Core Philosophy](#core-philosophy-the-greybrainer-movie-magic-theory)
 - [Key Features](#key-features--capabilities)
 - [Manual Analysis Workflow](#manual-analysis-workflow)
+- [Writer Hub Media Pack](#writer-hub-media-pack)
 - [Settings (What It Is)](#settings-what-it-is)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
@@ -71,6 +72,21 @@ This is the fastest, non-technical workflow for a content writer: open the app, 
 2.  **Generate output**
     - Click **Analyze Movie Magic** to generate the multi-layer analysis.
     - When available, click **Generate Complete Report** for the final consolidated output.
+
+## Writer Hub Media Pack
+
+The Writer Hub turns a saved review into publication-ready visual material without changing the engine's existing detailed report, ZIP, three-ring, or Morphokinetics outputs.
+
+1. Open a review in the Writer Hub and select **Media Pack**.
+2. Review the automatically extracted verdict, three layer scores, strongest signal, weakness, character movement, and five Morphokinetics moments.
+3. Upload approved actor, director, movie-still, and optional platform or studio images. These uploads use the existing R2 asset store and save to the current draft.
+4. Choose one of two production lanes:
+   - **Fast AI lane:** Copy the complete Image or Reel prompt, open ChatGPT Image, Gemini, or Meta AI, attach the approved sources when available, and generate one finished asset.
+   - **Greybrainer template lane:** Preview and download a deterministic PNG in Social 4:5, YouTube 16:9, or Reel 9:16 format.
+5. Check names, scores, visible text, and image rights before publishing. The prompts explicitly forbid invented faces, credits, logos, dates, ratings, footage, and plot facts.
+6. Select **Save Media Pack** after editorial copy changes. Normal image uploads save automatically.
+
+The pack is evidence-led: it summarizes the saved review rather than generating a separate opinion. Website publishing and social publishing remain separate approval actions.
 
 ## Settings (What It Is)
 
