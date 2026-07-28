@@ -3,6 +3,7 @@ import { listAiKeysForProvider, saveAiKey } from "./lib/aiKeyVault";
 import { generateDailyBrief } from "./lib/dailyBrief";
 import { persistDraftArtifacts } from "./lib/draftStorage";
 import { syncSharedDriveFolder } from "./lib/driveKnowledge";
+import { getAuthorizedEditorEmail } from "./lib/firebaseEditorAuth";
 import { backfillMediumUrls } from "./lib/knowledgeBackfill";
 import { listKnowledgeDocuments, listKnowledgeImportJobs } from "./lib/knowledgeRepository";
 import { syncMediumKnowledgeFeed } from "./lib/mediumKnowledge";
@@ -34,6 +35,10 @@ import {
   upsertPublication,
 } from "./lib/repository";
 import { discoverSocialAccount } from "./lib/socialAccounts";
+import {
+  generateSignalImage,
+  type SignalImageFormat,
+} from "./lib/signalImage";
 
 function corsHeaders() {
   return {
@@ -389,6 +394,34 @@ export default {
           });
           return new Response(object.body, { status: 200, headers });
         }
+      }
+
+      if (segments[1] === "signal-images" && segments[2] === "generate" && request.method === "POST") {
+        const editorEmail = await getAuthorizedEditorEmail(request, env);
+        if (!editorEmail) {
+          return unauthorized("A permitted Writer Hub account is required.");
+        }
+        const body = await parseBody<{
+          draftId?: string;
+          format?: SignalImageFormat;
+          prompt?: string;
+          sourceUrls?: string[];
+        }>(request);
+        if (!body?.draftId || !body.format || !body.prompt || !Array.isArray(body.sourceUrls)) {
+          return badRequest("draftId, format, prompt and sourceUrls are required.");
+        }
+        const result = await generateSignalImage(
+          client,
+          env,
+          {
+            draftId: body.draftId,
+            format: body.format,
+            prompt: body.prompt,
+            sourceUrls: body.sourceUrls,
+          },
+          url.origin,
+        );
+        return json(result, 201);
       }
 
       if (segments[1] === "daily-brief" && segments[2] === "generate" && request.method === "POST") {

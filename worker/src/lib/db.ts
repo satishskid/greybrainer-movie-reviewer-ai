@@ -12,7 +12,9 @@ export interface Env {
   DRAFT_STORAGE_MODE?: string;
   DAILY_BRIEF_ENABLED?: string;
   DAILY_BRIEF_TIMEZONE?: string;
+  FIREBASE_API_KEY?: string;
   GEMINI_API_KEY?: string;
+  GEMINI_IMAGE_MODEL?: string;
   GEMINI_MODEL?: string;
   KNOWLEDGE_SYNC_BATCH_SIZE?: string;
   KNOWLEDGE_STORAGE_MODE?: string;

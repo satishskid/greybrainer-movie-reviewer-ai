@@ -6,6 +6,7 @@ import {
   type SignalMediaUploadKey,
 } from './components/SignalMediaStudio';
 import {
+  generateSignalVisual,
   getDraft,
   listSocialAccounts,
   publishDraftToSocialAccounts,
@@ -17,8 +18,11 @@ import {
   updateDraftRecord,
 } from '../services/omnichannelDraftService';
 import {
+  buildGeminiVisualPrompt,
   createSignalMediaDraft,
+  getSignalVisualSourceUrls,
   type SignalMediaDraft,
+  type SignalMediaFormat,
 } from './services/signalMediaService';
 import { createContextEvent, listContextEvents, type ContextEventRecord } from './services/contextService';
 
@@ -276,6 +280,7 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
   const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isGeneratingSignalFormat, setIsGeneratingSignalFormat] = useState<SignalMediaFormat | null>(null);
   const [isUploadingAsset, setIsUploadingAsset] = useState(false);
   const [uploadKind, setUploadKind] = useState<UploadKind | null>(null);
   const [isPublishingWebsite, setIsPublishingWebsite] = useState(false);
@@ -639,6 +644,50 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
     }
   };
 
+  const handleGenerateSignalVisual = async (format: SignalMediaFormat) => {
+    if (!draft || !activeSignalMedia) return;
+    const sourceUrls = getSignalVisualSourceUrls(activeSignalMedia);
+    if (!sourceUrls.length) {
+      setError('Upload at least one approved poster, still or portrait before generating.');
+      return;
+    }
+
+    setIsGeneratingSignalFormat(format);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await generateSignalVisual({
+        draftId: draft.id,
+        format,
+        prompt: buildGeminiVisualPrompt(activeSignalMedia, format),
+        sourceUrls,
+      });
+      const nextSignalMedia: SignalMediaDraft = {
+        ...activeSignalMedia,
+        assets: {
+          ...activeSignalMedia.assets,
+          generatedVisualUrls: {
+            ...activeSignalMedia.assets.generatedVisualUrls,
+            [format]: result.url,
+          },
+        },
+      };
+      setSignalMediaDraft(nextSignalMedia);
+      await persistVersion({ signalMedia: nextSignalMedia });
+      setMessage(
+        `Gemini created and saved the ${format} visual from ${result.sourceCount} approved source${result.sourceCount === 1 ? '' : 's'}.`,
+      );
+    } catch (generationError) {
+      setError(
+        generationError instanceof Error
+          ? generationError.message
+          : 'Gemini could not generate this visual.',
+      );
+    } finally {
+      setIsGeneratingSignalFormat(null);
+    }
+  };
+
   const handleResetSignalMedia = () => {
     if (!draft || !currentVersion) return;
     const fresh = createSignalMediaDraft({
@@ -761,6 +810,7 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
           {viewMode === 'media' && activeSignalMedia ? (
             <SignalMediaStudio
               draft={activeSignalMedia}
+              isGeneratingFormat={isGeneratingSignalFormat}
               isSaving={isSaving}
               isUploadingKey={
                 uploadKind?.startsWith('signal-')
@@ -769,6 +819,7 @@ const DraftReviewWorkspace: React.FC<{ currentUserEmail?: string | null; draftId
               }
               onAssetUpload={(kind, file) => handleAssetUpload(kind, file)}
               onChange={setSignalMediaDraft}
+              onGenerateVisual={handleGenerateSignalVisual}
               onReset={handleResetSignalMedia}
               onSave={handleSaveVersion}
             />

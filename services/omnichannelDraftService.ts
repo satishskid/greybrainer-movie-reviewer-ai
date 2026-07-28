@@ -322,6 +322,14 @@ export interface DraftAssetUploadResult {
   size: number;
 }
 
+export interface SignalVisualGenerationResult {
+  format: "social" | "youtube" | "reel";
+  key: string;
+  model: string;
+  sourceCount: number;
+  url: string;
+}
+
 export interface SocialAccountTestResult {
   checkedAt: string;
   details: string;
@@ -772,4 +780,39 @@ export async function uploadDraftAsset(payload: {
   }
 
   return response.json() as Promise<DraftAssetUploadResult>;
+}
+
+export async function generateSignalVisual(payload: {
+  draftId: string;
+  format: "social" | "youtube" | "reel";
+  prompt: string;
+  sourceUrls: string[];
+}): Promise<SignalVisualGenerationResult> {
+  const token = await auth.currentUser?.getIdToken();
+  if (!token) {
+    throw new Error("Sign in before generating a Gemini visual.");
+  }
+
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}/signal-images/generate`, {
+      method: "POST",
+      headers: {
+        authorization: `Bearer ${token}`,
+        "content-type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch {
+    throw new Error(`Unable to reach the Gemini visual service at ${getApiBaseUrl()}.`);
+  }
+
+  const body = (await response.json().catch(() => null)) as
+    | (SignalVisualGenerationResult & { error?: string })
+    | null;
+  if (!response.ok || !body?.url) {
+    throw new Error(body?.error ?? "Gemini could not generate this visual.");
+  }
+
+  return body;
 }
