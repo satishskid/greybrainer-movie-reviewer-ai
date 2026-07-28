@@ -393,12 +393,17 @@ export async function verifyGroundingToken(input: {
 }) {
   const [encodedPayload, encodedSignature] = input.token.split(".");
   if (!encodedPayload || !encodedSignature) throw new Error("Grounding token has an invalid format.");
-  const validSignature = await crypto.subtle.verify(
-    "HMAC",
-    await importHmacKey(input.secret),
-    base64UrlToBytes(encodedSignature),
-    new TextEncoder().encode(encodedPayload),
-  );
+  let validSignature = false;
+  try {
+    validSignature = await crypto.subtle.verify(
+      "HMAC",
+      await importHmacKey(input.secret),
+      base64UrlToBytes(encodedSignature),
+      new TextEncoder().encode(encodedPayload),
+    );
+  } catch {
+    validSignature = false;
+  }
   if (!validSignature) throw new Error("Grounding token signature is invalid.");
 
   let payload: GroundingTokenPayload;
