@@ -66,6 +66,10 @@ function asString(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function factLabel(value: unknown) {
+  return asString(value).replace(/^[#*_`\s]+|[#*_`\s]+$/g, "").trim();
+}
+
 function asNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value !== "string") return null;
@@ -133,10 +137,10 @@ function parseCast(sourcePayload: JsonRecord, analysis: JsonRecord) {
   if (rawCast) {
     return rawCast
       .map((value) => {
-        if (typeof value === "string") return { actor: value.trim() };
+        if (typeof value === "string") return { actor: factLabel(value) };
         const item = asRecord(value);
-        const actor = asString(item.actor) || asString(item.name);
-        const role = asString(item.role) || asString(item.character);
+        const actor = factLabel(item.actor) || factLabel(item.name);
+        const role = factLabel(item.role) || factLabel(item.character);
         return actor ? { actor, ...(role ? { role } : {}) } : null;
       })
       .filter((value): value is GreybrainerCastMember => Boolean(value));
@@ -199,11 +203,18 @@ function parseMorphokinetics(sourcePayload: JsonRecord, analysis: JsonRecord) {
         };
       })
     : [];
+  const isPlaceholder = (value: string) =>
+    /(?:could not be parsed|not available|analysis unavailable)/i.test(value);
+  const overallSummary = asString(selected.overallSummary);
+  const timelineStructureNotes = asString(selected.timelineStructureNotes);
+  const usefulSummary = isPlaceholder(overallSummary) ? "" : overallSummary;
+  const usefulTimeline = isPlaceholder(timelineStructureNotes) ? "" : timelineStructureNotes;
+  if (!keyMoments.length && !usefulSummary && !usefulTimeline) return null;
 
   return {
     keyMoments,
-    overallSummary: asString(selected.overallSummary),
-    timelineStructureNotes: asString(selected.timelineStructureNotes) || undefined,
+    overallSummary: usefulSummary,
+    timelineStructureNotes: usefulTimeline || undefined,
   };
 }
 
@@ -225,10 +236,12 @@ export async function getReport(client: Client, id: string): Promise<Greybrainer
   const overall = storedOverall ?? Number(((story + concept + performance) / 3).toFixed(1));
   const personnel = asRecord(sourcePayload.personnelData);
   const fallbackPersonnel = asRecord(analysis.personnelData);
-  const creators = uniqueStrings([
-    ...stringArray(sourcePayload.creators),
-    ...stringArray(atPath(sourcePayload, "summaryReportData.creators")),
-  ]);
+  const creators = uniqueStrings(
+    [
+      ...stringArray(sourcePayload.creators),
+      ...stringArray(atPath(sourcePayload, "summaryReportData.creators")),
+    ].map(factLabel),
+  );
   const summary =
     firstString(sourcePayload, ["summaryReportData.reportText", "summary", "reportText"]) ||
     firstString(analysis, ["reportText", "summary"]) ||
@@ -238,7 +251,7 @@ export async function getReport(client: Client, id: string): Promise<Greybrainer
   return {
     cast: parseCast(sourcePayload, analysis),
     creators,
-    director: asString(personnel.director) || asString(fallbackPersonnel.director),
+    director: factLabel(personnel.director) || factLabel(fallbackPersonnel.director),
     generatedAt: draft.currentVersion.createdAt,
     id: draft.id,
     layerAnalysis: {
