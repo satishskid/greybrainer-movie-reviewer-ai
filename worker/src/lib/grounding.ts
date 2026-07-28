@@ -243,6 +243,50 @@ export function verifyGroundingDeterministic(report: GreybrainerReport, draft: G
   ].filter((violation, index, all) => all.indexOf(violation) === index);
 }
 
+function parseJudgeResponse(value: unknown, depth = 0): { violations: unknown[] } | null {
+  if (depth > 5 || value === null || value === undefined) return null;
+  if (typeof value === "string") {
+    const cleaned = value
+      .trim()
+      .replace(/^```json\s*/i, "")
+      .replace(/```$/i, "")
+      .trim();
+    if (!cleaned) return null;
+    try {
+      return parseJudgeResponse(JSON.parse(cleaned), depth + 1);
+    } catch {
+      return null;
+    }
+  }
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const parsed = parseJudgeResponse(item, depth + 1);
+      if (parsed) return parsed;
+    }
+    return null;
+  }
+  if (typeof value !== "object") return null;
+
+  const record = value as Record<string, unknown>;
+  if (Array.isArray(record.violations)) {
+    return { violations: record.violations };
+  }
+  for (const candidate of [
+    record.response,
+    record.result,
+    record.output,
+    record.output_text,
+    record.choices,
+    record.message,
+    record.content,
+    record.text,
+  ]) {
+    const parsed = parseJudgeResponse(candidate, depth + 1);
+    if (parsed) return parsed;
+  }
+  return null;
+}
+
 export async function createWorkersAiGroundingJudge(env: Env): Promise<SecondaryJudge> {
   return async (report, draft) => {
     if (!env.AI) return ["Secondary grounding judge is not configured."];
@@ -260,7 +304,7 @@ DRAFT:
 ${canonicalJson(normalizeGroundingDraft(draft))}
 `.trim();
     try {
-      const response = (await env.AI.run(model as keyof AiModels, {
+      const response = await env.AI.run(model as keyof AiModels, {
         max_tokens: 512,
         prompt,
         response_format: {
@@ -278,18 +322,11 @@ ${canonicalJson(normalizeGroundingDraft(draft))}
           type: "json_schema",
         },
         temperature: 0,
-      })) as { response?: unknown } | string;
-      const raw = typeof response === "string" ? response : response.response;
-      const parsed =
-        typeof raw === "string"
-          ? (JSON.parse(
-              raw.trim().replace(/^```json\s*/i, "").replace(/```$/i, "").trim(),
-            ) as { violations?: unknown })
-          : (raw as { violations?: unknown } | null);
-      if (!parsed || typeof parsed !== "object") {
+      });
+      const parsed = parseJudgeResponse(response);
+      if (!parsed) {
         return ["Secondary grounding judge returned an invalid response."];
       }
-      if (!Array.isArray(parsed.violations)) return ["Secondary grounding judge returned an invalid response."];
       return parsed.violations.map(String).filter(Boolean);
     } catch {
       return ["Secondary grounding judge failed closed."];

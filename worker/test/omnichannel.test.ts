@@ -134,6 +134,26 @@ describe("grounding gate", () => {
     expect(await judge(report, draft)).toEqual([]);
   });
 
+  test("accepts the current Workers AI chat-completions response envelope", async () => {
+    const judge = await createWorkersAiGroundingJudge({
+      AI: {
+        run: async () => ({
+          choices: [
+            {
+              message: {
+                content: '{"violations":[]}',
+                role: "assistant",
+              },
+            },
+          ],
+        }),
+      },
+      GROUNDING_JUDGE_MODEL: "@cf/google/gemma-4-26b-a4b-it",
+    } as never);
+    const draft = producePack(report, ["linkedin"])[0];
+    expect(await judge(report, draft)).toEqual([]);
+  });
+
   test("publish refuses a missing grounding token before any provider or database call", async () => {
     await expect(
       publishGrounded({
