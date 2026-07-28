@@ -246,7 +246,7 @@ export function verifyGroundingDeterministic(report: GreybrainerReport, draft: G
 export async function createWorkersAiGroundingJudge(env: Env): Promise<SecondaryJudge> {
   return async (report, draft) => {
     if (!env.AI) return ["Secondary grounding judge is not configured."];
-    const model = env.WORKERS_AI_FALLBACK_MODEL ?? "@cf/meta/llama-3.1-8b-instruct";
+    const model = env.GROUNDING_JUDGE_MODEL ?? "@cf/google/gemma-4-26b-a4b-it";
     const prompt = `
 You are a closed-book factual grounding judge. You may use ONLY the canonical report JSON below.
 Do not use outside knowledge. Formatting, exact arithmetic averages, and comparisons of stored scores are allowed.
@@ -260,10 +260,35 @@ DRAFT:
 ${canonicalJson(normalizeGroundingDraft(draft))}
 `.trim();
     try {
-      const response = (await env.AI.run(model as keyof AiModels, { prompt })) as { response?: string } | string;
-      const raw = typeof response === "string" ? response : response.response ?? "";
-      const cleaned = raw.trim().replace(/^```json\s*/i, "").replace(/```$/i, "").trim();
-      const parsed = JSON.parse(cleaned) as { violations?: unknown };
+      const response = (await env.AI.run(model as keyof AiModels, {
+        max_tokens: 512,
+        prompt,
+        response_format: {
+          json_schema: {
+            additionalProperties: false,
+            properties: {
+              violations: {
+                items: { type: "string" },
+                type: "array",
+              },
+            },
+            required: ["violations"],
+            type: "object",
+          },
+          type: "json_schema",
+        },
+        temperature: 0,
+      })) as { response?: unknown } | string;
+      const raw = typeof response === "string" ? response : response.response;
+      const parsed =
+        typeof raw === "string"
+          ? (JSON.parse(
+              raw.trim().replace(/^```json\s*/i, "").replace(/```$/i, "").trim(),
+            ) as { violations?: unknown })
+          : (raw as { violations?: unknown } | null);
+      if (!parsed || typeof parsed !== "object") {
+        return ["Secondary grounding judge returned an invalid response."];
+      }
       if (!Array.isArray(parsed.violations)) return ["Secondary grounding judge returned an invalid response."];
       return parsed.violations.map(String).filter(Boolean);
     } catch {

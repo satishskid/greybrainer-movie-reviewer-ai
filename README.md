@@ -113,7 +113,7 @@ The Worker now exposes a secured publishing plane for X and LinkedIn without cha
 
 - A stored draft version is adapted into one canonical `GreybrainerReport`.
 - `produce_pack` is deterministic and closed-book. It has no search, web, Gemini, or Workers AI call.
-- `verify_grounding` checks names, dates, numbers, exact layer scores, and attributed quotes. A secondary Workers AI judge receives only the report and draft.
+- `verify_grounding` checks names, dates, numbers, exact layer scores, and attributed quotes. A schema-constrained Workers AI judge at temperature `0` receives only the report and draft.
 - A successful check issues a short-lived HMAC token bound to the report version, channel, Greybrainer account ID, text, hashtags, and media.
 - `publish` refuses missing, expired, altered, or cross-account tokens.
 - `GREYBRAINER_HANDLE_ALLOWLIST` accepts only an exact numeric X user ID and exact LinkedIn author URN. No target account is accepted from an MCP caller.
