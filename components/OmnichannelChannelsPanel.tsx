@@ -18,13 +18,13 @@ interface OmnichannelChannelsPanelProps {
 const EXAMPLE_URLS = [
   'https://www.linkedin.com/company/greybrainer/',
   'https://medium.com/@GreyBrainer',
-  'https://x.com/greybrainai',
+  'https://x.com/Greybrainlens',
 ];
 
 const SUPPORTED_CHANNELS = [
-  { platform: 'linkedin', connectorKey: 'native-linkedin', state: 'planned-now' },
+  { platform: 'linkedin', connectorKey: 'native-linkedin', state: 'phase-1' },
   { platform: 'medium', connectorKey: 'native-medium', state: 'planned-now' },
-  { platform: 'x', connectorKey: 'native-x', state: 'planned-next' },
+  { platform: 'x', connectorKey: 'native-x', state: 'phase-1' },
   { platform: 'instagram', connectorKey: 'native-instagram', state: 'planned-next' },
   { platform: 'youtube', connectorKey: 'native-youtube', state: 'planned-next' },
   { platform: 'facebook', connectorKey: 'native-facebook', state: 'planned-later' },

@@ -228,7 +228,6 @@ export interface SocialAccountDiscovery {
 
 export interface SocialAccountRecord {
   connectorKey: string | null;
-  accessTokenEncrypted?: string | null;
   connectedAt: string | null;
   connectionStatus: string;
   createdAt: string;
@@ -242,10 +241,8 @@ export interface SocialAccountRecord {
   lastTestMessage?: string | null;
   lastTestStatus?: string | null;
   normalizedUrl: string;
-  oauthState?: string | null;
   platform: string;
   profileUrl: string;
-  refreshTokenEncrypted?: string | null;
   remoteAccountId: string | null;
   remoteUserId: string | null;
   tokenExpiresAt?: string | null;
@@ -428,7 +425,15 @@ function getAssetUploadUrl() {
 async function requestJson<T>(path: string, init?: RequestInit): Promise<T> {
   let response: Response;
   try {
-    response = await fetch(`${getApiBaseUrl()}${path}`, init);
+    const headers = new Headers(init?.headers);
+    const idToken = await auth.currentUser?.getIdToken();
+    if (idToken) {
+      headers.set("authorization", `Bearer ${idToken}`);
+    }
+    response = await fetch(`${getApiBaseUrl()}${path}`, {
+      ...init,
+      headers,
+    });
   } catch (error) {
     throw new Error(`Unable to reach the Cloudflare backend at ${getApiBaseUrl()}.`);
   }

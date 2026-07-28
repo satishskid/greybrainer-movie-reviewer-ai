@@ -20,6 +20,7 @@ export interface Env {
   KNOWLEDGE_STORAGE_MODE?: string;
   LINKEDIN_CLIENT_ID?: string;
   LINKEDIN_CLIENT_SECRET?: string;
+  LINKEDIN_API_VERSION?: string;
   LINKEDIN_OAUTH_SCOPES?: string;
   LINKEDIN_REDIRECT_URI?: string;
   MEDIUM_CLIENT_ID?: string;
@@ -28,10 +29,18 @@ export interface Env {
   MEDIUM_REDIRECT_URI?: string;
   MEDIUM_FEED_URL?: string;
   OMNICHANNEL_API_VERSION?: string;
+  GROUNDING_HMAC_SECRET?: string;
+  GROUNDING_TOKEN_TTL_SECONDS?: string;
+  GREYBRAINER_HANDLE_ALLOWLIST?: string;
+  MCP_API_TOKEN?: string;
   SOCIAL_CONNECT_SUCCESS_URL?: string;
   SOCIAL_TOKEN_ENCRYPTION_KEY?: string;
   WEBSITE_BASE_URL?: string;
   WORKERS_AI_FALLBACK_MODEL?: string;
+  X_CLIENT_ID?: string;
+  X_CLIENT_SECRET?: string;
+  X_OAUTH_SCOPES?: string;
+  X_REDIRECT_URI?: string;
   TURSO_AUTH_TOKEN: string;
   TURSO_DATABASE_URL: string;
 }

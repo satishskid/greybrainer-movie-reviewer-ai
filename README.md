@@ -12,6 +12,7 @@ Our platform is built upon the **"Greybrainer Movie Magic Theory,"** a systemati
 - [Current Publishing Workflow](#current-publishing-workflow)
 - [Manual Analysis Workflow](#manual-analysis-workflow)
 - [Writer Hub Media Pack](#writer-hub-media-pack)
+- [Grounded Omnichannel MCP](#grounded-omnichannel-mcp-phase-1)
 - [Settings (What It Is)](#settings-what-it-is)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
@@ -103,6 +104,86 @@ The Writer Hub turns a saved review into publication-ready visual material witho
 8. Select **Save Media Pack** after editorial copy changes. Normal image uploads and generated backgrounds save to the current draft automatically.
 
 The pack is evidence-led: it summarizes the saved review rather than generating a separate opinion. Website publishing and social publishing remain separate approval actions.
+
+## Grounded Omnichannel MCP (Phase 1)
+
+The Worker now exposes a secured publishing plane for X and LinkedIn without changing the analysis engine, Writer Hub editing flow, or existing R2 asset URLs.
+
+### Safety model
+
+- A stored draft version is adapted into one canonical `GreybrainerReport`.
+- `produce_pack` is deterministic and closed-book. It has no search, web, Gemini, or Workers AI call.
+- `verify_grounding` checks names, dates, numbers, exact layer scores, and attributed quotes. A secondary Workers AI judge receives only the report and draft.
+- A successful check issues a short-lived HMAC token bound to the report version, channel, Greybrainer account ID, text, hashtags, and media.
+- `publish` refuses missing, expired, altered, or cross-account tokens.
+- `GREYBRAINER_HANDLE_ALLOWLIST` accepts only an exact numeric X user ID and exact LinkedIn author URN. No target account is accepted from an MCP caller.
+- Writer Hub management routes require an approved Firebase editor token. Public Lens reads, previews, and R2 asset delivery remain public.
+
+### MCP connection
+
+- Production endpoint: `https://greybrainer-omnichannel-api.satish-9f4.workers.dev/mcp`
+- Transport: Streamable HTTP
+- Authentication: `Authorization: Bearer <MCP_API_TOKEN>`
+- Tools: `list_reports`, `get_report`, `produce_pack`, `verify_grounding`, `publish`, `list_scheduled`, `get_status`
+
+Use this order: list or get a report, produce a channel pack, let the editor approve it, verify the approved draft, then pass the unchanged content and returned token to `publish`.
+
+### Database migration
+
+Apply the Phase 1 job table and X PKCE verifier column once:
+
+```bash
+npm run db:migrate:omnichannel-mcp
+```
+
+The migration creates `publication_jobs`; it does not replace `drafts`, `draft_versions`, `channel_publications`, or either R2 bucket.
+The Worker also performs the same change idempotently on its first authenticated management, MCP tool, OAuth callback, or scheduled request. This is the production fallback when Turso credentials remain only in Worker Secrets.
+Scheduled publication jobs are checked every five minutes. The existing daily Medium knowledge sync and daily brief remain confined to the original `30 3 * * *` trigger.
+
+### Worker secrets and configuration
+
+Set these with `wrangler secret put`; never add real values to Git:
+
+```text
+TURSO_DATABASE_URL
+TURSO_AUTH_TOKEN
+SOCIAL_TOKEN_ENCRYPTION_KEY
+GROUNDING_HMAC_SECRET
+MCP_API_TOKEN
+X_CLIENT_ID
+X_CLIENT_SECRET
+LINKEDIN_CLIENT_ID
+LINKEDIN_CLIENT_SECRET
+```
+
+The callback URLs, OAuth scopes, token lifetime, API version, and hard account allowlist are non-secret Worker variables in `wrangler.jsonc`. `GREYBRAINER_HANDLE_ALLOWLIST` has this exact shape:
+
+```json
+{"x":"2032741439084572672","linkedin":"urn:li:organization:108086123"}
+```
+
+These IDs resolve to the supplied `@Greybrainlens` X account and `linkedin.com/company/greybrainer` company page. The X OAuth callback rechecks the connected user ID before saving tokens.
+
+### OAuth setup
+
+For X, register `https://greybrainer-omnichannel-api.satish-9f4.workers.dev/api/connect/callback/x`, enable OAuth 2.0 Authorization Code with PKCE, and grant `tweet.read tweet.write users.read offline.access`. The callback verifies that the signed-in X user ID equals the allowlisted Greybrainer ID before storing encrypted tokens.
+
+For LinkedIn, register `https://greybrainer-omnichannel-api.satish-9f4.workers.dev/api/connect/callback/linkedin`. Grant the applicable member or organization publishing scopes. For the company page, configure the exact `urn:li:organization:<id>` in the allowlist and social-account record. The publisher uses the current `/rest/posts` and `/rest/images?action=initializeUpload` APIs with the configured `Linkedin-Version`.
+
+Provider references: [X OAuth 2.0](https://docs.x.com/fundamentals/authentication/oauth-2-0/authorization-code), [X media upload](https://docs.x.com/x-api/media/initialize-media-upload), [LinkedIn Posts API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/posts-api), and [LinkedIn Images API](https://learn.microsoft.com/en-us/linkedin/marketing/community-management/shares/images-api).
+
+### Verification
+
+```bash
+npm run test:omnichannel
+npm run lint
+npm run build
+npx wrangler deploy --dry-run
+```
+
+The automated suite proves closed-book pack generation, exact-score rejection, invented-cast rejection, token tamper rejection, brand allowlist enforcement, atomic scheduled-job claiming, X thread chaining, and LinkedIn request shape. A real provider smoke post still requires approved X and LinkedIn OAuth applications plus connected Greybrainer test accounts; do not use production handles for the first credential test.
+
+Facebook and Instagram are deliberately Phase 2. YouTube is Phase 3 because upload processing and unverified-project restrictions require a separate operational test cycle.
 
 ### Gemini Visual Production Security
 

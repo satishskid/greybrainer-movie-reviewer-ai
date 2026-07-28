@@ -99,6 +99,7 @@ export interface UpdateSocialAccountInput {
   lastTestMessage?: string | null;
   lastTestStatus?: string | null;
   oauthState?: string | null;
+  oauthCodeVerifierEncrypted?: string | null;
   remoteAccountId?: string | null;
   remoteUserId?: string | null;
   tokenExpiresAt?: string | null;
@@ -234,6 +235,9 @@ function mapSocialAccountRow(row: Row) {
     lastTestStatus: rowValue(row, "last_test_status") ? String(rowValue(row, "last_test_status")) : null,
     normalizedUrl: String(rowValue(row, "normalized_url")),
     oauthState: rowValue(row, "oauth_state") ? String(rowValue(row, "oauth_state")) : null,
+    oauthCodeVerifierEncrypted: rowValue(row, "oauth_code_verifier_encrypted")
+      ? String(rowValue(row, "oauth_code_verifier_encrypted"))
+      : null,
     platform: String(rowValue(row, "platform")),
     profileUrl: String(rowValue(row, "profile_url")),
     refreshTokenEncrypted: rowValue(row, "refresh_token_encrypted") ? String(rowValue(row, "refresh_token_encrypted")) : null,
@@ -807,7 +811,7 @@ export async function updateSocialAccount(client: Client, socialAccountId: strin
       UPDATE social_accounts
       SET display_name = ?, handle = ?, connection_status = ?, provider_profile_id = ?,
           provider_user_id = ?, last_verified_at = ?, disabled_at = ?, provider = ?,
-          is_default_publish_target = ?, oauth_state = ?, connected_at = ?,
+          is_default_publish_target = ?, oauth_state = ?, oauth_code_verifier_encrypted = ?, connected_at = ?,
           access_token_encrypted = COALESCE(?, access_token_encrypted),
           refresh_token_encrypted = COALESCE(?, refresh_token_encrypted),
           token_expires_at = ?, last_test_status = ?, last_test_message = ?, updated_at = ?
@@ -826,6 +830,7 @@ export async function updateSocialAccount(client: Client, socialAccountId: strin
         ? Number(existing.isDefaultPublishTarget)
         : Number(input.isDefaultPublishTarget),
       input.oauthState ?? existing.oauthState,
+      input.oauthCodeVerifierEncrypted ?? existing.oauthCodeVerifierEncrypted,
       input.connectedAt ?? existing.connectedAt,
       null,
       null,
@@ -872,6 +877,7 @@ export async function storeSocialAccountTokens(
     connectedAt?: string | null;
     connectionStatus?: SocialConnectionStatus;
     oauthState?: string | null;
+    oauthCodeVerifierEncrypted?: string | null;
     refreshTokenEncrypted?: string | null;
     remoteAccountId?: string | null;
     remoteUserId?: string | null;
@@ -888,7 +894,7 @@ export async function storeSocialAccountTokens(
     sql: `
       UPDATE social_accounts
       SET access_token_encrypted = ?, refresh_token_encrypted = ?, token_expires_at = ?,
-          connection_status = ?, connected_at = ?, oauth_state = ?, provider_profile_id = ?,
+          connection_status = ?, connected_at = ?, oauth_state = ?, oauth_code_verifier_encrypted = ?, provider_profile_id = ?,
           provider_user_id = ?, last_verified_at = ?, last_test_status = ?, last_test_message = ?, updated_at = ?
       WHERE id = ?
     `,
@@ -899,6 +905,7 @@ export async function storeSocialAccountTokens(
       input.connectionStatus ?? "connected",
       connectedAt,
       input.oauthState ?? null,
+      input.oauthCodeVerifierEncrypted ?? null,
       input.remoteAccountId ?? existing.remoteAccountId,
       input.remoteUserId ?? existing.remoteUserId,
       connectedAt,
