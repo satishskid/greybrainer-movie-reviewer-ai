@@ -154,6 +154,28 @@ describe("grounding gate", () => {
     expect(await judge(report, draft)).toEqual([]);
   });
 
+  test("sends only the fact-lock and draft to the secondary judge", async () => {
+    let judgeInput: unknown;
+    const judge = await createWorkersAiGroundingJudge({
+      AI: {
+        run: async (_model: unknown, input: unknown) => {
+          judgeInput = input;
+          return { response: { violations: [] } };
+        },
+      },
+      GROUNDING_JUDGE_MODEL: "@cf/google/gemma-4-26b-a4b-it",
+    } as never);
+    const draft = producePack(report, ["linkedin"])[0];
+    expect(await judge(report, draft)).toEqual([]);
+    const messages = (judgeInput as { messages: Array<{ content: string }> }).messages;
+    const userPayload = JSON.parse(messages[1].content) as Record<string, unknown>;
+    const serializedPayload = JSON.stringify(userPayload);
+    expect(userPayload.FACT_LOCK).toBeDefined();
+    expect(serializedPayload).not.toContain(report.summary);
+    expect(serializedPayload).not.toContain(report.layerAnalysis.story);
+    expect(serializedPayload).not.toContain(report.representativeScenes[0]);
+  });
+
   test("publish refuses a missing grounding token before any provider or database call", async () => {
     await expect(
       publishGrounded({
