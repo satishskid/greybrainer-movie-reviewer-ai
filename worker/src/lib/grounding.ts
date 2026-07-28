@@ -303,7 +303,11 @@ export async function createWorkersAiGroundingJudge(env: Env): Promise<Secondary
     };
     try {
       const response = await env.AI.run(model as keyof AiModels, {
-        max_tokens: 512,
+        chat_template_kwargs: {
+          enable_thinking: false,
+          thinking: false,
+        },
+        max_completion_tokens: 512,
         messages: [
           {
             content: [
@@ -337,6 +341,7 @@ export async function createWorkersAiGroundingJudge(env: Env): Promise<Secondary
           },
           type: "json_schema",
         },
+        reasoning_effort: "none",
         temperature: 0,
       });
       const parsed = parseJudgeResponse(response);
