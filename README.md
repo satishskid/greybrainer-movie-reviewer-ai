@@ -93,13 +93,25 @@ The Writer Hub turns a saved review into publication-ready visual material witho
 1. Open a review in the Writer Hub and select **Media Pack**.
 2. Review the automatically extracted verdict, three layer scores, strongest signal, weakness, character movement, and five Morphokinetics moments.
 3. Upload approved actor, director, movie-still, and optional platform or studio images. These uploads use the existing R2 asset store and save to the current draft.
-4. Choose one of two production lanes:
-   - **Fast AI lane:** Copy the complete Image or Reel prompt, open ChatGPT Image, Gemini, or Meta AI, attach the approved sources when available, and generate one finished asset.
-   - **Greybrainer template lane:** Preview and download a deterministic PNG in Social 4:5, YouTube 16:9, or Reel 9:16 format.
-5. Check names, scores, visible text, and image rights before publishing. The prompts explicitly forbid invented faces, credits, logos, dates, ratings, footage, and plot facts.
-6. Select **Save Media Pack** after editorial copy changes. Normal image uploads save automatically.
+4. Select **Social 4:5**, **YouTube 16:9**, or **Reel 9:16**, then click **Generate** in the Gemini visual production panel.
+   - Gemini receives only the approved image URLs and creates a text-free cinematic composition for the selected format.
+   - Greybrainer places the exact title, verdict, three-layer scores, Morphokinetics, strengths, weaknesses, and overall signal over the generated visual.
+   - The generated background is saved to R2 and attached to the current draft. Regeneration creates a new version without deleting the original uploads.
+5. If direct generation is unavailable, use **Manual AI fallback** to copy the guarded prompt into ChatGPT Image, Gemini, or Meta AI.
+6. Preview and download the deterministic final PNG. Use **Use original images** to remove a generated background from the selected format.
+7. Check names, scores, visible text, and image rights before publishing.
+8. Select **Save Media Pack** after editorial copy changes. Normal image uploads and generated backgrounds save to the current draft automatically.
 
 The pack is evidence-led: it summarizes the saved review rather than generating a separate opinion. Website publishing and social publishing remain separate approval actions.
+
+### Gemini Visual Production Security
+
+- The browser never receives the server Gemini key.
+- The Worker endpoint requires a valid Firebase sign-in from an approved Writer Hub editor.
+- At least one approved HTTPS source image is required; a maximum of five are sent to Gemini.
+- The prompt forbids web search, invented people, replacement faces, new logos, visible text, ratings, credits, and unsupported plot details.
+- Production uses `GEMINI_IMAGE_MODEL` (currently `gemini-3.1-flash-image`) and the existing encrypted Worker key vault or `GEMINI_API_KEY`.
+- Generated PNGs are stored in the existing `greybrainer-content` R2 bucket.
 
 ## Settings (What It Is)
 

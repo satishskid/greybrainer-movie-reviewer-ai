@@ -22,6 +22,7 @@ export interface SignalMorphokinetics {
 export interface SignalMediaAssets {
   actorUrls: string[];
   directorUrl: string;
+  generatedVisualUrls: Record<SignalMediaFormat, string>;
   platformLogoUrl: string;
   posterUrl: string;
   stillUrl: string;
@@ -83,6 +84,11 @@ const EMPTY_MORPHOKINETICS: SignalMorphokinetics = {
 export const EMPTY_SIGNAL_MEDIA_ASSETS: SignalMediaAssets = {
   actorUrls: ['', '', ''],
   directorUrl: '',
+  generatedVisualUrls: {
+    reel: '',
+    social: '',
+    youtube: '',
+  },
   platformLogoUrl: '',
   posterUrl: '',
   stillUrl: '',
@@ -311,6 +317,7 @@ function readPersistedDraft(source: UnknownRecord | null): SignalMediaDraft | nu
   if (layers.length !== 3) return null;
 
   const morphokinetics = asRecord(persistedCopy.morphokinetics);
+  const generatedVisualUrls = asRecord(persistedAssets.generatedVisualUrls);
   const actorUrls = readStringArray(persistedAssets, ['actorUrls']);
   const verdictValue = readString(persistedCopy, ['verdict']);
   const verdict: SignalVerdict =
@@ -322,6 +329,11 @@ function readPersistedDraft(source: UnknownRecord | null): SignalMediaDraft | nu
     assets: {
       actorUrls: [0, 1, 2].map((index) => actorUrls[index] ?? ''),
       directorUrl: readString(persistedAssets, ['directorUrl']),
+      generatedVisualUrls: {
+        reel: readString(generatedVisualUrls, ['reel']),
+        social: readString(generatedVisualUrls, ['social']),
+        youtube: readString(generatedVisualUrls, ['youtube']),
+      },
       platformLogoUrl: readString(persistedAssets, ['platformLogoUrl']),
       posterUrl: readString(persistedAssets, ['posterUrl']),
       stillUrl: readString(persistedAssets, ['stillUrl']),
@@ -447,6 +459,54 @@ function scoreText(layer: SignalLayerScore): string {
 
 function assetLine(label: string, value: string): string {
   return `${label}: ${value || 'not supplied - omit rather than invent'}`;
+}
+
+export function getSignalVisualSourceUrls(draft: SignalMediaDraft): string[] {
+  return [
+    draft.assets.stillUrl,
+    draft.assets.posterUrl,
+    ...draft.assets.actorUrls,
+    draft.assets.directorUrl,
+  ]
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .filter((value, index, values) => values.indexOf(value) === index)
+    .slice(0, 5);
+}
+
+export function buildGeminiVisualPrompt(
+  draft: SignalMediaDraft,
+  format: SignalMediaFormat,
+): string {
+  const layout =
+    format === 'youtube'
+      ? 'Keep the supplied movie imagery concentrated in the left 45%. Preserve a calm, dark, low-detail right 55% for exact editorial overlays.'
+      : format === 'reel'
+        ? 'Keep the supplied movie imagery concentrated in the upper 42%. Preserve a calm, dark, low-detail lower 58% for exact editorial overlays and mobile-safe margins.'
+        : 'Keep the supplied movie imagery concentrated in the upper 40%. Preserve a calm, dark, low-detail lower 60% for exact editorial overlays.';
+
+  return `CREATE ONE TEXT-FREE CINEMATIC EDITORIAL BACKGROUND
+
+This image will sit underneath a deterministic Greybrainer review card for "${draft.copy.title}". The application will add every title, score, verdict, label, logo and Morphokinetics element after generation.
+
+STRICT SOURCE BOUNDARY
+- Use only the supplied approved images as visual source material.
+- Preserve every real face and identity exactly. Crop, layer and colour-grade; do not redraw, beautify, age, de-age, merge or replace faces.
+- Do not invent people, costumes, locations, scenes, props, plot events or logos.
+- Do not use web search or outside visual references.
+- Omit a source cleanly if it cannot be preserved faithfully.
+
+OUTPUT
+- One ${formatLabel(format)} cinematic editorial background.
+- ${layout}
+- Blend supplied stills and portraits with disciplined magazine-style composition, natural depth, restrained texture and clean negative space.
+- Palette: near-black, true white highlights, Greybrainer signal red, one cool blue accent and restrained amber.
+- Make the movie imagery immediate and recognisable without resembling fan art or a star-rating poster.
+
+ABSOLUTELY NO VISIBLE TEXT
+- No words, letters, numbers, scores, captions, credits, ratings, logos, watermarks, charts, interface panels or placeholder marks.
+- Do not attempt to typeset the movie title or GREYBRAINER.
+- Return only the finished text-free background image.`;
 }
 
 export function buildSingleShotImagePrompt(

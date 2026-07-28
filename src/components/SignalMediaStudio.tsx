@@ -10,11 +10,13 @@ import {
   Monitor,
   RefreshCw,
   Save,
+  Sparkles,
   Smartphone,
   Upload,
   X,
 } from 'lucide-react';
 import {
+  getSignalVisualSourceUrls,
   buildSingleShotImagePrompt,
   buildSingleShotReelPrompt,
   type SignalMediaCopy,
@@ -32,10 +34,12 @@ export type SignalMediaUploadKey =
 
 interface SignalMediaStudioProps {
   draft: SignalMediaDraft;
+  isGeneratingFormat: SignalMediaFormat | null;
   isSaving: boolean;
   isUploadingKey: SignalMediaUploadKey | null;
   onAssetUpload: (key: SignalMediaUploadKey, file: File) => Promise<void>;
   onChange: (draft: SignalMediaDraft) => void;
+  onGenerateVisual: (format: SignalMediaFormat) => Promise<void>;
   onReset: () => void;
   onSave: () => Promise<void>;
 }
@@ -226,7 +230,8 @@ function SignalCard({
   format: SignalMediaFormat;
 }) {
   const definition = FORMAT_DEFINITIONS[format];
-  const backgroundUrl = draft.assets.stillUrl || draft.assets.posterUrl;
+  const generatedBackgroundUrl = draft.assets.generatedVisualUrls[format];
+  const backgroundUrl = generatedBackgroundUrl || draft.assets.stillUrl || draft.assets.posterUrl;
   const isLandscape = format === 'youtube';
   const isReel = format === 'reel';
   const titleSize = isLandscape ? 'text-[44px]' : isReel ? 'text-[64px]' : 'text-[52px]';
@@ -238,7 +243,26 @@ function SignalCard({
       className="relative isolate overflow-hidden bg-[#080d18] text-white"
       style={{ height: definition.height, width: definition.width }}
     >
-      <div className={isLandscape ? 'absolute inset-y-0 left-0 w-[47%]' : 'absolute inset-x-0 top-0 h-[43%]'}>
+      {generatedBackgroundUrl && (
+        <div className="absolute inset-0">
+          <img
+            alt=""
+            crossOrigin="anonymous"
+            src={generatedBackgroundUrl}
+            className="h-full w-full object-cover"
+          />
+          <div className="absolute inset-0 bg-black/25" />
+          <div
+            className={`absolute inset-0 ${
+              isLandscape
+                ? 'bg-gradient-to-r from-transparent via-[#080d18]/45 to-[#080d18]/95'
+                : 'bg-gradient-to-b from-transparent via-[#080d18]/55 to-[#080d18]'
+            }`}
+          />
+        </div>
+      )}
+      {!generatedBackgroundUrl && (
+        <div className={isLandscape ? 'absolute inset-y-0 left-0 w-[47%]' : 'absolute inset-x-0 top-0 h-[43%]'}>
         {backgroundUrl ? (
           <img
             alt=""
@@ -260,6 +284,7 @@ function SignalCard({
           }`}
         />
       </div>
+      )}
 
       <div className={`relative z-10 flex h-full flex-col ${isLandscape ? 'ml-[43%] p-[4%]' : 'p-[5%]'}`}>
         <div className="flex items-center justify-between gap-4">
@@ -443,10 +468,12 @@ function EditableField({
 
 export const SignalMediaStudio: React.FC<SignalMediaStudioProps> = ({
   draft,
+  isGeneratingFormat,
   isSaving,
   isUploadingKey,
   onAssetUpload,
   onChange,
+  onGenerateVisual,
   onReset,
   onSave,
 }) => {
@@ -464,6 +491,9 @@ export const SignalMediaStudio: React.FC<SignalMediaStudioProps> = ({
   const imagePrompt = useMemo(() => buildSingleShotImagePrompt(draft, format), [draft, format]);
   const reelPrompt = useMemo(() => buildSingleShotReelPrompt(draft), [draft]);
   const activePrompt = promptMode === 'image' ? imagePrompt : reelPrompt;
+  const visualSourceCount = useMemo(() => getSignalVisualSourceUrls(draft).length, [draft]);
+  const generatedVisualUrl = draft.assets.generatedVisualUrls[format];
+  const isGenerating = isGeneratingFormat === format;
 
   const updateCopy = <K extends keyof SignalMediaCopy>(key: K, value: SignalMediaCopy[K]) => {
     onChange({
@@ -509,6 +539,19 @@ export const SignalMediaStudio: React.FC<SignalMediaStudioProps> = ({
     await navigator.clipboard.writeText(value);
     setCopied(mode);
     window.setTimeout(() => setCopied(null), 1800);
+  };
+
+  const clearGeneratedVisual = () => {
+    onChange({
+      ...draft,
+      assets: {
+        ...draft.assets,
+        generatedVisualUrls: {
+          ...draft.assets.generatedVisualUrls,
+          [format]: '',
+        },
+      },
+    });
   };
 
   const exportFormat = async (targetFormat: SignalMediaFormat) => {
@@ -572,6 +615,58 @@ export const SignalMediaStudio: React.FC<SignalMediaStudioProps> = ({
 
       <div className="grid gap-5 p-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
         <div className="min-w-0 space-y-4">
+          <div className="rounded-lg border border-sky-500/30 bg-sky-500/[0.06] p-4">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <h3 className="flex items-center gap-2 text-sm font-semibold text-white">
+                  <Sparkles className="h-4 w-4 text-sky-300" />
+                  Gemini visual production
+                </h3>
+                <p className="mt-1 max-w-xl text-[11px] leading-5 text-slate-400">
+                  Gemini composes the approved images only. Greybrainer adds every word, score and signal afterward.
+                </p>
+              </div>
+              <div className="whitespace-nowrap text-[10px] font-medium text-slate-500">
+                {visualSourceCount} source{visualSourceCount === 1 ? '' : 's'}
+              </div>
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void onGenerateVisual(format)}
+                disabled={isGeneratingFormat !== null || visualSourceCount === 0}
+                className="inline-flex h-9 items-center gap-2 rounded-md bg-sky-500 px-3 text-xs font-semibold text-slate-950 transition hover:bg-sky-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {isGenerating ? (
+                  <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Sparkles className="h-3.5 w-3.5" />
+                )}
+                {isGenerating
+                  ? 'Creating visual...'
+                  : generatedVisualUrl
+                    ? `Regenerate ${FORMAT_DEFINITIONS[format].label}`
+                    : `Generate ${FORMAT_DEFINITIONS[format].label}`}
+              </button>
+              {generatedVisualUrl && (
+                <button
+                  type="button"
+                  onClick={clearGeneratedVisual}
+                  disabled={isGeneratingFormat !== null}
+                  className="inline-flex h-9 items-center gap-2 rounded-md border border-slate-700 px-3 text-xs font-medium text-slate-300 transition hover:border-red-500 hover:text-red-200 disabled:opacity-50"
+                >
+                  <X className="h-3.5 w-3.5" />
+                  Use original images
+                </button>
+              )}
+            </div>
+            {visualSourceCount === 0 && (
+              <p className="mt-3 text-[11px] text-amber-200">
+                Upload at least one approved still, poster or portrait below to enable Gemini.
+              </p>
+            )}
+          </div>
+
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="inline-flex rounded-md border border-slate-800 bg-slate-950 p-1">
               {(Object.entries(FORMAT_DEFINITIONS) as Array<[SignalMediaFormat, FormatDefinition]>).map(([key, definition]) => {
@@ -685,8 +780,8 @@ export const SignalMediaStudio: React.FC<SignalMediaStudioProps> = ({
           <div className="rounded-lg border border-slate-800 bg-slate-950/70 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <h3 className="text-sm font-semibold text-white">Fast AI lane</h3>
-                <p className="mt-1 text-[11px] text-slate-500">Attach sources, paste one prompt, review the result.</p>
+                <h3 className="text-sm font-semibold text-white">Manual AI fallback</h3>
+                <p className="mt-1 text-[11px] text-slate-500">Use this prompt only when the direct Gemini button is unavailable.</p>
               </div>
               <div className="inline-flex rounded border border-slate-800 bg-slate-900 p-1">
                 <button
