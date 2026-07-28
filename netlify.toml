@@ -20,12 +20,6 @@
   force = true
 
 [[redirects]]
-  from = "/engine/assets/*"
-  to = "/assets/:splat"
-  status = 200
-  force = true
-
-[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
