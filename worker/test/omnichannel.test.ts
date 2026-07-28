@@ -121,6 +121,15 @@ describe("grounding gate", () => {
         token: `${token.slice(0, -1)}x`,
       }),
     ).rejects.toThrow("signature");
+    await expect(
+      verifyGroundingToken({
+        accountId: "12345",
+        channel: "x",
+        draft,
+        secret: "test-grounding-secret",
+        token: "bad.token",
+      }),
+    ).rejects.toThrow("signature");
   });
 
   test("accepts a schema-constrained Workers AI object response", async () => {
