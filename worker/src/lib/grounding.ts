@@ -291,22 +291,38 @@ export async function createWorkersAiGroundingJudge(env: Env): Promise<Secondary
   return async (report, draft) => {
     if (!env.AI) return ["Secondary grounding judge is not configured."];
     const model = env.GROUNDING_JUDGE_MODEL ?? "@cf/google/gemma-4-26b-a4b-it";
-    const prompt = `
-You are a closed-book factual grounding judge. You may use ONLY the canonical report JSON below.
-Do not use outside knowledge. Formatting, exact arithmetic averages, and comparisons of stored scores are allowed.
-Flag every name, date, number, quote, platform, cast claim, creator claim, or factual assertion that is not entailed by the report.
-Return JSON only: {"violations":["..."]}. Return an empty array when fully grounded.
-
-CANONICAL REPORT:
-${canonicalJson(report)}
-
-DRAFT:
-${canonicalJson(normalizeGroundingDraft(draft))}
-`.trim();
+    const factLock = {
+      cast: report.cast,
+      creators: report.creators,
+      director: report.director,
+      platform: report.platform,
+      releaseDate: report.releaseDate,
+      reportUrl: report.reportUrl,
+      scores: report.scores,
+      title: report.title,
+    };
     try {
       const response = await env.AI.run(model as keyof AiModels, {
         max_tokens: 512,
-        prompt,
+        messages: [
+          {
+            content: [
+              "You are a closed-book factual grounding judge.",
+              "Use only FACT_LOCK. Do not use outside knowledge and do not rewrite the draft.",
+              "Questions, formatting, hashtags, exact arithmetic, and comparisons of stored scores are allowed.",
+              "List only unsupported factual assertions, names, dates, numbers, quotes, platforms, cast claims, or creator claims.",
+              'Return {"violations":[]} when every claim is supported.',
+            ].join(" "),
+            role: "system",
+          },
+          {
+            content: canonicalJson({
+              DRAFT: normalizeGroundingDraft(draft),
+              FACT_LOCK: factLock,
+            }),
+            role: "user",
+          },
+        ],
         response_format: {
           json_schema: {
             additionalProperties: false,
