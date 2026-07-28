@@ -21,6 +21,7 @@ X_CLIENT_SECRET=your-x-oauth-client-secret-if-confidential
 X_REDIRECT_URI=https://your-worker.example.workers.dev/api/connect/callback/x
 X_OAUTH_SCOPES=tweet.read tweet.write users.read offline.access
 GREYBRAINER_HANDLE_ALLOWLIST={"x":"exact-numeric-x-user-id","linkedin":"urn:li:organization:exact-organization-id"}
+GROUNDING_JUDGE_MODEL=@cf/google/gemma-4-26b-a4b-it
 GROUNDING_HMAC_SECRET=generate-a-long-random-worker-secret
 GROUNDING_TOKEN_TTL_SECONDS=900
 MCP_API_TOKEN=generate-a-separate-long-random-worker-secret

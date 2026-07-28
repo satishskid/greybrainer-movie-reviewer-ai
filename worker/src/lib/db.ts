@@ -16,6 +16,7 @@ export interface Env {
   GEMINI_API_KEY?: string;
   GEMINI_IMAGE_MODEL?: string;
   GEMINI_MODEL?: string;
+  GROUNDING_JUDGE_MODEL?: string;
   KNOWLEDGE_SYNC_BATCH_SIZE?: string;
   KNOWLEDGE_STORAGE_MODE?: string;
   LINKEDIN_CLIENT_ID?: string;

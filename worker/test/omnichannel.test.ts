@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { createClient } from "@libsql/client";
 import {
+  createWorkersAiGroundingJudge,
   issueGroundingToken,
   verifyGrounding,
   verifyGroundingDeterministic,
@@ -120,6 +121,17 @@ describe("grounding gate", () => {
         token: `${token.slice(0, -1)}x`,
       }),
     ).rejects.toThrow("signature");
+  });
+
+  test("accepts a schema-constrained Workers AI object response", async () => {
+    const judge = await createWorkersAiGroundingJudge({
+      AI: {
+        run: async () => ({ response: { violations: [] } }),
+      },
+      GROUNDING_JUDGE_MODEL: "@cf/google/gemma-4-26b-a4b-it",
+    } as never);
+    const draft = producePack(report, ["linkedin"])[0];
+    expect(await judge(report, draft)).toEqual([]);
   });
 
   test("publish refuses a missing grounding token before any provider or database call", async () => {

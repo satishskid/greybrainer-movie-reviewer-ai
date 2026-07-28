@@ -23,6 +23,7 @@
     "DRAFT_STORAGE_MODE": "r2",
     "GEMINI_IMAGE_MODEL": "gemini-3.1-flash-image",
     "GEMINI_MODEL": "gemini-pro-latest",
+    "GROUNDING_JUDGE_MODEL": "@cf/google/gemma-4-26b-a4b-it",
     "GROUNDING_TOKEN_TTL_SECONDS": "900",
     "GREYBRAINER_HANDLE_ALLOWLIST": "{\"x\":\"2032741439084572672\",\"linkedin\":\"urn:li:organization:108086123\"}",
     "KNOWLEDGE_STORAGE_MODE": "r2",
