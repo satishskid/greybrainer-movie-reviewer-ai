@@ -27,12 +27,15 @@
     "db:migrate:ai-keys": "node scripts/migrate-sql.mjs db/ai_keys_phase8.sql",
     "db:migrate:ai-key-status": "node scripts/migrate-sql.mjs db/ai_key_status_phase9.sql",
     "content:backfill-images": "node scripts/backfill_images.mjs",
-    "db:migrate:context": "node scripts/migrate-sql.mjs db/context_mode_phase10.sql"
+    "db:migrate:context": "node scripts/migrate-sql.mjs db/context_mode_phase10.sql",
+    "db:migrate:omnichannel-mcp": "node scripts/migrate-sql.mjs db/omnichannel_mcp_phase12.sql",
+    "test:omnichannel": "bun test worker/test/omnichannel.test.ts"
   },
   "dependencies": {
     "@astrojs/sitemap": "^3.7.1",
     "@google/genai": "^1.50.1",
     "@libsql/client": "^0.15.15",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "astro": "^6.0.3",
     "file-saver": "^2.0.5",
     "firebase": "^12.5.0",
@@ -43,7 +46,8 @@
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-markdown": "^10.1.0",
-    "remark-gfm": "^4.0.1"
+    "remark-gfm": "^4.0.1",
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260303.0",

@@ -26,6 +26,28 @@ function nowIso() {
   return new Date().toISOString();
 }
 
+function bytesToBase64Url(bytes: Uint8Array) {
+  let binary = "";
+  for (const byte of bytes) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+}
+
+async function createPkcePair() {
+  const verifier = bytesToBase64Url(crypto.getRandomValues(new Uint8Array(48)));
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(verifier));
+  return { challenge: bytesToBase64Url(new Uint8Array(digest)), verifier };
+}
+
+function allowlistedTarget(env: Env, platform: "linkedin" | "x") {
+  if (!env.GREYBRAINER_HANDLE_ALLOWLIST) return null;
+  try {
+    const parsed = JSON.parse(env.GREYBRAINER_HANDLE_ALLOWLIST) as Record<string, unknown>;
+    return typeof parsed[platform] === "string" ? parsed[platform].trim() : null;
+  } catch {
+    return null;
+  }
+}
+
 function buildSuccessHtml(message: string) {
   return `<!doctype html>
 <html>
@@ -57,6 +79,32 @@ export async function startNativeConnection(client: Client, env: Env, socialAcco
 
   const oauthState = crypto.randomUUID();
   await updateSocialAccount(client, socialAccountId, { oauthState, connectionStatus: "pending_connection" });
+
+  if (socialAccount.connectorKey === "native-x") {
+    if (!env.X_CLIENT_ID || !env.X_REDIRECT_URI || !env.SOCIAL_TOKEN_ENCRYPTION_KEY) {
+      throw new Error("X OAuth is not configured in Cloudflare secrets yet.");
+    }
+    const pkce = await createPkcePair();
+    const encryptedVerifier = await encryptSecret(pkce.verifier, env.SOCIAL_TOKEN_ENCRYPTION_KEY);
+    await updateSocialAccount(client, socialAccountId, {
+      oauthCodeVerifierEncrypted: encryptedVerifier,
+      oauthState,
+      connectionStatus: "pending_connection",
+    });
+    const connectUrl = new URL("https://x.com/i/oauth2/authorize");
+    connectUrl.searchParams.set("response_type", "code");
+    connectUrl.searchParams.set("client_id", env.X_CLIENT_ID);
+    connectUrl.searchParams.set("redirect_uri", env.X_REDIRECT_URI);
+    connectUrl.searchParams.set("scope", env.X_OAUTH_SCOPES ?? "tweet.read tweet.write users.read offline.access");
+    connectUrl.searchParams.set("state", oauthState);
+    connectUrl.searchParams.set("code_challenge", pkce.challenge);
+    connectUrl.searchParams.set("code_challenge_method", "S256");
+    return {
+      connectUrl: connectUrl.toString(),
+      connectorKey: socialAccount.connectorKey,
+      instructions: "Authorize the Greybrainer X account, then return to Greybrainer and click Test.",
+    };
+  }
 
   if (socialAccount.connectorKey === "native-linkedin") {
     if (!env.LINKEDIN_CLIENT_ID || !env.LINKEDIN_REDIRECT_URI) {
@@ -142,9 +190,83 @@ async function handleLinkedInCallback(client: Client, env: Env, code: string, st
     accessTokenEncrypted: encryptedToken,
     connectedAt: nowIso(),
     oauthState: null,
+    remoteAccountId: allowlistedTarget(env, "linkedin"),
     tokenExpiresAt,
   });
 
+  return socialAccount;
+}
+
+async function handleXCallback(client: Client, env: Env, code: string, state: string) {
+  if (!env.X_CLIENT_ID || !env.X_REDIRECT_URI || !env.SOCIAL_TOKEN_ENCRYPTION_KEY) {
+    throw new Error("X callback is not fully configured in Cloudflare secrets.");
+  }
+  const socialAccount = await getSocialAccountByOauthState(client, state);
+  if (!socialAccount?.oauthCodeVerifierEncrypted) {
+    throw new Error("X OAuth state or PKCE verifier could not be matched to a Greybrainer channel.");
+  }
+  const verifier = await decryptSecret(
+    socialAccount.oauthCodeVerifierEncrypted,
+    env.SOCIAL_TOKEN_ENCRYPTION_KEY,
+  );
+  const headers: Record<string, string> = {
+    "content-type": "application/x-www-form-urlencoded",
+  };
+  if (env.X_CLIENT_SECRET) {
+    headers.Authorization = `Basic ${btoa(`${env.X_CLIENT_ID}:${env.X_CLIENT_SECRET}`)}`;
+  }
+  const response = await fetch("https://api.x.com/2/oauth2/token", {
+    method: "POST",
+    headers,
+    body: formUrlEncoded({
+      client_id: env.X_CLIENT_ID,
+      code,
+      code_verifier: verifier,
+      grant_type: "authorization_code",
+      redirect_uri: env.X_REDIRECT_URI,
+    }),
+  });
+  if (!response.ok) throw new Error(`X token exchange failed with ${response.status}.`);
+  const tokenBody = (await response.json()) as {
+    access_token?: string;
+    expires_in?: number;
+    refresh_token?: string;
+  };
+  if (!tokenBody.access_token) throw new Error("X token exchange did not return an access token.");
+
+  const profileResponse = await fetch("https://api.x.com/2/users/me", {
+    headers: { Authorization: `Bearer ${tokenBody.access_token}` },
+  });
+  if (!profileResponse.ok) throw new Error(`X profile verification failed with ${profileResponse.status}.`);
+  const profileBody = (await profileResponse.json()) as {
+    data?: { id?: string; name?: string; username?: string };
+  };
+  const remoteUserId = profileBody.data?.id;
+  if (!remoteUserId) throw new Error("X did not return the connected user id.");
+  const target = allowlistedTarget(env, "x");
+  if (target && target !== remoteUserId) {
+    throw new Error("The connected X account is not the Greybrainer account in the hard allowlist.");
+  }
+
+  await storeSocialAccountTokens(client, socialAccount.id, {
+    accessTokenEncrypted: await encryptSecret(tokenBody.access_token, env.SOCIAL_TOKEN_ENCRYPTION_KEY),
+    connectedAt: nowIso(),
+    oauthCodeVerifierEncrypted: null,
+    oauthState: null,
+    refreshTokenEncrypted: tokenBody.refresh_token
+      ? await encryptSecret(tokenBody.refresh_token, env.SOCIAL_TOKEN_ENCRYPTION_KEY)
+      : null,
+    remoteAccountId: remoteUserId,
+    remoteUserId,
+    tokenExpiresAt:
+      typeof tokenBody.expires_in === "number"
+        ? new Date(Date.now() + tokenBody.expires_in * 1000).toISOString()
+        : null,
+  });
+  await updateSocialAccount(client, socialAccount.id, {
+    displayName: profileBody.data?.name ?? socialAccount.displayName,
+    handle: profileBody.data?.username ? `@${profileBody.data.username}` : socialAccount.handle,
+  });
   return socialAccount;
 }
 
@@ -217,6 +339,8 @@ export async function handleNativeCallback(client: Client, env: Env, platform: s
 
   if (platform === "linkedin") {
     await handleLinkedInCallback(client, env, code, state);
+  } else if (platform === "x") {
+    await handleXCallback(client, env, code, state);
   } else if (platform === "medium") {
     await handleMediumCallback(client, env, code, state);
   } else {

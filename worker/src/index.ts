@@ -8,6 +8,8 @@ import { backfillMediumUrls } from "./lib/knowledgeBackfill";
 import { listKnowledgeDocuments, listKnowledgeImportJobs } from "./lib/knowledgeRepository";
 import { syncMediumKnowledgeFeed } from "./lib/mediumKnowledge";
 import { handleNativeCallback, publishDraftToSocialAccounts, startNativeConnection } from "./lib/nativeConnectorRuntime";
+import { handleMcpRequest, isMcpAuthorized } from "./lib/mcp";
+import { ensureOmnichannelSchema } from "./lib/omnichannelSchema";
 import { listPostizIntegrations } from "./lib/postizApi";
 import { listPublicLensManifest } from "./lib/publicLensManifest";
 import { publishDraftThroughLane, type PublishLaneInput } from "./lib/publishingLane";
@@ -35,6 +37,7 @@ import {
   upsertPublication,
 } from "./lib/repository";
 import { discoverSocialAccount } from "./lib/socialAccounts";
+import { processDuePublicationJobs } from "./lib/publishers";
 import {
   generateSignalImage,
   type SignalImageFormat,
@@ -42,9 +45,10 @@ import {
 
 function corsHeaders() {
   return {
-    "access-control-allow-headers": "content-type, authorization, x-api-key",
-    "access-control-allow-methods": "GET, POST, PATCH, OPTIONS",
+    "access-control-allow-headers": "content-type, authorization, x-api-key, mcp-session-id, last-event-id, mcp-protocol-version",
+    "access-control-allow-methods": "GET, POST, PATCH, DELETE, OPTIONS",
     "access-control-allow-origin": "*",
+    "access-control-expose-headers": "mcp-session-id, mcp-protocol-version",
     "access-control-max-age": "86400",
   };
 }
@@ -112,15 +116,41 @@ function pathSegments(request: Request) {
   return new URL(request.url).pathname.replace(/^\/+|\/+$/g, "").split("/");
 }
 
+function isPublicOrSeparatelyAuthenticatedRoute(segments: string[], method: string) {
+  if (segments[1] === "public" && method === "GET") return true;
+  if (segments[1] !== "assets") return false;
+  if (segments[2] === "upload" && method === "POST") return true;
+  return method === "GET";
+}
+
+function toPublicSocialAccount(account: Awaited<ReturnType<typeof getSocialAccountById>>) {
+  if (!account) return null;
+  const {
+    accessTokenEncrypted: _accessTokenEncrypted,
+    oauthCodeVerifierEncrypted: _oauthCodeVerifierEncrypted,
+    oauthState: _oauthState,
+    refreshTokenEncrypted: _refreshTokenEncrypted,
+    ...publicAccount
+  } = account;
+  return publicAccount;
+}
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
 
-    if (url.pathname.startsWith("/api/") && request.method === "OPTIONS") {
+    if ((url.pathname.startsWith("/api/") || url.pathname === "/mcp") && request.method === "OPTIONS") {
       return new Response(null, {
         status: 204,
         headers: corsHeaders(),
       });
+    }
+
+    if (url.pathname === "/mcp") {
+      if (!(await isMcpAuthorized(request, env))) {
+        return unauthorized("A valid Greybrainer MCP bearer token is required.");
+      }
+      return handleMcpRequest(request, env);
     }
 
     if (url.pathname === "/preview" || url.pathname === "/preview/" || url.pathname.startsWith("/preview/lens/")) {
@@ -153,6 +183,7 @@ export default {
       const platform = url.pathname.split("/").filter(Boolean).pop() ?? "";
       const client = createDbClient(env);
       try {
+        await ensureOmnichannelSchema(client);
         return await handleNativeCallback(client, env, platform, url);
       } catch (error) {
         const message = error instanceof Error ? error.message : "Unexpected callback error";
@@ -167,9 +198,23 @@ export default {
       return json({ error: "Not found" }, 404);
     }
 
+    const publicOrSeparatelyAuthenticated = isPublicOrSeparatelyAuthenticatedRoute(
+      segments,
+      request.method,
+    );
+    if (!publicOrSeparatelyAuthenticated) {
+      const editorEmail = await getAuthorizedEditorEmail(request, env);
+      if (!editorEmail) {
+        return unauthorized("A permitted Writer Hub account is required.");
+      }
+    }
+
     const client = createDbClient(env);
 
     try {
+      if (!publicOrSeparatelyAuthenticated) {
+        await ensureOmnichannelSchema(client);
+      }
       if (segments[1] === "knowledge") {
         if (segments[2] === "drive" && segments[3] === "folder" && segments[4] === "sync" && request.method === "POST") {
           const body = await parseBody<{ folderUrlOrId?: string; requestedBy?: string | null }>(request);
@@ -521,7 +566,7 @@ export default {
         if (segments.length === 2) {
           if (request.method === "GET") {
             const socialAccounts = await listSocialAccounts(client);
-            return json({ socialAccounts });
+            return json({ socialAccounts: socialAccounts.map(toPublicSocialAccount) });
           }
 
           if (request.method === "POST") {
@@ -531,7 +576,7 @@ export default {
             }
 
             const socialAccount = await createSocialAccount(client, body);
-            return json({ socialAccount }, 201);
+            return json({ socialAccount: toPublicSocialAccount(socialAccount) }, 201);
           }
         }
 
@@ -540,7 +585,9 @@ export default {
 
           if (request.method === "GET") {
             const socialAccount = await getSocialAccountById(client, socialAccountId);
-            return socialAccount ? json({ socialAccount }) : json({ error: "Social account not found" }, 404);
+            return socialAccount
+              ? json({ socialAccount: toPublicSocialAccount(socialAccount) })
+              : json({ error: "Social account not found" }, 404);
           }
 
           if (request.method === "PATCH") {
@@ -550,13 +597,17 @@ export default {
             }
 
             const socialAccount = await updateSocialAccount(client, socialAccountId, body);
-            return socialAccount ? json({ socialAccount }) : json({ error: "Social account not found" }, 404);
+            return socialAccount
+              ? json({ socialAccount: toPublicSocialAccount(socialAccount) })
+              : json({ error: "Social account not found" }, 404);
           }
         }
 
         if (segments.length === 4 && segments[3] === "test" && request.method === "POST") {
           const result = await testSocialAccountConnection(client, segments[2]);
-          return result ? json(result) : json({ error: "Social account not found" }, 404);
+          return result
+            ? json({ ...result, socialAccount: toPublicSocialAccount(result.socialAccount) })
+            : json({ error: "Social account not found" }, 404);
         }
 
         if (segments.length === 4 && segments[3] === "connect" && request.method === "POST") {
@@ -734,13 +785,17 @@ export default {
       client.close();
     }
   },
-  async scheduled(_controller: ScheduledController, env: Env): Promise<void> {
+  async scheduled(controller: ScheduledController, env: Env): Promise<void> {
     const client = createDbClient(env);
     try {
-      await syncMediumKnowledgeFeed(client, env);
-      if (env.DAILY_BRIEF_ENABLED === "true") {
-        await generateDailyBrief(client, env, { requestedBy: "system:daily-brief" });
+      await ensureOmnichannelSchema(client);
+      if (controller.cron === "30 3 * * *") {
+        await syncMediumKnowledgeFeed(client, env);
+        if (env.DAILY_BRIEF_ENABLED === "true") {
+          await generateDailyBrief(client, env, { requestedBy: "system:daily-brief" });
+        }
       }
+      await processDuePublicationJobs(client, env);
     } finally {
       client.close();
     }
